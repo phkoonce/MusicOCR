@@ -11,8 +11,18 @@ pdftoppm = "pdftoppm"
 [omr]
 # Which profile under [omr.profiles.*] to use unless --profile overrides it.
 profile = "default"
-# Hard ceiling on the Audiveris batch run.
+# Per-page ceiling on Audiveris (each page is transcribed in its own process).
+page_timeout_seconds = 900
+# Overall ceiling when Audiveris is run on the whole book in one go (only used
+# when the page count can't be determined).
 timeout_seconds = 1800
+# Transcribe each page in a separate Audiveris process. Strongly recommended: a
+# single un-transcribable page otherwise aborts the whole book with no output.
+per_page = true
+# After per-page OMR, stitch the pages into one <book>.musicxml (music21). Right
+# for a single continuous part; turn off for a mixed song-book to keep pages
+# separate. Pages are always kept individually regardless.
+merge_pages = true
 
 # Audiveris application "constants" (see `Audiveris -help`). Real tuning is
 # iterative: run once, inspect report.md + qa images, then add constants here.

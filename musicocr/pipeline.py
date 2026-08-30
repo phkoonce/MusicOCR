@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from musicocr.config import Config
+from musicocr.state import load_state, save_state
 
 # Canonical order. `correct` sits between OMR and extract so a corrected .omr
 # project feeds the rest of the pipeline unchanged.
@@ -82,8 +83,17 @@ def run_pipeline(
     to_stage: str | None = None,
     keep_going: bool = False,
 ) -> list[StageResult]:
+    slc = resolve_slice(from_stage, to_stage)
+    # Re-entering mid-pipeline: reload artifacts saved by earlier stages.
+    if slc and slc[0] != STAGE_ORDER[0] and ctx.workdir.exists():
+        prior = load_state(ctx.workdir)
+        for k, v in prior.items():
+            ctx.artifacts.setdefault(k, v)
+        if prior:
+            ctx.log(f"  (restored {len(prior)} artifact(s) from a previous run)")
+
     results: list[StageResult] = []
-    for name in resolve_slice(from_stage, to_stage):
+    for name in slc:
         run = _load_stage(name)
         ctx.log(f"[{name}] starting")
         t0 = time.monotonic()
@@ -96,6 +106,8 @@ def run_pipeline(
         result.duration_s = time.monotonic() - t0
         results.append(result)
         ctx.log(f"[{name}] {result.status} ({result.duration_s:.1f}s) {result.detail}".rstrip())
+        if result.ok and ctx.workdir.exists():
+            save_state(ctx.workdir, ctx.artifacts)
         if not result.ok and not keep_going:
             break
     return results

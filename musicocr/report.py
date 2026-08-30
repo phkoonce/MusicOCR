@@ -23,6 +23,7 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
     outputs = {k: str(v) for k, v in a.get("outputs", {}).items()}
     if a.get("musicxml"):
         outputs["musicxml"] = str(a["musicxml"])
+    page_files = [str(p) for p in a.get("musicxml_pages", [])]
     return {
         "book": ctx.book_name,
         "input_pdf": str(ctx.input_pdf),
@@ -37,7 +38,10 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
             for r in results
         ],
         "outputs": outputs,
+        "page_files": page_files,
         "omr_project": str(a.get("omr_project") or ""),
+        "omr_log": str(a.get("omr_log") or ""),
+        "omr_failed_pages": a.get("omr_failed_pages", []),
         "validation": val,
         "qa_pages": a.get("qa_pages", {}),
     }
@@ -48,14 +52,28 @@ def _md(report: dict, base: Path) -> str:
     L.append(f"# MusicOCR report — {report['book']}")
     L.append("")
     L.append(f"- **Input:** `{report['input_pdf']}`")
-    L.append(f"- **Pages:** {report.get('page_count', '?')}")
+    L.append(f"- **Pages:** {report.get('page_count') or '—'}")
     L.append(f"- **Generated:** {report['generated']}")
     L.append(f"- **OMR profile:** `{report['profile']}`"
              + (f" + constants `{report['constants']}`" if report["constants"] else ""))
     if report.get("omr_project"):
         L.append(f"- **Audiveris project (for GUI correction):** "
                  f"`{_rel(report['omr_project'], base)}`")
+    if report.get("omr_log"):
+        L.append(f"- **Audiveris log:** `{_rel(report['omr_log'], base)}`")
     L.append("")
+
+    failed = report.get("omr_failed_pages") or []
+    if failed:
+        total = report.get("page_count")
+        L.append(f"> ⚠️ **Partial transcription.** Audiveris failed on "
+                 f"{len(failed)} page(s): {failed}"
+                 + (f" of {total}" if total else "")
+                 + ". Those pages are missing from the score below. Re-run just "
+                 "them after tuning, e.g. "
+                 f"`--pages {','.join(map(str, failed))} --profile <name> --force`, "
+                 "or correct them in the Audiveris GUI.")
+        L.append("")
 
     L.append("## Stages")
     L.append("")
@@ -72,6 +90,12 @@ def _md(report: dict, base: Path) -> str:
             L.append(f"- **{k}:** `{_rel(v, base)}`")
     else:
         L.append("_none produced_")
+    pf = report.get("page_files") or []
+    if len(pf) > 1:
+        L.append(f"- **per-page MusicXML:** {len(pf)} files, "
+                 f"`{_rel(pf[0], base)}` … `{_rel(pf[-1], base)}` "
+                 "(more reliable than the merged score when pages disagree on "
+                 "clef/key or some pages failed)")
     L.append("")
 
     val = report.get("validation") or {}

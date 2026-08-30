@@ -35,18 +35,34 @@ Everything lands in `output/<book>/`:
 
 | File | What it is |
 |---|---|
-| `<book>.musicxml` | interchange master (validated, diffable) |
+| `<book>.musicxml` | interchange master — pages stitched into one score |
+| `<book>.pNNN.musicxml` | per-page MusicXML (kept even when merged) |
 | `<book>.mscz` | open/edit in MuseScore |
 | `<book>.mid` | quick aural check |
 | `render.pdf` | MuseScore's rendering of the OMR result |
 | `qa/src-*.png`, `qa/omr-*.png` | source scan vs render, page by page |
 | `report.md` / `report.json` | stage log + validation findings + QA images |
-| `<book>.omr` | Audiveris project file (needed for GUI correction) |
+| `pages/pNNN/*.log` | per-page Audiveris logs |
+| `<book>.omr` | Audiveris project file — only when GUI correction is enabled (see below) |
 | `source.pdf` | copy of the input |
 
 Read `report.md` first. Findings are ranked 🔴 error / 🟡 warn / 🔵 info, with
 part + measure numbers. Cross-check flagged measures against the `qa/` image
 pairs, then fix in MuseScore.
+
+### Partial transcription
+
+Real scans have pages Audiveris chokes on. When that happens the run **keeps
+going** — the bad pages are simply missing from the output, and `report.md` opens
+with a ⚠️ listing them. Re-run just those pages after tuning:
+
+```
+python -m musicocr run INPUT.pdf --pages 12,15 --profile <name> --force
+```
+
+(The pipeline does not skip `-save` fragility for free: enabling GUI correction
+re-adds Audiveris's `-save`, which is what makes one bad sheet able to abort a
+whole multi-page book. Automated runs leave it off.)
 
 ### Options
 

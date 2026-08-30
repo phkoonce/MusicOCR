@@ -29,6 +29,9 @@ class Config:
     pdftoppm: str
     omr_profile: str
     omr_timeout: int
+    omr_page_timeout: int
+    omr_per_page: bool
+    omr_merge_pages: bool
     profiles: dict[str, list[str]]
     correct_enabled: bool
     formats: list[str]
@@ -84,6 +87,9 @@ def load_config(path: str | Path | None = None) -> Config:
         pdftoppm=tools.get("pdftoppm", "pdftoppm"),
         omr_profile=omr.get("profile", "default"),
         omr_timeout=int(omr.get("timeout_seconds", 1800)),
+        omr_page_timeout=int(omr.get("page_timeout_seconds", 900)),
+        omr_per_page=bool(omr.get("per_page", True)),
+        omr_merge_pages=bool(omr.get("merge_pages", True)),
         profiles=profiles,
         correct_enabled=bool(
             data.get("stages", {}).get("correct", {}).get("enabled", False)
