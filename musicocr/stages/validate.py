@@ -83,7 +83,13 @@ def run(ctx: PipelineContext) -> StageResult:
             f"music21 not importable ({exc}). Activate the venv / run scripts/setup.sh."
         ) from exc
 
-    score = converter.parse(str(xml))
+    try:
+        score = converter.parse(str(xml))
+    except Exception as exc:  # noqa: BLE001
+        raise StageError(
+            f"music21 could not parse {xml.name} ({type(exc).__name__}: {exc}). "
+            "The OMR output is likely malformed; inspect the per-page files."
+        ) from exc
     parts = list(score.getElementsByClass(stream.Part)) or [score]
 
     findings: list[dict] = []

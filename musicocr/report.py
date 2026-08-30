@@ -42,6 +42,7 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
         "omr_project": str(a.get("omr_project") or ""),
         "omr_log": str(a.get("omr_log") or ""),
         "omr_failed_pages": a.get("omr_failed_pages", []),
+        "merge_skipped": [Path(p).name for p in a.get("merge_skipped", [])],
         "validation": val,
         "qa_pages": a.get("qa_pages", {}),
     }
@@ -73,6 +74,13 @@ def _md(report: dict, base: Path) -> str:
                  "them after tuning, e.g. "
                  f"`--pages {','.join(map(str, failed))} --profile <name> --force`, "
                  "or correct them in the Audiveris GUI.")
+        L.append("")
+
+    skipped = report.get("merge_skipped") or []
+    if skipped:
+        L.append(f"> ⚠️ **{len(skipped)} page file(s) too malformed for music21 to "
+                 f"read** and left out of the merged score: {skipped}. Their "
+                 "content is still in the matching per-page `.musicxml`.")
         L.append("")
 
     L.append("## Stages")

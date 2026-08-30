@@ -23,3 +23,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Experiment sweeps (scripts/experiment.py)
+/experiments/

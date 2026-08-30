@@ -14,9 +14,12 @@ _PATH_KEYS = {"source_pdf", "omr_log", "omr_project", "musicxml", "render_pdf"}
 _PATH_LIST_KEYS = {"mxl_files", "musicxml_pages"}
 _PATH_DICT_KEYS = {"outputs"}            # {str: path}
 _PAGE_MAP_KEYS = {"mxl_by_page"}         # {int: [path, ...]}
-_PLAIN_KEYS = {"page_count", "omr_failed_pages", "validation", "qa_pages"}
+_INT_PATH_MAP_KEYS = {"prepped_pages"}   # {int: path}
+_PLAIN_KEYS = {"page_count", "omr_failed_pages", "validation", "qa_pages",
+               "merge_skipped"}
 
-_ALL = _PATH_KEYS | _PATH_LIST_KEYS | _PATH_DICT_KEYS | _PAGE_MAP_KEYS | _PLAIN_KEYS
+_ALL = (_PATH_KEYS | _PATH_LIST_KEYS | _PATH_DICT_KEYS | _PAGE_MAP_KEYS
+        | _INT_PATH_MAP_KEYS | _PLAIN_KEYS)
 
 
 def save_state(workdir: Path, artifacts: dict) -> None:
@@ -33,6 +36,8 @@ def save_state(workdir: Path, artifacts: dict) -> None:
             out[k] = {kk: str(vv) for kk, vv in v.items()}
         elif k in _PAGE_MAP_KEYS:
             out[k] = {str(pg): [str(p) for p in paths] for pg, paths in v.items()}
+        elif k in _INT_PATH_MAP_KEYS:
+            out[k] = {str(pg): str(p) for pg, p in v.items()}
         else:
             out[k] = v
     try:
@@ -59,6 +64,8 @@ def load_state(workdir: Path) -> dict:
             art[k] = {kk: Path(vv) for kk, vv in v.items()}
         elif k in _PAGE_MAP_KEYS:
             art[k] = {int(pg): [Path(p) for p in paths] for pg, paths in v.items()}
+        elif k in _INT_PATH_MAP_KEYS:
+            art[k] = {int(pg): Path(p) for pg, p in v.items()}
         else:
             art[k] = v
     return art

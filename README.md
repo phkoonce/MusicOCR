@@ -80,33 +80,54 @@ Stages, in order: `ingest → omr → correct → extract → validate → conve
 Re-running `--from extract` after editing the `.mxl`/`.omr` is the normal way to
 iterate without paying for another full OMR pass.
 
+## Poor scans
+
+If `report.md` shows most of the page missing or garbled, check the scan
+resolution:
+
+```bash
+pdfimages -list -f 1 -l 1 "input/your.pdf"
+```
+
+`x-ppi` under ~150 means Audiveris doesn't have enough detail. Two levers:
+
+1. **Rescan higher** (250–400 DPI) — beats any amount of tuning.
+2. **Pre-process** — turn on `[preprocess]` in `config.toml`. It rasterises each
+   page at 300 DPI and runs autocontrast + an unsharp-mask pass before OMR. On
+   the test scan this recovered ~8x more music. Tune the parameters with:
+
+   ```bash
+   python scripts/experiment.py "input/your.pdf" --page 1
+   ```
+
+   which sweeps binarisation constants and pre-processing options on one page
+   and writes `output/<book>/experiments/pNN/summary.md` with a render of each.
+
 ## Tuning Audiveris
 
-Audiveris behaviour is controlled by "constants". The workflow:
-
-1. Run once, read `report.md`, look at the `qa/` images.
-2. Add constants to a profile in `config.toml` (`[omr.profiles.*]`) or pass
-   `--constant` ad hoc.
-3. Re-run with `--force`.
-
-List available constants with `/Applications/Audiveris.app/Contents/MacOS/Audiveris -help`
-and the Audiveris docs. Common ones: input resolution hints, binarization
-filter, whether to keep/merge movements.
+Audiveris behaviour is controlled by "constants" and "switches". From the
+pipeline: add `--constant key=value` (repeatable), or put constants in an
+`[omr.profiles.*]` preset and pass `--profile`. Filter constants
+(`org.audiveris.omr.image.FilterDescriptor.defaultKind`,
+`...GlobalDescriptor.defaultThreshold`,
+`...AdaptiveDescriptor.defaultMeanCoeff`) work from the CLI; several *switch*
+constants are silently ignored there — set those in the GUI instead.
 
 ## Manual correction via the Audiveris GUI (optional, off by default)
 
-v1 does not touch the GUI. When you want to try it:
+Full walkthrough: **[docs/audiveris-gui.md](docs/audiveris-gui.md)**.
 
-1. Set `[stages.correct] enabled = true` in `config.toml`.
-2. `python -m musicocr run <pdf>` now stops after OMR (status `paused`) and
-   prints instructions.
-3. `open -a Audiveris`, open `output/<book>/<book>.omr`, fix errors, then
-   **Book → Export**.
-4. `python -m musicocr run <pdf> --from extract` to finish the pipeline on the
-   corrected export.
+Short version:
 
-`musicocr/stages/correct.py` is where this lives; it is structured so it can
-later drive the GUI round-trip automatically instead of just pausing.
+1. Set `[stages.correct] enabled = true` in `config.toml` (this also makes the
+   OMR stage save a `.omr` project per page).
+2. `python -m musicocr run <pdf>` stops after OMR (status `paused`) and lists the
+   projects to open.
+3. `open -a Audiveris`; **File ▸ Open books…**; tune **Book ▸ Set book
+   parameters…**, **Sheet ▸ Transcribe sheet**, fix symbols, **Book ▸ Export
+   book**.
+4. `python -m musicocr run <pdf> --from extract` to finish on the corrected
+   export.
 
 ## No-scan smoke test
 

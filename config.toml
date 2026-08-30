@@ -37,6 +37,19 @@ constants = []
 # Placeholder preset for crisp born-digital PDFs.
 constants = []
 
+[preprocess]
+# Rasterise each PDF page and clean it up before OMR. Off by default; turn on
+# for low-resolution / grey scans (check `pdfimages -list your.pdf` — under
+# ~150 ppi means turn this on). Tune with scripts/experiment.py.
+enabled = false
+dpi = 300
+autocontrast = true
+autocontrast_cutoff = 1
+unsharp = true
+unsharp_radius = 2.0
+unsharp_percent = 150
+median = 0            # 0 = off; 3 = light denoise before sharpening
+
 [stages.correct]
 # When true, the pipeline stops after OMR so you can open the saved .omr project
 # in the Audiveris GUI, correct it, and re-run from `extract`. Off for v1.

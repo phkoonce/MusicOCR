@@ -25,6 +25,8 @@ def cmd_run(args) -> int:
 
     if args.profile:
         config.omr_profile = args.profile
+    if args.preprocess is not None:
+        config.preprocess = {**config.preprocess, "enabled": args.preprocess}
     try:
         config.constants_for_profile()
     except ConfigError as exc:
@@ -129,6 +131,10 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--constant", action="append", metavar="k=v",
                    help="extra Audiveris constant (repeatable)")
     r.add_argument("--force", action="store_true", help="re-run Audiveris even if output exists")
+    r.add_argument("--preprocess", dest="preprocess", action="store_true", default=None,
+                   help="force scan clean-up on (overrides config [preprocess])")
+    r.add_argument("--no-preprocess", dest="preprocess", action="store_false",
+                   help="force scan clean-up off")
     r.add_argument("--from", dest="from_stage", choices=STAGE_ORDER, help="start stage")
     r.add_argument("--to", dest="to_stage", choices=STAGE_ORDER, help="end stage (inclusive)")
     r.add_argument("--keep-going", action="store_true",

@@ -1,10 +1,11 @@
-"""Stage 1: validate the input PDF and prepare the work directory."""
+"""Stage 1: validate the input PDF, prepare the work dir, optionally clean up scans."""
 from __future__ import annotations
 
 import re
 import shutil
 
 from musicocr.pipeline import PipelineContext, StageError, StageResult
+from musicocr.preprocess import PreprocessOpts, prepare_page
 from musicocr.util import run_cmd
 
 
@@ -34,4 +35,35 @@ def run(ctx: PipelineContext) -> StageResult:
     ctx.artifacts["page_count"] = pages
 
     detail = f"{ctx.book_name}, {pages if pages is not None else '?'} page(s)"
+
+    opts = PreprocessOpts.from_dict(ctx.config.preprocess)
+    if opts.enabled:
+        detail += _preprocess(ctx, opts, pages)
+
     return StageResult("ingest", "ok", detail, data={"page_count": pages})
+
+
+def _preprocess(ctx: PipelineContext, opts: PreprocessOpts, pages: int | None) -> str:
+    pdftoppm = ctx.config.resolve_tool("pdftoppm")
+    if not pdftoppm:
+        ctx.log("  preprocess: pdftoppm not found, skipping")
+        return "  [preprocess skipped: no pdftoppm]"
+    if not pages:
+        ctx.log("  preprocess: page count unknown, skipping")
+        return "  [preprocess skipped: page count unknown]"
+
+    prepped: dict[int, str] = {}
+    for p in range(1, pages + 1):
+        dst = ctx.workdir / "prepped" / f"p{p:03d}.png"
+        if dst.exists() and not ctx.force:
+            prepped[p] = str(dst)
+            continue
+        out = prepare_page(ctx.artifacts["source_pdf"], p, dst, opts, pdftoppm, ctx.log)
+        if out:
+            prepped[p] = str(out)
+        else:
+            ctx.log(f"  preprocess: page {p} rasterise failed")
+    ctx.artifacts["prepped_pages"] = {int(k): v for k, v in prepped.items()}
+    ctx.log(f"  preprocess: {len(prepped)} page(s) at {opts.dpi} DPI "
+            f"(autocontrast={opts.autocontrast}, unsharp={opts.unsharp})")
+    return f"  [preprocessed {len(prepped)} pages @ {opts.dpi}dpi]"

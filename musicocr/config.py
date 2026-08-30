@@ -34,6 +34,7 @@ class Config:
     omr_merge_pages: bool
     profiles: dict[str, list[str]]
     correct_enabled: bool
+    preprocess: dict
     formats: list[str]
     qa_dpi: int
     path: Path
@@ -94,6 +95,7 @@ def load_config(path: str | Path | None = None) -> Config:
         correct_enabled=bool(
             data.get("stages", {}).get("correct", {}).get("enabled", False)
         ),
+        preprocess=dict(data.get("preprocess", {})),
         formats=formats,
         qa_dpi=int(output.get("qa_dpi", 150)),
         path=cfg_path,
