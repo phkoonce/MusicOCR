@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Pipeline inputs & outputs — never committed
+/input/*
+!/input/.gitkeep
+/output/*
+!/output/.gitkeep
+/samples/*
+!/samples/.gitkeep
+
+# Stray OMR / score artifacts if run outside the managed dirs
+*.omr
+*.mxl
+*.mscz
+*.mid
+
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
