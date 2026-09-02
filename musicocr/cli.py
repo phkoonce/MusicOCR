@@ -25,8 +25,20 @@ def cmd_run(args) -> int:
 
     if args.profile:
         config.omr_profile = args.profile
+    if args.merge is not None:
+        config.omr_merge_pages = args.merge
+
+    pp = dict(config.preprocess)
     if args.preprocess is not None:
-        config.preprocess = {**config.preprocess, "enabled": args.preprocess}
+        pp["enabled"] = args.preprocess
+    if args.deskew is not None:
+        pp["deskew"] = args.deskew
+    if args.crop is not None:
+        pp["crop_margins"] = args.crop
+    if (args.deskew or args.crop) and args.preprocess is None and not pp.get("enabled"):
+        pp["enabled"] = True
+        print("note: --deskew/--crop turn on the [preprocess] pass")
+    config.preprocess = pp
     try:
         config.constants_for_profile()
     except ConfigError as exc:
@@ -131,10 +143,22 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--constant", action="append", metavar="k=v",
                    help="extra Audiveris constant (repeatable)")
     r.add_argument("--force", action="store_true", help="re-run Audiveris even if output exists")
+    r.add_argument("--merge", dest="merge", action="store_true", default=None,
+                   help="stitch pages into one score (overrides config [omr] merge_pages)")
+    r.add_argument("--no-merge", dest="merge", action="store_false",
+                   help="keep pages separate — for a book of independent parts or songs")
     r.add_argument("--preprocess", dest="preprocess", action="store_true", default=None,
                    help="force scan clean-up on (overrides config [preprocess])")
     r.add_argument("--no-preprocess", dest="preprocess", action="store_false",
                    help="force scan clean-up off")
+    r.add_argument("--deskew", dest="deskew", action="store_true", default=None,
+                   help="preprocess: rotate each page so the staves are level (camera scans)")
+    r.add_argument("--no-deskew", dest="deskew", action="store_false",
+                   help="preprocess: skip the deskew pass")
+    r.add_argument("--crop", dest="crop", action="store_true", default=None,
+                   help="preprocess: trim the header/footer text band down to the staves")
+    r.add_argument("--no-crop", dest="crop", action="store_false",
+                   help="preprocess: skip the margin crop")
     r.add_argument("--from", dest="from_stage", choices=STAGE_ORDER, help="start stage")
     r.add_argument("--to", dest="to_stage", choices=STAGE_ORDER, help="end stage (inclusive)")
     r.add_argument("--keep-going", action="store_true",

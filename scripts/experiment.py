@@ -54,6 +54,10 @@ class Experiment:
     unsharp_percent: int = 150
     median: int | None = None         # median-filter window (denoise) before sharpen
     prebinarize: int | None = None    # hard threshold to 1-bit at this grey level
+    deskew: bool = False              # projection-profile rotation to level staves
+    max_skew: float = 5.0
+    crop_margins: bool = False        # trim header/footer text to the staff band
+    crop_pad_frac: float = 0.035
     note: str = ""
 
 
@@ -104,6 +108,14 @@ EXPERIMENTS = [
     # -- upscale the tiny embedded image instead of rasterising the PDF page --
     Experiment("upscale-3x", upscale=3.0, autocontrast=True, unsharp=True,
                note="3x LANCZOS upscale of the page + sharpen"),
+
+    # -- camera-scan geometry: level the staves, drop the header/footer text --
+    Experiment("sharp-deskew", raster_dpi=300, autocontrast=True, unsharp=True,
+               deskew=True, note="sharpen + projection-profile deskew"),
+    Experiment("sharp-crop", raster_dpi=300, autocontrast=True, unsharp=True,
+               crop_margins=True, note="sharpen + trim header/footer to staff band"),
+    Experiment("sharp-deskew-crop", raster_dpi=300, autocontrast=True, unsharp=True,
+               deskew=True, crop_margins=True, note="sharpen + deskew + crop"),
 ]
 
 
@@ -120,9 +132,11 @@ SYSTEMS_RE = re.compile(r"Page #\d+: (\d+) part.* along (\d+) system")
 def _prep_image(cfg: Experiment, pdf: Path, page: int, tools, workdir: Path) -> Path | None:
     """Return a path to a pre-processed PNG, or None to use the PDF directly."""
     if not (cfg.raster_dpi or cfg.upscale or cfg.autocontrast or cfg.unsharp
-            or cfg.prebinarize):
+            or cfg.prebinarize or cfg.deskew or cfg.crop_margins):
         return None
     from PIL import Image, ImageOps, ImageFilter
+
+    from musicocr.preprocess import _estimate_skew, _staff_band
 
     dpi = cfg.raster_dpi or 300
     stem = workdir / "input"
@@ -141,6 +155,16 @@ def _prep_image(cfg: Experiment, pdf: Path, page: int, tools, workdir: Path) -> 
         im = im.filter(ImageFilter.MedianFilter(size=cfg.median))
     if cfg.autocontrast:
         im = ImageOps.autocontrast(im, cutoff=cfg.autocontrast_cutoff)
+    if cfg.deskew:
+        angle = _estimate_skew(im, cfg.max_skew)
+        if abs(angle) >= 0.2:
+            im = im.rotate(angle, resample=Image.BICUBIC, expand=False, fillcolor=255)
+            print(f"    deskew {angle:+.2f}°")
+    if cfg.crop_margins:
+        band = _staff_band(im, cfg.crop_pad_frac)
+        if band:
+            im = im.crop((0, band[0], im.width, band[1]))
+            print(f"    cropped to rows {band[0]}–{band[1]}")
     if cfg.unsharp:
         im = im.filter(ImageFilter.UnsharpMask(
             radius=cfg.unsharp_radius, percent=cfg.unsharp_percent, threshold=2))

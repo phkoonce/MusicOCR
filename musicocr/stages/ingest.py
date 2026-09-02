@@ -64,6 +64,14 @@ def _preprocess(ctx: PipelineContext, opts: PreprocessOpts, pages: int | None) -
         else:
             ctx.log(f"  preprocess: page {p} rasterise failed")
     ctx.artifacts["prepped_pages"] = {int(k): v for k, v in prepped.items()}
-    ctx.log(f"  preprocess: {len(prepped)} page(s) at {opts.dpi} DPI "
-            f"(autocontrast={opts.autocontrast}, unsharp={opts.unsharp})")
-    return f"  [preprocessed {len(prepped)} pages @ {opts.dpi}dpi]"
+    passes = ["autocontrast"] if opts.autocontrast else []
+    if opts.deskew:
+        passes.append("deskew")
+    if opts.crop_margins:
+        passes.append("crop")
+    if opts.unsharp:
+        passes.append("unsharp")
+    summary = f"{len(prepped)} page(s) @ {opts.dpi} DPI ({', '.join(passes) or 'raster only'})"
+    ctx.artifacts["preprocess_summary"] = summary
+    ctx.log(f"  preprocess: {summary}")
+    return f"  [preprocess: {summary}]"

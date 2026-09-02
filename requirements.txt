@@ -2,3 +2,7 @@
 music21>=8,<9
 # Python 3.9 has no stdlib tomllib.
 tomli>=2 ; python_version < "3.11"
+# Scan pre-processing (musicocr/preprocess.py): rasterise, deskew, crop, sharpen.
+# Both are already pulled in by music21, but preprocess.py imports them directly.
+Pillow>=9
+numpy>=1.23
