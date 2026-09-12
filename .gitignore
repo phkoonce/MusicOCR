@@ -26,3 +26,9 @@ __pycache__/
 
 # Experiment sweeps (scripts/experiment.py)
 /experiments/
+
+# omr-eval: derived scan pages / OMR output — same "never committed" policy as
+# /input, /output (copyrighted source material), keep only setup.sh + README.md
+/omr-eval/pages/
+/omr-eval/*/*.musicxml
+/omr-eval/*/*.png
