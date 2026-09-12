@@ -32,6 +32,8 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
         "page_count": a.get("page_count"),
         "profile": ctx.config.omr_profile,
         "constants": ctx.constants(),
+        "preprocess": a.get("preprocess_summary", ""),
+        "merge_pages": ctx.config.omr_merge_pages,
         "stages": [
             {"name": r.name, "status": r.status, "detail": r.detail,
              "duration_s": round(r.duration_s, 2)}
@@ -57,6 +59,10 @@ def _md(report: dict, base: Path) -> str:
     L.append(f"- **Generated:** {report['generated']}")
     L.append(f"- **OMR profile:** `{report['profile']}`"
              + (f" + constants `{report['constants']}`" if report["constants"] else ""))
+    if report.get("preprocess"):
+        L.append(f"- **Scan pre-processing:** {report['preprocess']}")
+    if report.get("merge_pages") is False:
+        L.append("- **Page merge:** off — per-page `.musicxml` kept separate")
     if report.get("omr_project"):
         L.append(f"- **Audiveris project (for GUI correction):** "
                  f"`{_rel(report['omr_project'], base)}`")

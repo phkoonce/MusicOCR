@@ -72,9 +72,16 @@ python -m musicocr run INPUT.pdf \
   --profile clean-typeset # constants preset from config.toml
   --constant k=v          # extra Audiveris constant, repeatable
   --force                 # re-run Audiveris even if output exists
+  --no-merge              # keep pages separate (book of independent parts/songs)
+  --preprocess / --no-preprocess   # force scan clean-up on/off (see below)
+  --deskew --crop         # extra clean-up passes for camera scans (see below)
   --from validate         # re-run from a stage (reuses earlier artifacts)
   --to omr                # stop after a stage
 ```
+
+`--pages` + `--no-merge` is the combination for a PDF that's really several
+independent parts glued together (e.g. a full part set). Run each part's page
+range on its own; merging different instruments into one score is meaningless.
 
 Stages, in order: `ingest → omr → correct → extract → validate → convert → qa`.
 Re-running `--from extract` after editing the `.mxl`/`.omr` is the normal way to
@@ -92,16 +99,31 @@ pdfimages -list -f 1 -l 1 "input/your.pdf"
 `x-ppi` under ~150 means Audiveris doesn't have enough detail. Two levers:
 
 1. **Rescan higher** (250–400 DPI) — beats any amount of tuning.
-2. **Pre-process** — turn on `[preprocess]` in `config.toml`. It rasterises each
-   page at 300 DPI and runs autocontrast + an unsharp-mask pass before OMR. On
-   the test scan this recovered ~8x more music. Tune the parameters with:
+2. **Pre-process** — turn on `[preprocess]` in `config.toml` (or pass
+   `--preprocess`). It rasterises each page at 300 DPI and runs autocontrast +
+   an unsharp-mask pass before OMR. On the test scan this recovered ~8x more
+   music and was the difference between Audiveris reading the clef and not.
+
+   **Camera / phone scans** (Adobe Scan, photos) also need geometry fixes —
+   turn on `deskew` and `crop_margins` in `[preprocess]`, or pass
+   `--deskew --crop`:
+
+   - **deskew** rotates each page so the staves are level. Audiveris only
+     tolerates a degree or so of skew; a hand-held scan is usually more.
+   - **crop_margins** trims the stray text lines above and below the music —
+     the running-header line (`… - 3rd Trombone` + page number) and the footer
+     (copyright, URL, logos) — that OMR otherwise turns into junk text symbols.
+     It's conservative: it leaves a first page's centred title block in place
+     (delete that frame once in MuseScore) rather than risk clipping a system.
+
+   Tune all of it with:
 
    ```bash
    python scripts/experiment.py "input/your.pdf" --page 1
    ```
 
    which sweeps binarisation constants and pre-processing options on one page
-   and writes `output/<book>/experiments/pNN/summary.md` with a render of each.
+   and writes `experiments/<book>/pNN/summary.md` with a render of each.
 
 ## Tuning Audiveris
 

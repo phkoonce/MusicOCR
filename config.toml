@@ -38,17 +38,28 @@ constants = []
 constants = []
 
 [preprocess]
-# Rasterise each PDF page and clean it up before OMR. Off by default; turn on
-# for low-resolution / grey scans (check `pdfimages -list your.pdf` — under
-# ~150 ppi means turn this on). Tune with scripts/experiment.py.
-enabled = false
-dpi = 300
+# Rasterise each PDF page and clean it up before OMR. Meant for low-resolution /
+# grey / camera scans (check `pdfimages -list your.pdf` — under ~200 ppi means
+# leave this on). Pass --no-preprocess for a crisp born-digital PDF, where
+# rasterising only adds noise. Tune with scripts/experiment.py.
+enabled = true
+dpi = 350
 autocontrast = true
 autocontrast_cutoff = 1
 unsharp = true
 unsharp_radius = 2.0
 unsharp_percent = 150
 median = 0            # 0 = off; 3 = light denoise before sharpening
+# Camera / phone scans: rotate each page so the staves are level (Audiveris only
+# tolerates a degree or so of skew), and trim the stray header/footer text lines
+# (running "… - 3rd Trombone" line, page number, copyright, logos) that OMR turns
+# into junk text symbols. Both skip themselves when there's nothing to fix, and
+# the crop is conservative — it won't touch a first page's centred title block.
+# Toggle per-run with --deskew/--crop and --no-deskew/--no-crop.
+deskew = true
+max_skew = 5.0        # only correct rotation within +/- this many degrees
+crop_margins = true
+crop_pad_frac = 0.035  # whitespace to leave above/below the outer staves
 
 [stages.correct]
 # When true, the pipeline stops after OMR so you can open the saved .omr project
