@@ -53,6 +53,146 @@ interpreter explicitly: `omr-eval/homr/.venv/bin/python
 omr-eval/homr/.venv/bin/homr <page.png>`. Re-running `setup.sh` fixes it
 properly.
 
+## Findings so far (2026-09-13): full piece, all 8 horn parts
+
+Ran homr on the whole `Bach_Preludio e Fuga - 8 Horns - Parts.pdf` (16 pages,
+2 per horn — p001/p002 = horn1, p003/p004 = horn2, ... p015/p016 = horn8),
+not just horn1 as before. Fed it the same preprocessed page PNGs the pipeline
+already produced for each horn's Audiveris run
+(`output/bach-horn-parts/hornN/prepped/pNNN.png`) — confirmed byte-identical
+across horns since preprocessing runs on the same source PDF regardless of
+which horn's ingest triggered it.
+
+| Page | Measures | Notes | Rests |
+|---|---|---|---|
+| horn1 p001 | 39 | 126 | 32 |
+| horn1 p002 | 36 | 119 | 24 |
+| horn2 p003 | 39 | 144 | 26 |
+| horn2 p004 | 40 | 167 | 18 |
+| horn3 p005 | 38 | 130 | 25 |
+| horn3 p006 | 41 | 119 | 31 |
+| horn4 p007 | 43 | 136 | 24 |
+| horn4 p008 | 40 | 125 | 19 |
+| horn5 p009 | 35 | 125 | 23 |
+| horn5 p010 | 27 | 90 | 18 |
+| horn6 p011 | 25 | 59 | 22 |
+| horn6 p012 | 39 | 122 | 17 |
+| horn7 p013 | 34 | 113 | 25 |
+| horn7 p014 | 27 | 87 | 13 |
+| horn8 p015 | 24 | 59 | 19 |
+| horn8 p016 | 38 | 135 | 13 |
+
+All 14 new pages (horn1 was already done) ran and parsed as one coherent
+document each, same as horn1 — no fragmentation across the whole piece.
+
+**`fix_multirest_xml.py`** (the generator-bug fix from 2026-09-12) fixed 11
+measures across 6 pages (horn2 p003 ×2, horn3 p005 ×1, horn4 p007 ×2, horn5
+p009 ×3, horn6 p011 ×1, horn7 p013 ×2). Two pages hit a case the script can't
+handle: `horn3_p006` measure 17 and `horn8_p016` measures 12 and 17 are
+tagged `<multiple-rest>` but occur before the script has seen any
+divisions/time-signature in that file, so it can't compute a duration and
+skips them (logged as a WARNING, not silently dropped) — worth a manual check
+against the scan on those three measures specifically.
+
+**`check_multirest.py`** grand-total-duration cross-check across all 8 parts
+came back with no agreement at all — every part but horn1 disagrees with the
+(arbitrary) majority:
+
+| Part | Total (quarter notes) |
+|---|---|
+| horn1 | 318 |
+| horn2 | 350.25 |
+| horn3 | 331 |
+| horn4 | 354 |
+| horn5 | 277.5 |
+| horn6 | 297 |
+| horn7 | 287 |
+| horn8 | 299 |
+
+It also flagged 19 plain whole-measure rests across 10 pages as "not tagged
+as a multi-rest — could be a dropped multi-rest," i.e. candidates for the
+2026-09-12 "model silently dropped the multi-rest tag" failure mode, spread
+across the whole piece rather than isolated to horn1.
+
+**`check_measure_duration.py`** found internal measure-duration mismatches
+(measure content doesn't sum to the time signature) on 12 of the 16 pages —
+only horn1 p002, horn3 p006, horn5 p010, horn7 p014, and horn8 p016 came back
+clean. The dominant pattern is the same one already documented for horn1:
+`6.0 beats, expected 4.0` (one note read a step too long right before a fast
+run that should have summed to 4.0 on its own), repeated dozens of times
+across parts.
+
+**Conclusion:** the structural strengths seen on horn1 (coherent per-page
+parsing, no system-break fragmentation, measure counts in the right
+ballpark vs. Audiveris) hold up across the whole piece. But the rhythm risks
+also hold up at full scale, not just on horn1 — no two of the 8 parts agree
+on total duration even after the known generator-bug fix, and 3 in 4 pages
+have at least one internal measure-duration mismatch. Per the 2026-09-12
+root-cause finding, this isn't fixable by preprocessing or the post-processing
+script; it's the model's rhythm classification. Treat this full run the same
+way as the single-part finding: a structurally-solid draft that still needs a
+hand-QA pass per part before trusting the rhythm, not a replacement for
+Audiveris + correction on its own.
+
+### Per-part concatenation and measure-length normalization (2026-09-13)
+
+Two more post-processing scripts, meant to run in this order after
+`fix_multirest_xml.py`, to get homr's output into better shape for
+hand-correction in MuseScore:
+
+```bash
+# 1. One MusicXML per part instead of one per page. Reuses the same
+#    measure-append logic the main pipeline already uses to stitch
+#    Audiveris's per-page output (musicocr.stages.extract._concat): the
+#    first page's score (identification, part-list, attributes) is kept,
+#    each subsequent page's measures are appended and renumbered 1..N. Only
+#    the first page's non-measure data survives -- that's the deduplication.
+.venv/bin/python omr-eval/concat_pages.py \
+    horn1=omr-eval/pages/bach_horn1_p001.musicxml,omr-eval/pages/bach_horn1_p002.musicxml \
+    horn2=omr-eval/pages/bach_horn2_p003.musicxml,omr-eval/pages/bach_horn2_p004.musicxml ...
+# writes omr-eval/pages/hornN.musicxml
+
+# 2. Force every measure check_measure_duration.py flags onto its time
+#    signature's nominal length (run on the *merged* per-part file, not
+#    individual pages -- see the script's docstring for why). Overlong
+#    measures get truncated at the barline; underlong ones (other than a
+#    real pickup or the piece's true final measure) get padded with a rest.
+.venv/bin/python omr-eval/normalize_measure_length.py omr-eval/pages/horn1.musicxml ...
+```
+
+The motivation for (2): MusicXML has no field for "this measure is
+irregular," so a measure whose notes sum to something other than the time
+signature just gets whatever length its content implies. MuseScore then
+treats that as the measure's own actual duration, distinct from the nominal
+one — barlines stop lining up with neighboring measures, which makes
+hand-correction (dragging notes between measures, working across a passage
+on the same beat grid) much more annoying than editing a wrong-but-regular
+measure. Since the note actually at fault can't be identified without the
+scan anyway, this trades note accuracy (already wrong) for a uniform grid:
+truncate overlong measures at the barline, pad underlong ones with a rest.
+
+Ran against all 8 merged parts: 158 measures normalized across the piece (16
+to 22 per part), `check_measure_duration.py` comes back clean on all 8
+afterward, and measure counts are unchanged (concatenation nor
+normalization add or remove any measures — the piece is still 75, 79, 79,
+83, 62, 64, 61, 62 measures per horn 1–8).
+
+**Implementation snag worth recording:** naively truncating a `Measure`
+object's notes in place (`stream.remove()`, shortening a note's
+`.duration.quarterLength`) does *not* change what gets written — music21
+writes back the *original* pre-edit length regardless, padding the gap with
+an invisible (`print-object="no"`) filler rest to match. Confirmed this
+isn't about any obvious cache (`Stream._cache`, `coreElementsChanged()`,
+even explicitly reassigning `.duration`, all had zero effect on the
+written-out length — see the script's git history for the debugging trail).
+The fix that actually works: build a *brand-new* `Measure`/`Voice` object
+and copy over only the elements you want to keep, then `Stream.replace()`
+the old one with it. A freshly constructed container has no stale span to
+fall back to. Separately, replacing a measure in place doesn't shift
+anything *after* it, so every measure past a truncated/padded one needs its
+part-level offset recomputed too, or the next measure is left sitting in a
+gap (or overlapping) relative to the one that changed size.
+
 ## Findings so far (2026-09-12)
 
 homr on `Bach_Preludio e Fuga - 8 Horns - Parts.pdf`, Horn 1 (2 pages, run one
