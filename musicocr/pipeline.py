@@ -19,8 +19,10 @@ from musicocr.config import Config
 from musicocr.state import load_state, save_state
 
 # Canonical order. `correct` sits between OMR and extract so a corrected .omr
-# project feeds the rest of the pipeline unchanged.
-STAGE_ORDER = ["ingest", "omr", "correct", "extract", "validate", "convert", "qa"]
+# project feeds the rest of the pipeline unchanged. `normalize` sits between
+# extract and validate so it works on the merged score and its fixes show up
+# in the same validate pass that would otherwise just flag them.
+STAGE_ORDER = ["ingest", "omr", "correct", "extract", "normalize", "validate", "convert", "qa"]
 
 
 @dataclass

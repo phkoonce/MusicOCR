@@ -31,6 +31,7 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
         "generated": datetime.now().isoformat(timespec="seconds"),
         "workdir": str(ctx.workdir),
         "page_count": a.get("page_count"),
+        "omr_engine": ctx.config.omr_engine,
         "profile": ctx.config.omr_profile,
         "constants": ctx.constants(),
         "preprocess": a.get("preprocess_summary", ""),
@@ -58,8 +59,11 @@ def _md(report: dict, base: Path) -> str:
     L.append(f"- **Input:** `{report['input_pdf']}`")
     L.append(f"- **Pages:** {report.get('page_count') or '—'}")
     L.append(f"- **Generated:** {report['generated']}")
-    L.append(f"- **OMR profile:** `{report['profile']}`"
-             + (f" + constants `{report['constants']}`" if report["constants"] else ""))
+    engine = report.get("omr_engine", "")
+    L.append(f"- **OMR engine:** `{engine}`")
+    if engine == "audiveris":
+        L.append(f"- **OMR profile:** `{report['profile']}`"
+                 + (f" + constants `{report['constants']}`" if report["constants"] else ""))
     if report.get("preprocess"):
         L.append(f"- **Scan pre-processing:** {report['preprocess']}")
     if report.get("merge_pages") is False:
@@ -68,13 +72,13 @@ def _md(report: dict, base: Path) -> str:
         L.append(f"- **Audiveris project (for GUI correction):** "
                  f"`{_rel(report['omr_project'], base)}`")
     if report.get("omr_log"):
-        L.append(f"- **Audiveris log:** `{_rel(report['omr_log'], base)}`")
+        L.append(f"- **{engine or 'OMR'} log:** `{_rel(report['omr_log'], base)}`")
     L.append("")
 
     failed = report.get("omr_failed_pages") or []
     if failed:
         total = report.get("page_count")
-        L.append(f"> ⚠️ **Partial transcription.** Audiveris failed on "
+        L.append(f"> ⚠️ **Partial transcription.** {engine or 'the OMR engine'} failed on "
                  f"{len(failed)} page(s): {failed}"
                  + (f" of {total}" if total else "")
                  + ". Those pages are missing from the score below. Re-run just "

@@ -21,11 +21,18 @@ Artifacts set on ``ctx`` mirror ``omr_audiveris`` so downstream stages
   * ``omr_failed_pages`` - pages homr could not transcribe
   * ``omr_log``          - newest homr stdout/stderr capture (per-page: the last one)
   * ``omr_project``      - always ``None`` (homr has no project file / GUI round-trip)
+
+Each page's raw export is also patched in place for homr's known empty-multirest
+generator bug (``[omr.homr] fix_multirest``, default on) -- see
+``musicocr.homr_fixes`` and omr-eval/README.md's 2026-09-12 finding. This has to
+happen here, immediately after homr writes the file and before anything else
+(merging, validation) touches it.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
+from musicocr.homr_fixes import fix_multirest_file
 from musicocr.pipeline import PipelineContext, StageError, StageResult
 from musicocr.preprocess import PreprocessOpts, prepare_page
 from musicocr.stages._omr_common import resolve_pages
@@ -93,6 +100,14 @@ def run(ctx: PipelineContext) -> StageResult:
             logs.append(log_path)
 
         if out_xml.exists() and out_xml.stat().st_size > 0:
+            if ctx.config.homr_fix_multirest:
+                try:
+                    fixed = fix_multirest_file(out_xml, log=ctx.log)
+                except Exception as exc:  # noqa: BLE001
+                    fixed = 0
+                    ctx.log(f"  page {page}: multirest fix failed ({type(exc).__name__}: {exc})")
+                if fixed:
+                    ctx.log(f"  page {page}: fixed {fixed} empty multi-rest measure(s)")
             by_page[page] = [out_xml]
             note = "" if (res and res.returncode == 0) else " (homr exited nonzero)"
             ctx.log(f"  page {page} ({i}/{len(pages)}): 1 .musicxml{note}")

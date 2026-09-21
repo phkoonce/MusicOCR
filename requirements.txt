@@ -6,3 +6,5 @@ tomli>=2 ; python_version < "3.11"
 # Both are already pulled in by music21, but preprocess.py imports them directly.
 Pillow>=9
 numpy>=1.23
+# Tests (tests/) — not needed to run the pipeline itself.
+pytest>=7

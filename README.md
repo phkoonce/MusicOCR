@@ -103,9 +103,34 @@ python -m musicocr run INPUT.pdf \
 independent parts glued together (e.g. a full part set). Run each part's page
 range on its own; merging different instruments into one score is meaningless.
 
-Stages, in order: `ingest → omr → correct → extract → validate → convert → qa`.
-Re-running `--from extract` after editing the `.mxl`/`.omr` is the normal way to
-iterate without paying for another full OMR pass.
+Stages, in order: `ingest → omr → correct → extract → normalize → validate →
+convert → qa`. Re-running `--from extract` after editing the `.mxl`/`.omr` is
+the normal way to iterate without paying for another full OMR pass.
+
+### homr-specific pre/post-processing
+
+`omr-eval/README.md` documents two recurring homr failure modes found across a
+full multi-part piece; the pipeline now handles both automatically:
+
+* **Empty multi-rest measures** — homr has an open upstream generator bug
+  (`liebharc/homr#140`) where a correctly-recognised multi-measure rest is
+  exported with a `<multiple-rest>` tag but no actual rest/duration content.
+  The `omr` stage patches each page's export in place right after homr writes
+  it (`[omr.homr] fix_multirest`, on by default; `musicocr/homr_fixes.py`).
+* **Rhythm misreads that leave a measure's duration wrong** (e.g. a half note
+  read as a whole note) can't be corrected — the actually-wrong note can't be
+  identified without the scan — but they leave MuseScore's barlines out of
+  alignment with neighboring measures, which makes hand-correction much more
+  tedious. The `normalize` stage (after `extract`, `[stages.normalize]`, on by
+  default) mechanically truncates/pads every such measure to match its time
+  signature, trading note accuracy (already wrong) for a uniform grid to
+  correct against. See `musicocr/measure_normalize.py`.
+
+Neither pass can fix a *misread* multi-rest count (e.g. a printed "3" read as
+"6") or a multi-rest dropped entirely — those are transformer misclassifications,
+not bugs. `validate.py` flags plain whole-measure rests as a weak
+(false-positive-prone) `info`-level hint that one might be a dropped multi-rest,
+when running the homr engine.
 
 ## Poor scans
 
@@ -185,14 +210,25 @@ A clean synthetic score should come back with few or no findings.
 
 ```
 musicocr/
-  cli.py            # `run` / `doctor`
-  config.py         # config.toml loader
-  pipeline.py       # stage protocol + ordered runner
-  report.py         # report.md / report.json
-  stages/           # ingest, omr (dispatches to omr_homr/omr_audiveris),
-                     # correct, extract, validate, convert, qa
-config.toml         # tool paths, OMR engine/profiles, output formats
-scripts/setup.sh    # environment bootstrap (main pipeline)
+  cli.py               # `run` / `doctor`
+  config.py            # config.toml loader
+  pipeline.py          # stage protocol + ordered runner
+  report.py            # report.md / report.json
+  homr_fixes.py         # homr multi-rest generator-bug fix + dropped-multirest heuristic
+  measure_normalize.py  # measure-duration normalization (homr rhythm misreads)
+  stages/               # ingest, omr (dispatches to omr_homr/omr_audiveris),
+                         # correct, extract, normalize, validate, convert, qa
+tests/                # pytest unit tests for homr_fixes / measure_normalize
+config.toml           # tool paths, OMR engine/profiles, output formats
+scripts/setup.sh      # environment bootstrap (main pipeline)
 scripts/make_sample.py
-omr-eval/setup.sh   # installs homr's own venv (default OMR engine)
+omr-eval/setup.sh     # installs homr's own venv (default OMR engine)
+omr-eval/*.py         # standalone CLI wrappers for ad-hoc eval work, thin
+                       # over the same musicocr modules the pipeline uses
+```
+
+Run the test suite with:
+
+```bash
+.venv/bin/python -m pytest tests/
 ```

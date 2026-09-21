@@ -133,7 +133,10 @@ def cmd_doctor(args) -> int:
 
     print("\nprofiles:", ", ".join(sorted(config.profiles)))
     print("stages:  ", " -> ".join(STAGE_ORDER),
-          f"\n         (correct: {'enabled' if config.correct_enabled else 'disabled'})")
+          f"\n         (correct: {'enabled' if config.correct_enabled else 'disabled'}"
+          f", normalize: {'enabled' if config.normalize_enabled else 'disabled'})")
+    if config.omr_engine == "homr":
+        print(f"homr:     fix_multirest={'on' if config.homr_fix_multirest else 'off'}")
     print("formats: ", ", ".join(config.formats))
     return 0 if ok else 1
 

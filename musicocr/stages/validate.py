@@ -1,4 +1,4 @@
-"""Stage 5: sanity-check the MusicXML with music21. Reports only, no fixes.
+"""Stage 6: sanity-check the MusicXML with music21. Reports only, no fixes.
 
 Findings are stashed on ``ctx.artifacts['validation']`` for the final report.
 Severities: ``error`` (almost certainly wrong), ``warn`` (suspicious / worth a
@@ -127,6 +127,18 @@ def run(ctx: PipelineContext) -> StageResult:
             f"{accidentals}/{notes} notes carry accidentals — check key signature"))
     if notes == 0:
         findings.append(_finding("error", "no-notes", "no notes recognised in the score"))
+
+    if ctx.config.omr_engine == "homr":
+        # homr-specific: a dropped multi-rest (the model reads a printed "3" as
+        # a plain bar) has no structural signature of its own -- see
+        # musicocr.homr_fixes and omr-eval/README.md. Weak heuristic, expect
+        # false positives from legitimate single-bar rests.
+        from musicocr.homr_fixes import suspicious_whole_rests
+        try:
+            for note in suspicious_whole_rests(xml):
+                findings.append(_finding("info", "untagged-whole-rest", note))
+        except Exception as exc:  # noqa: BLE001
+            ctx.log(f"  suspicious_whole_rests check failed: {type(exc).__name__}: {exc}")
 
     counts = {s: sum(1 for f in findings if f["severity"] == s)
               for s in ("error", "warn", "info")}
