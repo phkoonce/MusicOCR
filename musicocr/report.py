@@ -20,7 +20,8 @@ def _rel(p, base: Path) -> str:
 def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
     a = ctx.artifacts
     val = a.get("validation", {})
-    outputs = {k: str(v) for k, v in a.get("outputs", {}).items()}
+    outputs = {k: ([str(p) for p in v] if isinstance(v, list) else str(v))
+               for k, v in a.get("outputs", {}).items()}
     if a.get("musicxml"):
         outputs["musicxml"] = str(a["musicxml"])
     page_files = [str(p) for p in a.get("musicxml_pages", [])]
@@ -101,7 +102,10 @@ def _md(report: dict, base: Path) -> str:
     L.append("")
     if report["outputs"]:
         for k, v in report["outputs"].items():
-            L.append(f"- **{k}:** `{_rel(v, base)}`")
+            if isinstance(v, list):
+                L.append(f"- **{k}:** " + ", ".join(f"`{_rel(p, base)}`" for p in v))
+            else:
+                L.append(f"- **{k}:** `{_rel(v, base)}`")
     else:
         L.append("_none produced_")
     pf = report.get("page_files") or []

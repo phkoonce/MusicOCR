@@ -11,12 +11,12 @@ from pathlib import Path
 STATE_FILE = ".musicocr-state.json"
 
 _PATH_KEYS = {"source_pdf", "omr_log", "omr_project", "musicxml", "render_pdf"}
-_PATH_LIST_KEYS = {"mxl_files", "musicxml_pages"}
-_PATH_DICT_KEYS = {"outputs"}            # {str: path}
+_PATH_LIST_KEYS = {"mxl_files", "musicxml_pages", "render_pdfs"}
+_PATH_DICT_KEYS = {"outputs"}            # {str: path | [path, ...]}
 _PAGE_MAP_KEYS = {"mxl_by_page"}         # {int: [path, ...]}
 _INT_PATH_MAP_KEYS = {"prepped_pages"}   # {int: path}
 _PLAIN_KEYS = {"page_count", "omr_failed_pages", "validation", "qa_pages",
-               "merge_skipped"}
+               "merge_skipped", "extract_merged"}
 
 _ALL = (_PATH_KEYS | _PATH_LIST_KEYS | _PATH_DICT_KEYS | _PAGE_MAP_KEYS
         | _INT_PATH_MAP_KEYS | _PLAIN_KEYS)
@@ -33,7 +33,8 @@ def save_state(workdir: Path, artifacts: dict) -> None:
         elif k in _PATH_LIST_KEYS:
             out[k] = [str(p) for p in v]
         elif k in _PATH_DICT_KEYS:
-            out[k] = {kk: str(vv) for kk, vv in v.items()}
+            out[k] = {kk: ([str(p) for p in vv] if isinstance(vv, list) else str(vv))
+                      for kk, vv in v.items()}
         elif k in _PAGE_MAP_KEYS:
             out[k] = {str(pg): [str(p) for p in paths] for pg, paths in v.items()}
         elif k in _INT_PATH_MAP_KEYS:
@@ -61,7 +62,8 @@ def load_state(workdir: Path) -> dict:
         elif k in _PATH_LIST_KEYS:
             art[k] = [Path(p) for p in v]
         elif k in _PATH_DICT_KEYS:
-            art[k] = {kk: Path(vv) for kk, vv in v.items()}
+            art[k] = {kk: ([Path(p) for p in vv] if isinstance(vv, list) else Path(vv))
+                      for kk, vv in v.items()}
         elif k in _PAGE_MAP_KEYS:
             art[k] = {int(pg): [Path(p) for p in paths] for pg, paths in v.items()}
         elif k in _INT_PATH_MAP_KEYS:

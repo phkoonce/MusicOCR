@@ -1,8 +1,8 @@
-"""Stage 4: turn Audiveris .mxl export(s) into plain .musicxml.
+"""Stage 4: turn the OMR engine's per-page export(s) into plain .musicxml.
 
-An ``.mxl`` is a zip whose ``META-INF/container.xml`` names the score file.
-
-Per-page OMR gives one (sometimes several) ``.mxl`` per page. We keep each as
+Audiveris exports ``.mxl`` (a zip whose ``META-INF/container.xml`` names the
+score file); homr writes plain ``.musicxml`` directly. Either way, per-page OMR
+gives one (sometimes several) file per page. We keep each as
 ``<book>.pNNN[.k].musicxml`` and, when ``[omr] merge_pages`` is on, stitch them
 into a single ``<book>.musicxml`` by appending each page's measures onto the
 part(s) of the first page (correct for one continuous instrumental part;
@@ -26,6 +26,14 @@ def _unzip_mxl(mxl: Path, dest: Path) -> Path:
             raise StageError(f"{mxl.name}: no rootfile in container.xml")
         data = zf.read(inner)
     dest.write_bytes(data)
+    return dest
+
+
+def _page_musicxml(src: Path, dest: Path) -> Path:
+    """Normalize one page's OMR export (``.mxl`` or plain ``.musicxml``) to `dest`."""
+    if src.suffix == ".mxl":
+        return _unzip_mxl(src, dest)
+    dest.write_bytes(src.read_bytes())
     return dest
 
 
@@ -105,20 +113,21 @@ def run(ctx: PipelineContext) -> StageResult:
     if set(by_page) == {0}:
         files = by_page[0]
         if len(files) == 1:
-            _unzip_mxl(files[0], master)
+            _page_musicxml(files[0], master)
             ctx.artifacts["musicxml"] = master
             ctx.artifacts["musicxml_pages"] = []
             return StageResult("extract", "ok", master.name)
         parts = []
         for i, mxl in enumerate(files, 1):
             t = out / f"{ctx.book_name}.mvt{i}.musicxml"
-            _unzip_mxl(mxl, t)
+            _page_musicxml(mxl, t)
             parts.append(t)
         merged, skipped = (_concat(parts, master, ctx.log)
                            if ctx.config.omr_merge_pages else (None, []))
         ctx.artifacts["musicxml"] = merged or parts[0]
         ctx.artifacts["musicxml_pages"] = parts
         ctx.artifacts["merge_skipped"] = [str(p) for p in skipped]
+        ctx.artifacts["extract_merged"] = bool(merged)
         return StageResult("extract", "ok",
                            f"{master.name} (merged)" if merged
                            else f"{len(parts)} movements (not merged)")
@@ -129,7 +138,7 @@ def run(ctx: PipelineContext) -> StageResult:
         for k, mxl in enumerate(by_page[page]):
             suffix = f".p{page:03d}" + (f".{k + 1}" if len(by_page[page]) > 1 else "")
             t = out / f"{ctx.book_name}{suffix}.musicxml"
-            _unzip_mxl(mxl, t)
+            _page_musicxml(mxl, t)
             page_files.append(t)
             ctx.log(f"  extracted {t.name}")
     ctx.artifacts["musicxml_pages"] = page_files
@@ -137,12 +146,14 @@ def run(ctx: PipelineContext) -> StageResult:
     if len(page_files) == 1:
         master.write_bytes(page_files[0].read_bytes())
         ctx.artifacts["musicxml"] = master
+        ctx.artifacts["extract_merged"] = True
         return StageResult("extract", "ok", f"{master.name} (1 page)")
 
     merged, skipped = (_concat(page_files, master, ctx.log)
                        if ctx.config.omr_merge_pages else (None, []))
     ctx.artifacts["merge_skipped"] = [str(p) for p in skipped]
     ctx.artifacts["musicxml"] = merged or page_files[0]
+    ctx.artifacts["extract_merged"] = bool(merged)
     if merged:
         kept = len(page_files) - len(skipped)
         detail = f"{master.name} (merged {kept}/{len(page_files)} page files)"

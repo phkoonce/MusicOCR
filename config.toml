@@ -3,21 +3,40 @@
 
 [tools]
 audiveris = "/Applications/Audiveris.app/Contents/MacOS/Audiveris"
+# homr's own isolated venv (Python 3.12 + ONNX runtime, separate from this
+# project's venv) — see omr-eval/README.md for setup. Defaults to
+# <repo>/omr-eval/homr/.venv/bin/python; override if you installed it
+# elsewhere. Invoked by calling homr.main:main directly rather than the
+# installed console-script, so a moved venv's stale shebang doesn't matter.
+# homr_python = "/path/to/omr-eval/homr/.venv/bin/python"
 musescore = "/Applications/MuseScore 4.app/Contents/MacOS/mscore"
 # poppler utilities (installed via `brew install poppler`)
 pdfinfo = "pdfinfo"
 pdftoppm = "pdftoppm"
 
 [omr]
-# Which profile under [omr.profiles.*] to use unless --profile overrides it.
+# Which engine transcribes pages:
+#   "homr"      - end-to-end OMR model (omr-eval/README.md). No whole-book
+#                 mode, no [omr.profiles.*] tuning, no GUI correction. Needs
+#                 rasterised page images, so it always rasterises pages
+#                 regardless of [preprocess] enabled.
+#   "audiveris" - classical segment-classify-reconstruct pipeline, tunable via
+#                 [omr.profiles.*] constants, the only engine with a GUI
+#                 hand-correction round-trip ([stages.correct]).
+# homr consistently outperformed Audiveris on monophonic wind/brass parts in
+# local testing; Audiveris remains available for full scores / hand-correction.
+engine = "homr"
+# Which profile under [omr.profiles.*] to use unless --profile overrides it
+# (Audiveris only).
 profile = "default"
-# Per-page ceiling on Audiveris (each page is transcribed in its own process).
+# Per-page ceiling on the OMR engine (each page runs in its own process).
 page_timeout_seconds = 900
 # Overall ceiling when Audiveris is run on the whole book in one go (only used
-# when the page count can't be determined).
+# when the page count can't be determined; homr always runs per-page).
 timeout_seconds = 1800
-# Transcribe each page in a separate Audiveris process. Strongly recommended: a
-# single un-transcribable page otherwise aborts the whole book with no output.
+# Transcribe each page in a separate process. Strongly recommended for
+# Audiveris: a single un-transcribable page otherwise aborts the whole book
+# with no output. homr always runs per-page regardless of this setting.
 per_page = true
 # After per-page OMR, stitch the pages into one <book>.musicxml (music21). Right
 # for a single continuous part; turn off for a mixed song-book to keep pages

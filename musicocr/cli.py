@@ -23,6 +23,8 @@ def cmd_run(args) -> int:
         print(f"config error: {exc}", file=sys.stderr)
         return 2
 
+    if args.engine:
+        config.omr_engine = args.engine
     if args.profile:
         config.omr_profile = args.profile
     if args.merge is not None:
@@ -108,12 +110,18 @@ def cmd_doctor(args) -> int:
 
     print(f"MusicOCR {__version__}")
     print(f"config: {config.path}")
+    print(f"OMR engine: {config.omr_engine}")
     print("\ntools:")
     ok = True
+    engine_tool = "homr_python" if config.omr_engine == "homr" else "audiveris"
+    ok &= _check("homr (venv python)", config.resolve_tool("homr_python"))
     ok &= _check("Audiveris", config.resolve_tool("audiveris"), ["-version"])
     ok &= _check("MuseScore", config.resolve_tool("musescore"), ["--version"])
     ok &= _check("pdfinfo", config.resolve_tool("pdfinfo"), ["-v"])
     ok &= _check("pdftoppm", config.resolve_tool("pdftoppm"), ["-v"])
+    if not config.resolve_tool(engine_tool):
+        print(f"  ✗ configured engine {config.omr_engine!r} is not available")
+        ok = False
 
     print("\npython deps:")
     try:
@@ -139,10 +147,12 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("input", help="input PDF")
     r.add_argument("--output", help="output root dir (default: ./output)")
     r.add_argument("--pages", help="page selection, e.g. '1,4-5' (Audiveris -sheets)")
-    r.add_argument("--profile", help="OMR profile from config.toml")
+    r.add_argument("--engine", choices=["homr", "audiveris"],
+                   help="OMR engine (overrides config [omr] engine, default: homr)")
+    r.add_argument("--profile", help="OMR profile from config.toml (Audiveris only)")
     r.add_argument("--constant", action="append", metavar="k=v",
-                   help="extra Audiveris constant (repeatable)")
-    r.add_argument("--force", action="store_true", help="re-run Audiveris even if output exists")
+                   help="extra Audiveris constant (repeatable, Audiveris only)")
+    r.add_argument("--force", action="store_true", help="re-run OMR even if output exists")
     r.add_argument("--merge", dest="merge", action="store_true", default=None,
                    help="stitch pages into one score (overrides config [omr] merge_pages)")
     r.add_argument("--no-merge", dest="merge", action="store_false",

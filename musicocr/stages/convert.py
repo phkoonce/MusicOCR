@@ -56,13 +56,39 @@ def run(ctx: PipelineContext) -> StageResult:
             f"MuseScore not found at {ctx.config.musescore!r} (edit config.toml [tools])"
         )
 
+    # When the extract stage couldn't merge multi-page output into one
+    # continuous score, `musicxml` is only the first page — converting just
+    # that file would silently drop every later page from the deliverable.
+    # Convert every page's MusicXML instead, one file per page.
+    pages = ctx.artifacts.get("musicxml_pages") or []
+    merged = ctx.artifacts.get("extract_merged", True)
+    sources = (
+        [(p.stem.rsplit(".", 1)[-1], p) for p in pages]
+        if not merged and len(pages) > 1
+        else [(None, xml)]
+    )
+
+    outputs = ctx.artifacts.setdefault("outputs", {})
     produced = []
-    for fmt in wanted:
-        name = "render.pdf" if fmt == "qa-pdf" else f"{ctx.book_name}{_EXT[fmt]}"
-        dst = _convert(tool, xml, ctx.workdir / name, ctx.log)
-        ctx.artifacts.setdefault("outputs", {})[fmt] = dst
-        produced.append(dst.name)
+    for suffix, src in sources:
+        for fmt in wanted:
+            if suffix:
+                name = f"render.{suffix}.pdf" if fmt == "qa-pdf" else f"{ctx.book_name}.{suffix}{_EXT[fmt]}"
+            else:
+                name = "render.pdf" if fmt == "qa-pdf" else f"{ctx.book_name}{_EXT[fmt]}"
+            dst = _convert(tool, src, ctx.workdir / name, ctx.log)
+            if suffix:
+                outputs.setdefault(fmt, []).append(dst)
+            else:
+                outputs[fmt] = dst
+            produced.append(dst.name)
 
     if "qa-pdf" in wanted:
-        ctx.artifacts["render_pdf"] = ctx.workdir / "render.pdf"
+        qa_out = outputs["qa-pdf"]
+        render_pdfs = qa_out if isinstance(qa_out, list) else [qa_out]
+        ctx.artifacts["render_pdfs"] = render_pdfs
+        ctx.artifacts["render_pdf"] = render_pdfs[0]
+    if not merged and len(pages) > 1:
+        ctx.log(f"  note: pages did not merge into one score — "
+                 f"converted {len(pages)} pages separately instead of dropping the rest")
     return StageResult("convert", "ok", ", ".join(produced))
