@@ -42,9 +42,8 @@ from fractions import Fraction
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-
-def measure_full_duration(divisions: int, beats: int, beat_type: int) -> Fraction:
-    return Fraction(divisions) * beats * 4 / beat_type
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from musicocr.homr_fixes import suspicious_whole_rests  # noqa: E402
 
 
 def scan_file(path: Path) -> tuple[Fraction, list[str]]:
@@ -52,56 +51,24 @@ def scan_file(path: Path) -> tuple[Fraction, list[str]]:
     tree = ET.parse(path)
     root = tree.getroot()
     total = Fraction(0)
-    notes: list[str] = []
 
     for part in root.findall("part"):
         divisions: int | None = None
-        beats: int | None = None
-        beat_type: int | None = None
         part_total_divisions = 0
 
         for measure in part.findall("measure"):
             for div in measure.findall("./attributes/divisions"):
                 if div.text:
                     divisions = int(div.text)
-            for time in measure.findall("./attributes/time"):
-                b, bt = time.find("beats"), time.find("beat-type")
-                if b is not None and b.text:
-                    beats = int(b.text)
-                if bt is not None and bt.text:
-                    beat_type = int(bt.text)
-
-            multi_rest = measure.find("./attributes/measure-style/multiple-rest")
-            note_children = measure.findall("note")
-
-            for note in note_children:
+            for note in measure.findall("note"):
                 dur = note.find("duration")
                 if dur is not None and dur.text:
                     part_total_divisions += int(dur.text)
 
-            if multi_rest is None and len(note_children) == 1:
-                note = note_children[0]
-                rest = note.find("rest")
-                dur = note.find("duration")
-                if (
-                    rest is not None
-                    and dur is not None
-                    and dur.text
-                    and divisions is not None
-                    and beats is not None
-                    and beat_type is not None
-                ):
-                    full = measure_full_duration(divisions, beats, beat_type)
-                    if full.denominator == 1 and int(dur.text) == int(full):
-                        notes.append(
-                            f"{path.name} measure {measure.get('number')}: "
-                            "plain whole-measure rest, not tagged as a multi-rest -- "
-                            "worth a glance against the scan (could be a dropped multi-rest)"
-                        )
-
         if divisions:
             total += Fraction(part_total_divisions, divisions)
 
+    notes = [f"{path.name} {n}" for n in suspicious_whole_rests(path)]
     return total, notes
 
 

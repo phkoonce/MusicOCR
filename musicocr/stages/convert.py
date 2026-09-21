@@ -1,4 +1,4 @@
-"""Stage 6: convert the MusicXML master to the requested deliverables via MuseScore.
+"""Stage 7: convert the MusicXML master to the requested deliverables via MuseScore.
 
 Formats (from config ``output.formats``):
   * ``mscz``   -> ``<book>.mscz``   (hand-edit in MuseScore)

@@ -43,6 +43,14 @@ per_page = true
 # separate. Pages are always kept individually regardless.
 merge_pages = true
 
+[omr.homr]
+# Patch homr's known generator bug where a correctly-recognised multi-measure
+# rest is exported with a <multiple-rest> tag but no note/rest content at all
+# (liebharc/homr#140, open upstream as of 2026-09). Runs on each page's raw
+# export right after homr writes it, before merge/validate see it. See
+# musicocr/homr_fixes.py and omr-eval/README.md's 2026-09-12 finding.
+fix_multirest = true
+
 # Audiveris application "constants" (see `Audiveris -help`). Real tuning is
 # iterative: run once, inspect report.md + qa images, then add constants here.
 [omr.profiles.default]
@@ -84,6 +92,17 @@ crop_pad_frac = 0.035  # whitespace to leave above/below the outer staves
 # When true, the pipeline stops after OMR so you can open the saved .omr project
 # in the Audiveris GUI, correct it, and re-run from `extract`. Off for v1.
 enabled = false
+
+[stages.normalize]
+# After extract, force every measure whose notes don't sum to its time
+# signature (the dominant homr rhythm-misread pattern -- see
+# omr-eval/README.md) to match it exactly: truncate overlong measures at the
+# barline, pad underlong ones with a rest. Lossy (the actually-wrong note
+# can't be identified without the scan) but keeps MuseScore's barlines
+# aligned across parts, which matters a lot for hand-correction. Mechanical
+# and engine-agnostic -- only measures already disagreeing with their time
+# signature are touched -- so it's safe to leave on for Audiveris output too.
+enabled = true
 
 [output]
 # Any subset of: "musicxml", "mscz", "midi", "qa-pdf"

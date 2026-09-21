@@ -8,6 +8,16 @@ stages; modern end-to-end image-to-sequence models (CNN/transformer encoder →
 token decoder) tend to do meaningfully better on monophonic material because
 there's no voice-separation ambiguity to get wrong.
 
+**homr won** (see the 2026-09-13 findings below) and is now the pipeline's
+default engine. The post-processing scripts this evaluation produced
+(`fix_multirest_xml.py`, `check_multirest.py`, `normalize_measure_length.py`)
+are now also wired into the main pipeline itself (the `omr` and `normalize`
+stages — see `../README.md#homr-specific-prepost-processing`); the shared
+logic lives in `musicocr/homr_fixes.py` and `musicocr/measure_normalize.py`,
+and these scripts are now thin CLI wrappers around it, kept for ad-hoc work
+(e.g. cross-part total-duration comparison, which needs several parts' output
+at once and so isn't something a single pipeline run does on its own).
+
 ## Setup
 
 ```bash

@@ -35,8 +35,10 @@ class Config:
     omr_page_timeout: int
     omr_per_page: bool
     omr_merge_pages: bool
+    homr_fix_multirest: bool
     profiles: dict[str, list[str]]
     correct_enabled: bool
+    normalize_enabled: bool
     preprocess: dict
     formats: list[str]
     qa_dpi: int
@@ -102,9 +104,13 @@ def load_config(path: str | Path | None = None) -> Config:
         omr_page_timeout=int(omr.get("page_timeout_seconds", 900)),
         omr_per_page=bool(omr.get("per_page", True)),
         omr_merge_pages=bool(omr.get("merge_pages", True)),
+        homr_fix_multirest=bool(omr.get("homr", {}).get("fix_multirest", True)),
         profiles=profiles,
         correct_enabled=bool(
             data.get("stages", {}).get("correct", {}).get("enabled", False)
+        ),
+        normalize_enabled=bool(
+            data.get("stages", {}).get("normalize", {}).get("enabled", True)
         ),
         preprocess=dict(data.get("preprocess", {})),
         formats=formats,

@@ -1,4 +1,4 @@
-"""Stage 7: rasterize the source scan and the rendered score for side-by-side QA.
+"""Stage 8: rasterize the source scan and the rendered score for side-by-side QA.
 
 Writes ``qa/src-NNN.png`` (original) and ``qa/omr-NNN.png`` (MuseScore render).
 The final report links matching pairs.
