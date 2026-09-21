@@ -7,19 +7,22 @@ It orchestrates tools that are already installed on this machine:
 
 | Tool | Role |
 |---|---|
-| [Audiveris](https://audiveris.github.io/audiveris/) 5.x | Optical music recognition (PDF → MusicXML). Bundles its own Java + Tesseract. |
+| [homr](https://github.com/liebharc/homr) | **Default OMR engine.** End-to-end transformer image→MusicXML model, own Python 3.12/ONNX venv under `omr-eval/homr/`. Consistently outperformed Audiveris on monophonic wind/brass parts in local evaluation (`omr-eval/README.md`). |
+| [Audiveris](https://audiveris.github.io/audiveris/) 5.x | Alternative OMR engine (`[omr] engine = "audiveris"`). Classical segment-classify-reconstruct pipeline, tunable via constants, and the only engine with a GUI hand-correction round-trip. Bundles its own Java + Tesseract. |
 | [MuseScore](https://musescore.org) 4.x | MusicXML → `.mscz`, `.mid`, rendered `.pdf` |
 | [music21](https://www.music21.org) | Post-OMR validation / measure checks |
-| poppler (`pdfinfo`, `pdftoppm`) | Page count + QA page images |
+| poppler (`pdfinfo`, `pdftoppm`) | Page rasterisation, page count, QA page images |
 
 OMR is never perfect. This tool runs **fully automated** and then tells you where
 to look — it does not guess pitches or rhythms. Correcting the output is done by
-hand afterward in MuseScore (or, later, via the Audiveris GUI — see below).
+hand afterward in MuseScore (or, when using the Audiveris engine, via its GUI —
+see below).
 
 ## Setup
 
 ```bash
 bash scripts/setup.sh          # brew install poppler + create .venv + pip install
+bash omr-eval/setup.sh         # creates the homr venv (default OMR engine)
 source .venv/bin/activate
 python -m musicocr doctor       # verify all tools are found
 ```
@@ -42,8 +45,8 @@ Everything lands in `output/<book>/`:
 | `render.pdf` | MuseScore's rendering of the OMR result |
 | `qa/src-*.png`, `qa/omr-*.png` | source scan vs render, page by page |
 | `report.md` / `report.json` | stage log + validation findings + QA images |
-| `pages/pNNN/*.log` | per-page Audiveris logs |
-| `<book>.omr` | Audiveris project file — only when GUI correction is enabled (see below) |
+| `pages/pNNN/*.log` | per-page OMR engine logs (homr or Audiveris) |
+| `<book>.omr` | Audiveris project file — only when using the Audiveris engine with GUI correction enabled (see below) |
 | `source.pdf` | copy of the input |
 
 Read `report.md` first. Findings are ranked 🔴 error / 🟡 warn / 🔵 info, with
@@ -52,32 +55,49 @@ pairs, then fix in MuseScore.
 
 ### Partial transcription
 
-Real scans have pages Audiveris chokes on. When that happens the run **keeps
+Real scans have pages the OMR engine chokes on. When that happens the run **keeps
 going** — the bad pages are simply missing from the output, and `report.md` opens
 with a ⚠️ listing them. Re-run just those pages after tuning:
 
 ```
-python -m musicocr run INPUT.pdf --pages 12,15 --profile <name> --force
+python -m musicocr run INPUT.pdf --pages 12,15 --force
 ```
 
-(The pipeline does not skip `-save` fragility for free: enabling GUI correction
-re-adds Audiveris's `-save`, which is what makes one bad sheet able to abort a
-whole multi-page book. Automated runs leave it off.)
+(Audiveris-specific: the pipeline does not skip `-save` fragility for free —
+enabling GUI correction re-adds Audiveris's `-save`, which is what makes one bad
+sheet able to abort a whole multi-page book. Automated runs leave it off. homr
+has no whole-book mode to abort — it always runs one page per process.)
 
 ### Options
 
 ```
 python -m musicocr run INPUT.pdf \
-  --pages 1,4-5          # only these pages (Audiveris -sheets)
-  --profile clean-typeset # constants preset from config.toml
+  --pages 1,4-5          # only these pages
+  --engine homr|audiveris # OMR engine (default: homr, config [omr] engine)
+  --profile clean-typeset # Audiveris constants preset from config.toml
   --constant k=v          # extra Audiveris constant, repeatable
-  --force                 # re-run Audiveris even if output exists
+  --force                 # re-run OMR even if output exists
   --no-merge              # keep pages separate (book of independent parts/songs)
   --preprocess / --no-preprocess   # force scan clean-up on/off (see below)
   --deskew --crop         # extra clean-up passes for camera scans (see below)
   --from validate         # re-run from a stage (reuses earlier artifacts)
   --to omr                # stop after a stage
 ```
+
+## OMR engine
+
+`[omr] engine` in `config.toml` (or `--engine`) picks the transcription engine:
+
+* **`homr`** (default) — an end-to-end transformer OMR model. No whole-book
+  mode, no Audiveris-style constant tuning, no GUI correction round-trip; it
+  just reads one rasterised page image and writes MusicXML. Needs its own
+  venv: `bash omr-eval/setup.sh` (see `omr-eval/README.md` for background on
+  why it was adopted — it beat Audiveris consistently on monophonic
+  wind/brass parts in local testing). Because it needs an image, it always
+  rasterises pages regardless of `[preprocess] enabled`.
+* **`audiveris`** — the original classical pipeline. Still the better choice
+  for full scores / multi-staff systems, and the only engine with a hand
+  correction workflow (see below).
 
 `--pages` + `--no-merge` is the combination for a PDF that's really several
 independent parts glued together (e.g. a full part set). Run each part's page
@@ -125,7 +145,7 @@ pdfimages -list -f 1 -l 1 "input/your.pdf"
    which sweeps binarisation constants and pre-processing options on one page
    and writes `experiments/<book>/pNN/summary.md` with a render of each.
 
-## Tuning Audiveris
+## Tuning Audiveris (Audiveris engine only)
 
 Audiveris behaviour is controlled by "constants" and "switches". From the
 pipeline: add `--constant key=value` (repeatable), or put constants in an
@@ -135,14 +155,15 @@ pipeline: add `--constant key=value` (repeatable), or put constants in an
 `...AdaptiveDescriptor.defaultMeanCoeff`) work from the CLI; several *switch*
 constants are silently ignored there — set those in the GUI instead.
 
-## Manual correction via the Audiveris GUI (optional, off by default)
+## Manual correction via the Audiveris GUI (Audiveris engine only, off by default)
 
 Full walkthrough: **[docs/audiveris-gui.md](docs/audiveris-gui.md)**.
 
 Short version:
 
-1. Set `[stages.correct] enabled = true` in `config.toml` (this also makes the
-   OMR stage save a `.omr` project per page).
+1. Set `[omr] engine = "audiveris"` and `[stages.correct] enabled = true` in
+   `config.toml` (the latter also makes the OMR stage save a `.omr` project
+   per page).
 2. `python -m musicocr run <pdf>` stops after OMR (status `paused`) and lists the
    projects to open.
 3. `open -a Audiveris`; **File ▸ Open books…**; tune **Book ▸ Set book
@@ -168,8 +189,10 @@ musicocr/
   config.py         # config.toml loader
   pipeline.py       # stage protocol + ordered runner
   report.py         # report.md / report.json
-  stages/           # ingest, omr, correct, extract, validate, convert, qa
-config.toml         # tool paths, OMR profiles, output formats
-scripts/setup.sh    # environment bootstrap
+  stages/           # ingest, omr (dispatches to omr_homr/omr_audiveris),
+                     # correct, extract, validate, convert, qa
+config.toml         # tool paths, OMR engine/profiles, output formats
+scripts/setup.sh    # environment bootstrap (main pipeline)
 scripts/make_sample.py
+omr-eval/setup.sh   # installs homr's own venv (default OMR engine)
 ```

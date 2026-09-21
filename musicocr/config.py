@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.toml"
 
 VALID_FORMATS = {"musicxml", "mscz", "midi", "qa-pdf"}
+VALID_ENGINES = {"homr", "audiveris"}
 
 
 class ConfigError(RuntimeError):
@@ -24,9 +25,11 @@ class ConfigError(RuntimeError):
 @dataclass
 class Config:
     audiveris: str
+    homr_python: str
     musescore: str
     pdfinfo: str
     pdftoppm: str
+    omr_engine: str
     omr_profile: str
     omr_timeout: int
     omr_page_timeout: int
@@ -81,11 +84,19 @@ def load_config(path: str | Path | None = None) -> Config:
     if bad:
         raise ConfigError(f"invalid output.formats entries: {sorted(bad)}")
 
+    engine = omr.get("engine", "homr")
+    if engine not in VALID_ENGINES:
+        raise ConfigError(f"invalid [omr] engine {engine!r}; known: {sorted(VALID_ENGINES)}")
+
+    default_homr_python = REPO_ROOT / "omr-eval" / "homr" / ".venv" / "bin" / "python"
+
     return Config(
         audiveris=tools.get("audiveris", ""),
+        homr_python=tools.get("homr_python", str(default_homr_python)),
         musescore=tools.get("musescore", ""),
         pdfinfo=tools.get("pdfinfo", "pdfinfo"),
         pdftoppm=tools.get("pdftoppm", "pdftoppm"),
+        omr_engine=engine,
         omr_profile=omr.get("profile", "default"),
         omr_timeout=int(omr.get("timeout_seconds", 1800)),
         omr_page_timeout=int(omr.get("page_timeout_seconds", 900)),
