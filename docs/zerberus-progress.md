@@ -27,3 +27,17 @@ Auto-written by `scripts/zerberus_batch.py` (updated 2026-10-09 22:11). Outputs 
 ## Status
 
 All 19 parts OMR'd with homr (2026-10-09). **Next: manual correction of each part** (open `output/<key>/<key>.mscz` in MuseScore, compare against `render.pdf`/`qa/`, save corrected MusicXML), then build `omr-eval/specs/zerberus.py` and combine with `omr-eval/align_combine.py`.
+
+## Combined score (non-percussion), 2026-10-09
+
+`omr-eval/align_systems.py` + `omr-eval/specs/zerberus.py` align the 16 pitched parts to the
+210 printed bars and combine them into `output/Zerberus_combined/Zerberus_combined.{musicxml,mscz,mid,pdf}`:
+
+    .venv/bin/python omr-eval/align_systems.py omr-eval/specs/zerberus.py output/Zerberus_combined/Zerberus_combined.musicxml
+
+Alignment is derived automatically (printed system-start bar numbers + multi-rest counts from the
+part PDFs' text layer vs. homr's per-system measure counts); the spec only holds score-wide facts
+(meter: 4/4 to bar 34 with a 1-beat pickup bar 1, 6/8 from bar 35; key map; tempo/rehearsal marks).
+`Zerberus_combined.report.txt` lists every repair (dropped stray measures, lost/misread multi-rests)
+and every bar whose note content doesn't add up to the bar length (those are the OMR errors to fix).
+Pauken and Perkussion 1/2 are not included yet.
