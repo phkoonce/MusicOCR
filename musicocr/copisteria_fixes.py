@@ -235,3 +235,145 @@ def reveal_gaps(path: Path, color: str = GAP_COLOR,
         ET.indent(tree, space="  ")
         tree.write(path, encoding="UTF-8", xml_declaration=True)
     return revealed
+
+
+# --- half-read tuplets ---------------------------------------------------------------
+#
+# Copisteria decodes a tuplet note by note. On a duplet / triplet it can give the
+# time-modification to only some of the group (Zerberus Horn 7 p.2: a beamed pair where
+# the first eighth is 2:3 and the second a plain eighth), so the bar is short by exactly
+# what the other members would add, which shows as a gap. When one such unmodified
+# neighbour (same type, same voice, adjacent, beamed to a modified note) accounts for the
+# gap exactly, finish the tuplet: same time-modification, duration scaled by it, gap removed.
+
+def _gap_total(measure: ET.Element) -> tuple[int, list[ET.Element]]:
+    gaps = [k for k in measure if k.tag == "forward" or (k.tag == "note" and _is_hidden_rest(k))]
+    return sum(int(g.findtext("duration") or 0) for g in gaps), gaps
+
+
+def _insert_time_mod(note: ET.Element, tm: ET.Element) -> None:
+    import copy
+    new = copy.deepcopy(tm)
+    for i, k in enumerate(list(note)):
+        if k.tag in ("stem", "notehead", "staff", "beam", "notations"):
+            note.insert(i, new)
+            return
+    note.append(new)
+
+
+
+
+def _capacity(state: dict, measure: ET.Element) -> int | None:
+    """The bar's length in divisions, tracking the divisions / time signature in force."""
+    for attrs in measure.findall("attributes"):
+        div = attrs.findtext("divisions")
+        if div:
+            state["div"] = int(div)
+        t = attrs.find("time")
+        if t is not None and t.findtext("beats") and t.findtext("beat-type"):
+            try:
+                state["beats"], state["bt"] = int(t.findtext("beats")), int(t.findtext("beat-type"))
+            except ValueError:
+                pass
+    if not all(k in state for k in ("div", "beats", "bt")):
+        return None
+    cap = state["div"] * 4 * state["beats"]
+    return cap // state["bt"] if cap % state["bt"] == 0 else None
+
+
+def _bar_sum(measure: ET.Element) -> int:
+    total = 0
+    for k in measure:
+        if k.tag == "note" and k.find("chord") is None and k.find("grace") is None:
+            total += int(k.findtext("duration") or 0)
+        elif k.tag == "forward":
+            total += int(k.findtext("duration") or 0)
+    return total
+
+
+def _move_tuplet_stop(old: ET.Element, new: ET.Element) -> None:
+    """The bracket's end belongs on the last member: move it from ``old`` to ``new`` when
+    ``new`` follows ``old`` (a note after its tuplet's recorded end)."""
+    stops = [t for t in old.iter("tuplet") if t.get("type") == "stop"]
+    if not stops:
+        return
+    parent_notations = old.find("notations")
+    if parent_notations is None:
+        return
+    for st in stops:
+        parent_notations.remove(st)
+    dest = new.find("notations")
+    if dest is None:
+        dest = ET.SubElement(new, "notations")
+    for st in stops:
+        dest.append(st)
+
+
+def fix_half_tuplets(path: Path, log: Callable[[str], None] = print) -> int:
+    """Rewrite ``path`` in place; return the number of notes given the missing time-modification.
+
+    Also handles the mirror case: the last member of a tuplet left unmodified at its plain
+    duration makes the bar overfull by exactly what the tuplet scaling takes back."""
+    tree = ET.parse(path)
+    fixed = 0
+    for part in tree.getroot().findall("part"):
+        state: dict = {}
+        for measure in part.findall("measure"):
+            cap = _capacity(state, measure)
+            if measure.find("backup") is not None:
+                continue
+            gap, gaps = _gap_total(measure)
+            old = _bar_sum(measure)
+            if gap <= 0 and (cap is None or old == cap):
+                continue
+            notes = [k for k in measure if k.tag == "note" and not _is_hidden_rest(k)
+                     and k.find("chord") is None and k.find("rest") is None]
+            picks: list[tuple[ET.Element, ET.Element, ET.Element]] = []
+            for i, n in enumerate(notes):
+                if n.find("time-modification") is not None:
+                    continue
+                for j in (i - 1, i + 1):
+                    if not 0 <= j < len(notes):
+                        continue
+                    m = notes[j]
+                    tm = m.find("time-modification")
+                    if (tm is None or m.findtext("type") != n.findtext("type")
+                            or (m.find("dot") is None) != (n.find("dot") is None)
+                            or m.findtext("voice") != n.findtext("voice")
+                            or not m.findall("beam") or not n.findall("beam")):
+                        continue
+                    picks.append((n, tm, m))
+                    break
+            added = 0
+            plan = []
+            for n, tm, m in picks:
+                act, nor = int(tm.findtext("actual-notes") or 0), int(tm.findtext("normal-notes") or 0)
+                d = int(n.findtext("duration") or 0)
+                if not act or d * nor % act:
+                    plan = []
+                    break
+                nd = d * nor // act
+                added += nd - d
+                plan.append((n, tm, nd, m))
+            if not plan:
+                continue
+            new = old + added - gap
+            if cap is not None:
+                if new != cap:
+                    continue
+            elif added != gap:
+                continue
+            for n, tm, nd, m in plan:
+                n.find("duration").text = str(nd)
+                _insert_time_mod(n, tm)
+                if notes.index(n) > notes.index(m):
+                    _move_tuplet_stop(m, n)
+                fixed += 1
+            for g in gaps:
+                measure.remove(g)
+            log(f"  measure {measure.get('number')}: completed a half-read tuplet "
+                f"({len(plan)} note(s), bar length {old} -> {new})")
+    if fixed:
+        ET.indent(tree, space="  ")
+        tree.write(path, encoding="UTF-8", xml_declaration=True)
+    return fixed

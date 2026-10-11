@@ -45,13 +45,21 @@ def main(png: str, base: str, out: str, scale: str) -> None:
 
     base_path = Path(base)
     imgsz = int(base_path.stem.rsplit("_", 1)[1])
-    big_sz = int(round(imgsz * float(scale) / 32.0)) * 32
     dets = json.loads(base_path.read_text())
     det = Detector()
-    arr, s = det.prepare(Image.open(png), big_sz)
-    merged = union_dets(dets, det.run_array(arr, s))
+    img = Image.open(png)
+    merged, sizes = dets, []
+    # ``scale`` may be a comma list: the detector's blind spots depend on the input size
+    # (a symbol missed at 1600 and 2048 can show at 1824 or 2400+), so union several.
+    for sc in str(scale).split(","):
+        big_sz = int(round(imgsz * float(sc) / 32.0)) * 32
+        if big_sz in sizes:
+            continue
+        sizes.append(big_sz)
+        arr, s = det.prepare(img, big_sz)
+        merged = union_dets(merged, det.run_array(arr, s))
     Path(out).write_text(json.dumps(merged))
-    print(json.dumps({"added": len(merged) - len(dets), "imgsz": big_sz}))
+    print(json.dumps({"added": len(merged) - len(dets), "imgsz": sizes[-1], "sizes": sizes}))
 
 
 if __name__ == "__main__":

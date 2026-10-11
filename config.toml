@@ -84,6 +84,12 @@ fix_ghost_bars = true
 # reading stays). Costs one extra run for pages that have gaps.
 second_pass = true
 second_pass_scale = 1.28
+# Further input sizes (x) whose extra notes/rests are unioned in as well: the detector's
+# blind spots depend on the size (Horn 7: a note missed at 1.0x and 1.28x shows at 1.75x).
+second_pass_extra_scales = [1.75]
+# A duplet/triplet Copisteria gave the time-modification to only some of its notes leaves a
+# gap; finish it when one unmodified neighbour accounts for the gap exactly.
+fix_half_tuplets = true
 # Page 1 only: Copisteria pads a pickup (upbeat) bar to a full bar with a hidden
 # rest when it misses the printed opening meter; drop the padding and show the meter.
 fix_pickup = true

@@ -21,8 +21,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix_opening_pickup,
-                                        reveal_gaps)
+from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix_half_tuplets,
+                                        fix_opening_pickup, reveal_gaps)
 from musicocr.copisteria_second_pass import gap_bars, merge_second_pass
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
@@ -111,7 +111,9 @@ def run(ctx: PipelineContext) -> StageResult:
         script = Path(__file__).resolve().parent.parent / "second_pass_detect.py"
         res = run_cmd_lenient(
             [py, str(script), str(work / img.name), str(base[0]), str(work / base[0].name),
-             str(ctx.config.omr.copisteria.second_pass_scale)], cwd=repo, **kw)
+             ",".join(str(x) for x in (ctx.config.omr.copisteria.second_pass_scale,
+                                        *ctx.config.omr.copisteria.second_pass_extra_scales))],
+            cwd=repo, **kw)
         if res is None or res.returncode != 0 or not (work / base[0].name).exists():
             ctx.log(f"  {img.stem}: second pass skipped (larger-scale detection failed)")
             return
@@ -168,6 +170,14 @@ def run(ctx: PipelineContext) -> StageResult:
             else:
                 if n:
                     ctx.log(f"  page {page}: opening bar made a pickup / time signature shown")
+        if ctx.config.omr.copisteria.fix_half_tuplets:
+            try:
+                n = fix_half_tuplets(xml, log=ctx.log)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  page {page}: half-tuplet fix failed ({type(exc).__name__}: {exc})")
+            else:
+                if n:
+                    ctx.log(f"  page {page}: completed {n} half-read tuplet note(s)")
         if ctx.config.omr.copisteria.reveal_gaps:
             try:
                 n = reveal_gaps(xml, log=lambda s: None)
