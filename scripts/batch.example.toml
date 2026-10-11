@@ -9,6 +9,10 @@ title = "My Piece"                       # heading of the progress doc
 source_pdf = "~/Music/my-piece-score-and-parts.pdf"   # the combined PDF (~ is expanded)
 key_prefix = "MyPiece_"                  # pipeline key = key_prefix + part id
 
+# engines = ["homr", "copisteria"]   # optional: run `musicocr compare` per part instead of `run`
+#                                    # (outputs in output/<name>/<key>/engines/<engine>/ + compare.md)
+# convert = true                     # with engines: also build .mscz/.mid/render per engine
+
 # Optional overrides (paths relative to the repo root):
 # input_dir    = "input/my-piece"
 # output_dir   = "output/my-piece"

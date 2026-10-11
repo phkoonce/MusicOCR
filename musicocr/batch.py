@@ -15,7 +15,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import tomllib
 
@@ -56,6 +56,8 @@ class BatchSpec:
     source_pdf: Path
     key_prefix: str
     parts: List[Part]
+    engines: Tuple[str, ...]
+    convert: bool
     input_dir: Path
     output_dir: Path
     state_path: Path
@@ -100,6 +102,17 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
         seen.add(part.id)
         parts.append(part)
 
+    engines = data.get("engines", [])
+    if not isinstance(engines, list) or not all(isinstance(e, str) for e in engines):
+        raise BatchSpecError("batch spec: 'engines' must be a list of engine names")
+    from musicocr.engines import ENGINES
+    unknown = sorted(set(engines) - set(ENGINES))
+    if unknown:
+        raise BatchSpecError(f"batch spec: unknown engine(s) {unknown}; known: {sorted(ENGINES)}")
+    convert = data.get("convert", False)
+    if not isinstance(convert, bool):
+        raise BatchSpecError("batch spec: 'convert' must be true/false")
+
     def rel(key: str, default: str) -> Path:
         return root / data.get(key, default)
 
@@ -111,6 +124,8 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
         source_pdf=source,
         key_prefix=prefix,
         parts=parts,
+        engines=tuple(engines),
+        convert=convert,
         input_dir=rel("input_dir", f"input/{name}"),
         output_dir=output_dir,
         state_path=rel("state_file", f"output/{name}/_state.json"),
@@ -222,14 +237,21 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
     out_dir = spec.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     started = time.time()
-    cmd = [str(spec.root / "run.sh"), "run", str(pdf), "--output", str(out_dir), "--keep-going"]
+    if spec.engines:   # side-by-side: output/<name>/<key>/engines/<engine>/ + compare.md
+        cmd = [str(spec.root / "run.sh"), "compare", str(pdf), "--engines", ",".join(spec.engines),
+               "--output", str(out_dir), "--keep-going"]
+        if spec.convert:
+            cmd.append("--convert")
+    else:
+        cmd = [str(spec.root / "run.sh"), "run", str(pdf), "--output", str(out_dir), "--keep-going"]
     if part.instrument:
         cmd += ["--transpose-instrument", part.instrument]
     with open(out_dir / f"{key}.run.log", "w") as log:
         rc = subprocess.run(
             cmd, stdout=log, stderr=subprocess.STDOUT,
         ).returncode
-    produced = out_dir / key / f"{key}.musicxml"
+    produced = (out_dir / key / "compare.md") if spec.engines \
+        else out_dir / key / f"{key}.musicxml"
     if produced.exists() and produced.stat().st_size > 0:
         minutes = (time.time() - started) / 60
         return {"status": DONE, "note": f"{minutes:.1f} min, rc={rc}; see {_rel(out_dir / key, spec.root)}/report.md"}

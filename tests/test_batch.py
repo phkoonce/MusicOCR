@@ -54,6 +54,34 @@ def test_run_part_writes_into_batch_output_dir(tmp_path, monkeypatch):
     assert (spec.output_dir / "Demo_a.run.log").exists()
 
 
+def test_engines_selects_compare_command(tmp_path, monkeypatch):
+    d = _data()
+    d["engines"] = ["homr", "copisteria"]
+    spec = batch.parse_spec(d, "demo", root=tmp_path)
+    assert spec.engines == ("homr", "copisteria")
+    seen = {}
+
+    def fake_run(cmd, stdout=None, stderr=None):
+        seen["cmd"] = cmd
+        book = spec.output_dir / "Demo_a"
+        book.mkdir(parents=True)
+        (book / "compare.md").write_text("x")
+        return type("R", (), {"returncode": 0})()
+
+    monkeypatch.setattr(batch.subprocess, "run", fake_run)
+    assert batch.run_part(spec, spec.parts[0], tmp_path / "a.pdf")["status"] == batch.DONE
+    cmd = seen["cmd"]
+    assert cmd[1] == "compare" and cmd[cmd.index("--engines") + 1] == "homr,copisteria"
+
+
+@pytest.mark.parametrize("bad", [["nope"], "homr", [1]])
+def test_engines_validated(tmp_path, bad):
+    d = _data()
+    d["engines"] = bad
+    with pytest.raises(BatchSpecError):
+        batch.parse_spec(d, "demo", root=tmp_path)
+
+
 def test_parse_spec_overrides(tmp_path):
     d = _data()
     d["progress_doc"] = "docs/other.md"
