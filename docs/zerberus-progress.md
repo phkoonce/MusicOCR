@@ -1,6 +1,7 @@
+<!-- batch:begin (auto-generated; text outside the markers is preserved) -->
 # Zerberus OMR progress
 
-Auto-written by `scripts/zerberus_batch.py` (updated 2026-10-09 22:11). Outputs in `output/<key>/`; per-part PDFs in `input/zerberus/`. Re-run the script to resume.
+Auto-written by `musicocr.batch` from `zerberus.toml` (updated 2026-10-11 09:54). Outputs in `output/<key>/`; per-part PDFs in `input/zerberus/`. Re-run the batch to resume.
 
 | Part | Pages | Status | Notes |
 |---|---|---|---|
@@ -23,6 +24,7 @@ Auto-written by `scripts/zerberus_batch.py` (updated 2026-10-09 22:11). Outputs 
 | Pauken (`Zerberus_pauken`) | 69-71 | done | 0.4 min, rc=0; see output/Zerberus_pauken/report.md |
 | Perkussion 1 (`Zerberus_perc1`) | 72-73 | done | 0.3 min, rc=0; see output/Zerberus_perc1/report.md |
 | Perkussion 2 (`Zerberus_perc2`) | 74-77 | done | 0.6 min, rc=0; see output/Zerberus_perc2/report.md |
+<!-- batch:end -->
 
 ## Status
 

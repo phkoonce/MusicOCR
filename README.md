@@ -248,6 +248,8 @@ tests/                # pytest unit tests for homr_fixes / measure_normalize
 config.toml           # tool paths, OMR engine/profiles, output formats
 scripts/setup.sh      # environment bootstrap (main pipeline)
 scripts/make_sample.py
+scripts/batch_run.py   # resumable multi-part batch (--batch SPEC.toml; see scripts/batch.example.toml;
+                       # logic in musicocr/batch.py, local specs in git-ignored batches/)
 omr-eval/setup.sh     # installs homr's own venv (default OMR engine)
 omr-eval/*.py         # standalone CLI wrappers for ad-hoc eval work, thin
                        # over the same musicocr modules the pipeline uses
