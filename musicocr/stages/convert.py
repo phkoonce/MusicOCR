@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from musicocr.errors import StageError, StageResult
 from musicocr.pipeline import PipelineContext
+from musicocr.stages._common import require_musicxml
 from musicocr.util import run_cmd_lenient
 
 _EXT = {"mscz": ".mscz", "midi": ".mid", "qa-pdf": ".pdf"}
@@ -40,12 +41,7 @@ def _convert(tool, src, dst, log):
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
-    if not xml.exists():
-        raise StageError(
-            f"no .musicxml at {xml.name}; run the extract stage first "
-            "(e.g. --from extract)"
-        )
+    xml = require_musicxml(ctx)
 
     wanted = [f for f in ctx.config.output.formats if f in _EXT]
     if not wanted:

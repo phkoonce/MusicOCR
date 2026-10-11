@@ -15,37 +15,19 @@ output too.
 """
 from __future__ import annotations
 
-from musicocr.errors import StageError, StageResult
+from musicocr.errors import StageResult
 from musicocr.pipeline import PipelineContext
+from musicocr.stages._common import disabled, load_score, require_musicxml
 
 
 def run(ctx: PipelineContext) -> StageResult:
     if not ctx.config.stages.normalize_enabled:
-        return StageResult("normalize", "skipped", "disabled ([stages.normalize] enabled = false)")
+        return disabled("normalize", "normalize")
 
-    xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
-    if not xml.exists():
-        raise StageError(
-            f"no .musicxml at {xml.name}; run the extract stage first (e.g. --from extract)"
-        )
-    if ctx.artifacts.musicxml is None:
-        ctx.artifacts.musicxml = xml
-
-    try:
-        from music21 import converter
-    except Exception as exc:  # noqa: BLE001
-        raise StageError(
-            f"music21 not importable ({exc}). Activate the venv / run scripts/setup.sh."
-        ) from exc
+    xml = require_musicxml(ctx)
+    score = load_score(xml)
 
     from musicocr.measure_normalize import normalize_score
-
-    try:
-        score = converter.parse(str(xml))
-    except Exception as exc:  # noqa: BLE001
-        raise StageError(
-            f"music21 could not parse {xml.name} ({type(exc).__name__}: {exc})."
-        ) from exc
 
     fixed = normalize_score(score, log=ctx.log)
     if not fixed:

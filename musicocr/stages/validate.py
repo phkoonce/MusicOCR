@@ -6,8 +6,9 @@ look), ``info`` (context).
 """
 from __future__ import annotations
 
-from musicocr.errors import StageError, StageResult
+from musicocr.errors import StageResult
 from musicocr.pipeline import PipelineContext
+from musicocr.stages._common import load_score, require_musicxml
 
 _TOL = 1e-6
 
@@ -69,29 +70,10 @@ def _check_part(part, p_index, findings):
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
-    if not xml.exists():
-        raise StageError(
-            f"no .musicxml at {xml.name}; run the extract stage first "
-            "(e.g. --from extract)"
-        )
-    if ctx.artifacts.musicxml is None:
-        ctx.artifacts.musicxml = xml
-
-    try:
-        from music21 import converter, stream
-    except Exception as exc:  # noqa: BLE001
-        raise StageError(
-            f"music21 not importable ({exc}). Activate the venv / run scripts/setup.sh."
-        ) from exc
-
-    try:
-        score = converter.parse(str(xml))
-    except Exception as exc:  # noqa: BLE001
-        raise StageError(
-            f"music21 could not parse {xml.name} ({type(exc).__name__}: {exc}). "
-            "The OMR output is likely malformed; inspect the per-page files."
-        ) from exc
+    xml = require_musicxml(ctx)
+    score = load_score(
+        xml, parse_hint="The OMR output is likely malformed; inspect the per-page files.")
+    from music21 import stream
     parts = list(score.getElementsByClass(stream.Part)) or [score]
 
     findings: list[dict] = []

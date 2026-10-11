@@ -21,21 +21,16 @@ import shutil
 
 from musicocr.errors import StageError, StageResult
 from musicocr.pipeline import PipelineContext
+from musicocr.stages._common import disabled, require_musicxml
 from musicocr.transpose import transpose_file
 
 
 def run(ctx: PipelineContext) -> StageResult:
     cfg = ctx.config.stages.transpose
     if not cfg.enabled:
-        return StageResult("transpose", "skipped", "disabled ([stages.transpose] enabled = false)")
+        return disabled("transpose", "transpose")
 
-    xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
-    if not xml.exists():
-        raise StageError(
-            f"no .musicxml at {xml.name}; run the extract stage first (e.g. --from extract)"
-        )
-    if ctx.artifacts.musicxml is None:
-        ctx.artifacts.musicxml = xml
+    xml = require_musicxml(ctx)
 
     targets = [xml]
     pages = ctx.artifacts.musicxml_pages or []
