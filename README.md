@@ -79,6 +79,12 @@ python -m musicocr transpose part.musicxml --semitones -2 -o out.musicxml
 python -m musicocr instruments                                        # show the table
 ```
 
+To do it inside a run, enable the `transpose` stage (`[stages.transpose]` in
+`config.toml`, or `--transpose-instrument "horn in f"` / `--transpose-semitones -7`
+on `run`). The untransposed file is kept in `output/<book>/written/`, and re-running
+`--from transpose` always starts from that copy, so shifts never stack. The `qa`
+render will be at the new pitch, so it won't visually match a written-pitch scan.
+
 Pitches and key signatures move together and are respelled (C major horn part →
 F major). The shared instrument table lives in `musicocr/instruments.py`; values
 are semitones to add to written pitch, and clef-dependent instruments (baritone /
@@ -120,8 +126,8 @@ python -m musicocr run INPUT.pdf \
 independent parts glued together (e.g. a full part set). Run each part's page
 range on its own; merging different instruments into one score is meaningless.
 
-Stages, in order: `ingest → omr → correct → extract → normalize → validate →
-convert → qa`. Re-running `--from extract` after editing the `.mxl`/`.omr` is
+Stages, in order: `ingest → omr → correct → extract → normalize → transpose →
+validate → convert → qa` (`transpose` is optional, off by default). Re-running `--from extract` after editing the `.mxl`/`.omr` is
 the normal way to iterate without paying for another full OMR pass.
 
 ### homr-specific pre/post-processing
@@ -233,8 +239,9 @@ musicocr/
   report.py            # report.md / report.json
   homr_fixes.py         # homr multi-rest generator-bug fix + dropped-multirest heuristic
   measure_normalize.py  # measure-duration normalization (homr rhythm misreads)
+  transpose.py / instruments.py  # semitone transposition + shared instrument table
   stages/               # ingest, omr (dispatches to omr_homr/omr_audiveris),
-                         # correct, extract, normalize, validate, convert, qa
+                         # correct, extract, normalize, transpose, validate, convert, qa
 tests/                # pytest unit tests for homr_fixes / measure_normalize
 config.toml           # tool paths, OMR engine/profiles, output formats
 scripts/setup.sh      # environment bootstrap (main pipeline)

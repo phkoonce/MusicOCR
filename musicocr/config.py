@@ -44,6 +44,7 @@ class Config:
     qa_dpi: int
     path: Path
     raw: dict[str, Any] = field(repr=False, default_factory=dict)
+    transpose: dict[str, Any] = field(default_factory=dict)   # [stages.transpose]
 
     def constants_for_profile(self, name: str | None = None) -> list[str]:
         name = name or self.omr_profile
@@ -90,6 +91,12 @@ def load_config(path: str | Path | None = None) -> Config:
     if engine not in VALID_ENGINES:
         raise ConfigError(f"invalid [omr] engine {engine!r}; known: {sorted(VALID_ENGINES)}")
 
+    tr = dict(data.get("stages", {}).get("transpose", {}))
+    if tr.get("semitones") is not None and tr.get("instrument"):
+        raise ConfigError("[stages.transpose]: set either semitones or instrument, not both")
+    if tr.get("clef") and tr["clef"] not in ("treble", "bass", "c"):
+        raise ConfigError("[stages.transpose] clef must be treble, bass or c")
+
     default_homr_python = REPO_ROOT / "omr-eval" / "homr" / ".venv" / "bin" / "python"
 
     return Config(
@@ -117,4 +124,5 @@ def load_config(path: str | Path | None = None) -> Config:
         qa_dpi=int(output.get("qa_dpi", 150)),
         path=cfg_path,
         raw=data,
+        transpose=tr,
     )

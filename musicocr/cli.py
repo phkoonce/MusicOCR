@@ -42,6 +42,15 @@ def cmd_run(args) -> int:
         pp["enabled"] = True
         print("note: --deskew/--crop turn on the [preprocess] pass")
     config.preprocess = pp
+
+    tr = dict(config.transpose)
+    if args.transpose_instrument is not None:
+        tr.update(enabled=True, instrument=args.transpose_instrument, semitones=None)
+    if args.transpose_semitones is not None:
+        tr.update(enabled=True, semitones=args.transpose_semitones, instrument="")
+    if args.transpose is not None:
+        tr["enabled"] = args.transpose
+    config.transpose = tr
     try:
         config.constants_for_profile()
     except ConfigError as exc:
@@ -162,7 +171,8 @@ def cmd_doctor(args) -> int:
     print("\nprofiles:", ", ".join(sorted(config.profiles)))
     print("stages:  ", " -> ".join(STAGE_ORDER),
           f"\n         (correct: {'enabled' if config.correct_enabled else 'disabled'}"
-          f", normalize: {'enabled' if config.normalize_enabled else 'disabled'})")
+          f", normalize: {'enabled' if config.normalize_enabled else 'disabled'}"
+          f", transpose: {'enabled' if config.transpose.get('enabled') else 'disabled'})")
     if config.omr_engine == "homr":
         print(f"homr:     fix_multirest={'on' if config.homr_fix_multirest else 'off'}")
     print("formats: ", ", ".join(config.formats))
@@ -200,6 +210,14 @@ def build_parser() -> argparse.ArgumentParser:
                    help="preprocess: trim the header/footer text band down to the staves")
     r.add_argument("--no-crop", dest="crop", action="store_false",
                    help="preprocess: skip the margin crop")
+    r.add_argument("--transpose", dest="transpose", action="store_true", default=None,
+                   help="enable the transpose stage (config [stages.transpose])")
+    r.add_argument("--no-transpose", dest="transpose", action="store_false",
+                   help="disable the transpose stage")
+    r.add_argument("--transpose-instrument", metavar="NAME",
+                   help="transpose by this instrument's table entry (implies --transpose)")
+    r.add_argument("--transpose-semitones", type=int, metavar="N",
+                   help="transpose by N semitones (implies --transpose)")
     r.add_argument("--from", dest="from_stage", choices=STAGE_ORDER, help="start stage")
     r.add_argument("--to", dest="to_stage", choices=STAGE_ORDER, help="end stage (inclusive)")
     r.add_argument("--keep-going", action="store_true",

@@ -22,7 +22,11 @@ from musicocr.state import load_state, save_state
 # project feeds the rest of the pipeline unchanged. `normalize` sits between
 # extract and validate so it works on the merged score and its fixes show up
 # in the same validate pass that would otherwise just flag them.
-STAGE_ORDER = ["ingest", "omr", "correct", "extract", "normalize", "validate", "convert", "qa"]
+# `transpose` (optional, off by default) follows normalize so it shifts the
+# already-cleaned score, and precedes validate/convert so the deliverables carry
+# the new pitch.
+STAGE_ORDER = ["ingest", "omr", "correct", "extract", "normalize", "transpose",
+               "validate", "convert", "qa"]
 
 
 @dataclass

@@ -139,3 +139,46 @@ def test_tuba_treble_clef_depends_on_pitch():
     root = _score("Eb Tuba", [("C", 0, 5)])
     transpose_score(root)
     assert _read(root) == [("E", -1, 3)] and _keys(root) == [-3]   # C5 -> Eb3 (down 21)
+
+
+def test_stage_is_idempotent_and_restores_from_written_copy(tmp_path):
+    from musicocr.config import load_config
+    from musicocr.pipeline import PipelineContext
+    from musicocr.stages import transpose as stage
+
+    xml = tmp_path / "book.musicxml"
+    ET.ElementTree(_score("Voice", [("C", 0, 5)])).write(xml)
+    cfg = load_config()
+    cfg.transpose = {"enabled": True, "instrument": "horn in f"}
+    ctx = PipelineContext(input_pdf=tmp_path / "x.pdf", workdir=tmp_path, config=cfg,
+                          book_name="book", log=lambda s: None)
+    ctx.artifacts["musicxml"] = xml
+
+    assert stage.run(ctx).status == "ok"
+    first = xml.read_text()
+    assert stage.run(ctx).status == "ok"          # second run must not shift again
+    assert xml.read_text() == first
+    assert _read(ET.parse(xml).getroot()) == [("F", 0, 4)]
+    assert _read(ET.parse(tmp_path / "written" / "book.musicxml").getroot()) == [("C", 0, 5)]
+
+    # a fresh upstream rewrite becomes the new written copy
+    ET.ElementTree(_score("Voice", [("D", 0, 5)])).write(xml)
+    stage.run(ctx)
+    assert _read(ET.parse(xml).getroot()) == [("G", 0, 4)]
+
+
+def test_stage_disabled_and_unresolvable(tmp_path):
+    from musicocr.config import load_config
+    from musicocr.pipeline import PipelineContext, StageError
+    from musicocr.stages import transpose as stage
+
+    xml = tmp_path / "book.musicxml"
+    ET.ElementTree(_score("Voice", [("C", 0, 5)])).write(xml)
+    cfg = load_config()
+    ctx = PipelineContext(input_pdf=tmp_path / "x.pdf", workdir=tmp_path, config=cfg,
+                          book_name="book", log=lambda s: None)
+    ctx.artifacts["musicxml"] = xml
+    assert stage.run(ctx).status == "skipped"
+    cfg.transpose = {"enabled": True}              # no instrument, generic part name
+    with pytest.raises(StageError):
+        stage.run(ctx)

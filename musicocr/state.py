@@ -16,7 +16,7 @@ _PATH_DICT_KEYS = {"outputs"}            # {str: path | [path, ...]}
 _PAGE_MAP_KEYS = {"mxl_by_page"}         # {int: [path, ...]}
 _INT_PATH_MAP_KEYS = {"prepped_pages"}   # {int: path}
 _PLAIN_KEYS = {"page_count", "omr_failed_pages", "validation", "qa_pages",
-               "merge_skipped", "extract_merged"}
+               "merge_skipped", "extract_merged", "transpose_stamps"}
 
 _ALL = (_PATH_KEYS | _PATH_LIST_KEYS | _PATH_DICT_KEYS | _PAGE_MAP_KEYS
         | _INT_PATH_MAP_KEYS | _PLAIN_KEYS)

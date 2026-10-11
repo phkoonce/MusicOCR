@@ -104,6 +104,18 @@ enabled = false
 # signature are touched -- so it's safe to leave on for Audiveris output too.
 enabled = true
 
+[stages.transpose]
+# Optional: shift written pitch to concert pitch (or any interval) after
+# normalize, keys included. Off by default. Give `semitones` (all parts) or
+# `instrument` (looked up in musicocr/instruments.py); with neither, each part
+# is identified by its <part-name>. `clef` ("treble"/"bass"/"c") overrides the
+# first-clef detection for clef-dependent instruments (baritone, tuba...).
+# CLI: --transpose / --no-transpose / --transpose-instrument / --transpose-semitones.
+enabled = false
+# instrument = "horn in f"
+# semitones = -7
+# clef = "treble"
+
 [output]
 # Any subset of: "musicxml", "mscz", "midi", "qa-pdf"
 formats = ["musicxml", "mscz", "midi", "qa-pdf"]
