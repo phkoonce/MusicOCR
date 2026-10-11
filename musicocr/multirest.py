@@ -64,6 +64,30 @@ def _write(tree: ET.ElementTree, path: Path) -> None:
     tree.write(path, encoding="UTF-8", xml_declaration=True)
 
 
+def collapsed_units(part: ET.Element) -> list[tuple[ET.Element, int]]:
+    """``(measure, printed_bars)`` per unit of ``part`` in the collapsed convention.
+
+    Works on either spelling without modifying anything: a tagged multi-rest
+    measure absorbs the following pure-rest bars it announces (the expanded form),
+    so both forms give one unit per printed multi-rest. ``printed_bars`` is the
+    multi-rest's count (1 for ordinary bars).
+    """
+    measures = part.findall("measure")
+    units: list[tuple[ET.Element, int]] = []
+    i = 0
+    while i < len(measures):
+        n = _count(measures[i])
+        take = 0
+        if n >= 2:
+            for follower in measures[i + 1:i + n]:
+                if not _is_pure_rest_measure(follower):
+                    break
+                take += 1
+        units.append((measures[i], max(n, 1)))
+        i += 1 + take
+    return units
+
+
 def collapse_multirests(path: Path, log: Callable[[str], None] = print) -> int:
     """Fold each tagged multi-rest and its N-1 follower bars into one measure.
 

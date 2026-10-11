@@ -54,9 +54,9 @@ Unit = Tuple[int, int]               # (index into all measures, <multiple-rest>
 Plan = List[Tuple[int, int, Optional[Source], bool]]   # (first_bar, last_bar, source, is_multirest)
 
 
-def pdf_words(pdf: str, page: int) -> List[Word]:
+def pdf_words(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[Word]:
     """Words with bounding boxes ``(xmin, ymin, xmax, ymax, text)`` via ``pdftotext -bbox``."""
-    t = subprocess.run(["pdftotext", "-bbox", "-f", str(page), "-l", str(page), pdf, "-"],
+    t = subprocess.run([pdftotext, "-bbox", "-f", str(page), "-l", str(page), pdf, "-"],
                        capture_output=True, text=True).stdout
     return [(float(a), float(b), float(c), float(d), w) for a, b, c, d, w in
             re.findall(r'xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)<', t)]

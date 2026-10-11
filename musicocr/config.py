@@ -55,6 +55,7 @@ class HomrConfig:
 class CopisteriaConfig:
     detector: str = "28m"   # "28m" (default) or "2m" (smaller, faster)
     fix_empty: bool = True   # give bare-<forward> bars a whole-measure rest
+    fix_ghost_bars: bool = True   # drop key/time-signature "bars" misread from cautionary signatures
     texts: str = "pdf-layer"   # page-text source: "pdf-layer" (multi-rest counts) or "none"
     multirest_form: str = "collapse"   # "collapse" (homr's form), "expand", or "keep"
     repo: str = str(REPO_ROOT / "omr-eval" / "copisteria" / "repo")
@@ -72,6 +73,7 @@ class CopisteriaConfig:
         if form not in ("collapse", "expand", "keep"):
             raise ConfigError("[omr.copisteria] multirest_form must be 'collapse', 'expand' or 'keep'")
         return cls(detector=detector, texts=texts, fix_empty=bool(d.get("fix_empty", True)),
+                   fix_ghost_bars=bool(d.get("fix_ghost_bars", True)),
                    multirest_form=form,
                    repo=str(d.get("repo", base.repo)))
 

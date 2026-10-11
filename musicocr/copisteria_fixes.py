@@ -39,3 +39,114 @@ def fill_empty_measures(path: Path, log: Callable[[str], None] = print) -> int:
         ET.indent(tree, space="  ")
         tree.write(path, encoding="UTF-8", xml_declaration=True)
     return fixed
+
+
+# --- ghost bars from cautionary key/time signatures --------------------------------
+#
+# A cautionary key + time signature printed after a double bar at the end of a system
+# (repeated at the next system's start) can be read as an extra, note-bearing "measure":
+# Zerberus Horn 1 p.1 gets a bar holding only a key change and a spurious whole note,
+# followed by a bar that carries just the time change. Real music puts a key and a time
+# change at the same barline, so the signature being split over two consecutive bars,
+# right after a double barline, with a few plain notes in the first and no other
+# content, is strong evidence the first bar is a misread signature.
+
+_DOUBLE = {"light-light", "light-heavy", "heavy-light", "heavy-heavy"}
+
+
+def _sig(measure: ET.Element) -> tuple[ET.Element | None, ET.Element | None]:
+    attrs = measure.find("attributes")
+    if attrs is None:
+        return None, None
+    return attrs.find("key"), attrs.find("time")
+
+
+def _same(a: ET.Element | None, b: ET.Element | None) -> bool:
+    return (a is not None and b is not None
+            and ET.tostring(a) == ET.tostring(b))
+
+
+def _ends_with_double_bar(measure: ET.Element) -> bool:
+    for bl in measure.findall("barline"):
+        if bl.get("location", "right") == "right" and bl.findtext("bar-style") in _DOUBLE:
+            return True
+    return False
+
+
+def _is_ghost(prev: ET.Element, ghost: ET.Element, nxt: ET.Element) -> bool:
+    if not _ends_with_double_bar(prev):
+        return False
+    # Only attributes + a few plain pitched notes; anything else is content we can't explain.
+    kinds = [c.tag for c in ghost]
+    if any(k not in ("attributes", "note") for k in kinds) or "attributes" not in kinds:
+        return False
+    attrs = ghost.find("attributes")
+    if any(c.tag not in ("key", "time", "divisions") for c in attrs):
+        return False
+    notes = ghost.findall("note")
+    if not 1 <= len(notes) <= 2:
+        return False
+    for n in notes:
+        if n.find("pitch") is None or n.find("rest") is not None or n.find("notations") is not None \
+                or n.find("tie") is not None or n.find("lyric") is not None:
+            return False
+    gk, gt = _sig(ghost)
+    nk, nt = _sig(nxt)
+    if gk is None and gt is None:
+        return False
+    # Complementary halves of one signature block: what the ghost declares, the next bar
+    # does not contradict, and the next bar declares something the ghost does not.
+    if gk is not None and nk is not None and not _same(gk, nk):
+        return False
+    if gt is not None and nt is not None and not _same(gt, nt):
+        return False
+    if (gk is None) == (gt is None):
+        # ghost has both: only if the next bar repeats at least one of them identically
+        return _same(gk, nk) or _same(gt, nt)
+    return (gk is not None and nt is not None and nk is None) or \
+           (gt is not None and nk is not None and nt is None)
+
+
+def drop_ghost_bars(path: Path, log: Callable[[str], None] = print) -> int:
+    """Remove ghost bars (see above) in place; return how many were dropped.
+
+    The ghost's key/time declarations move onto the following bar so nothing is
+    lost; measures are renumbered.
+    """
+    tree = ET.parse(path)
+    dropped = 0
+    for part in tree.getroot().findall("part"):
+        measures = part.findall("measure")
+        i = 1
+        while i < len(measures) - 1:
+            prev, ghost, nxt = measures[i - 1], measures[i], measures[i + 1]
+            if not _is_ghost(prev, ghost, nxt):
+                i += 1
+                continue
+            attrs = nxt.find("attributes")
+            if attrs is None:
+                attrs = ET.Element("attributes")
+                nxt.insert(0, attrs)
+            gk, gt = _sig(ghost)
+            if gk is not None and attrs.find("key") is None:
+                pos = 1 if attrs.find("divisions") is not None else 0
+                attrs.insert(pos, gk)
+            if gt is not None and attrs.find("time") is None:
+                pos = [c.tag for c in attrs].index("key") + 1 if attrs.find("key") is not None \
+                    else (1 if attrs.find("divisions") is not None else 0)
+                attrs.insert(pos, gt)
+            notes = [(n.findtext("pitch/step") or "?") + (n.findtext("pitch/octave") or "")
+                     for n in ghost.findall("note")]
+            log(f"  measure {ghost.get('number')}: dropped ghost bar after a double bar "
+                f"(key/time-signature bar with note(s) {notes}; next bar carries the other half "
+                f"of the signature)")
+            part.remove(ghost)
+            measures.remove(ghost)
+            dropped += 1
+        for n, m in enumerate(part.findall("measure"), int(measures[0].get("number", "1"))
+                              if measures and measures[0].get("number", "").isdigit() else 1):
+            m.set("number", str(n))
+    if dropped:
+        ET.indent(tree, space="  ")
+        tree.write(path, encoding="UTF-8", xml_declaration=True)
+    return dropped

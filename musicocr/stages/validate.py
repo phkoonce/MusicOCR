@@ -6,6 +6,8 @@ look), ``info`` (context).
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from musicocr.engines import has_check
 from musicocr.errors import StageResult
 from musicocr.pipeline import PipelineContext
@@ -92,6 +94,24 @@ def suspicious_tuplet_measures(part) -> list[tuple[int, str]]:
     return out
 
 
+def _bar_count_findings(ctx: PipelineContext, findings: list[dict]) -> None:
+    """Flag ghost/missing bars against the PDF's printed bar numbers (text layer only)."""
+    pages = ctx.artifacts.musicxml_pages
+    pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
+    pdftotext = ctx.config.resolve_tool("pdftotext")
+    if not pages or not pdftotext or not Path(pdf).exists():
+        return
+    from musicocr.barcheck import check_bar_counts, page_files_of
+    try:
+        issues = check_bar_counts(Path(pdf), page_files_of(pages), pdftotext)
+    except Exception as exc:  # noqa: BLE001
+        ctx.log(f"  bar-count check failed: {type(exc).__name__}: {exc}")
+        return
+    for i in issues:
+        findings.append(_finding("warn", "bar-count", i.message, page=i.page,
+                                 expected=i.expected, actual=i.actual))
+
+
 def run(ctx: PipelineContext) -> StageResult:
     xml = require_musicxml(ctx)
     score = load_score(
@@ -136,6 +156,8 @@ def run(ctx: PipelineContext) -> StageResult:
             f"{accidentals}/{notes} notes carry accidentals — check key signature"))
     if notes == 0:
         findings.append(_finding("error", "no-notes", "no notes recognised in the score"))
+
+    _bar_count_findings(ctx, findings)
 
     if has_check(ctx.config.omr.engine, "dropped_multirest"):
         # homr-specific: a dropped multi-rest (the model reads a printed "3" as

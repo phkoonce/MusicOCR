@@ -175,6 +175,17 @@ the normal way to iterate without paying for another full OMR pass.
 * **Empty bars** (bare `<forward>`, e.g. a multi-rest whose count it could not
   place) get a whole-measure rest (`[omr.copisteria] fix_empty`,
   `musicocr/copisteria_fixes.py`).
+* **Ghost bars.** A cautionary key + time signature after a double bar can be read
+  as an extra bar holding a key change and a spurious note, with the time change in
+  the next bar. `[omr.copisteria] fix_ghost_bars` (default on) drops such a bar only
+  when it follows a double barline, holds only key/time attributes plus 1-2 plain
+  notes (no rests, ties, articulations, directions), and the next bar carries the
+  complementary half of the signature; the declarations move to that bar and the drop
+  is logged.
+* `validate` flags `bar-count` for any engine when the source PDF has a text layer:
+  measure units per system (or per page when the XML has no system marks, as
+  Copisteria) are compared with the printed system-start bar numbers minus
+  multi-rest counts (`musicocr/barcheck.py`), reporting ghost (extra) or missing bars.
 * `validate` flags `odd-tuplets` for any engine: bars with mixed tuplet ratios
   or a tuplet note shorter than a 32nd (Copisteria infers tuplets from spacing
   and can invent them while still summing to the right bar length).

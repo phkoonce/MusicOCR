@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from musicocr.copisteria_fixes import fill_empty_measures
+from musicocr.copisteria_fixes import drop_ghost_bars, fill_empty_measures
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
 from musicocr.page_text import boost_multirest_dets, write_texts_json
@@ -98,6 +98,14 @@ def run(ctx: PipelineContext) -> StageResult:
             else:
                 if fixed:
                     ctx.log(f"  page {page}: gave {fixed} empty bar(s) a whole-measure rest")
+        if ctx.config.omr.copisteria.fix_ghost_bars:
+            try:
+                ghosts = drop_ghost_bars(xml, log=ctx.log)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  page {page}: ghost-bar fix failed ({type(exc).__name__}: {exc})")
+            else:
+                if ghosts:
+                    ctx.log(f"  page {page}: dropped {ghosts} ghost bar(s)")
         form = ctx.config.omr.copisteria.multirest_form
         try:
             n = apply_multirest_form(xml, form, log=ctx.log)
