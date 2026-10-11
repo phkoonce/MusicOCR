@@ -91,7 +91,8 @@ def run(ctx: PipelineContext) -> StageResult:
                     else:
                         ctx.log(f"  {img.stem}: empty-bar fill: {(res.output.strip().splitlines() or [''])[-1]}")
                 if texts_found:
-                    add_missing_multirest_dets(dets, texts, log=ctx.log)
+                    if cfg.synth_multirest:
+                        add_missing_multirest_dets(dets, texts, log=ctx.log)
                     boost_multirest_dets(dets, texts, log=ctx.log)
                 if cfg.small_graces:        # after the fill, whose added notes may be small too
                     n = mark_small_graces(dets)

@@ -379,3 +379,25 @@ def test_union_into_empty_only_fills_measure_boxes_that_hold_nothing():
     assert [r["cls"] for r in got[len(base):]] == ["mRest_measure"]
     assert got[len(base)]["xyxy"][0] == 140
     assert union_into_empty([box("measure", 0, 100), box("note_quarter", 40, 60)], big)[2:] == []
+
+
+def test_key_reset_skips_multirest_follower_bars(tmp_path):
+    import json
+    from musicocr.copisteria_fixes import fix_missing_key_cancel
+    rest = '<note><rest measure="yes"/><duration>12</duration></note>'
+    xml = tmp_path / "p.musicxml"
+    xml.write_text(f"""<score-partwise><part id="P1">
+<measure number="1"><attributes><key><fifths>3</fifths></key>
+<measure-style><multiple-rest>3</multiple-rest></measure-style></attributes>{rest}</measure>
+<measure number="2">{rest}</measure><measure number="3">{rest}</measure>
+<measure number="4"><note><pitch><step>C</step><alter>1</alter><octave>5</octave></pitch><duration>12</duration></note></measure>
+</part></score-partwise>""")
+    # two printed bars: the multi-rest, then a bar opening a staff with a clef but no key
+    tok = lambda key: {"cls": {"v": "measure"}, "clef": {"v": "G2"}, "key": {"v": key, "p": 1.0}}  # noqa: E731
+    rj = tmp_path / "p.reading.json"
+    rj.write_text(json.dumps({"tokens": {"1": tok(3), "2": tok(None)}}))
+    assert fix_missing_key_cancel(xml, rj, log=lambda s: None) == 1
+    ms = ET.parse(xml).getroot().findall("part/measure")
+    assert [m.find("attributes/key") is not None for m in ms] == [True, False, False, True]
+    assert ms[3].find("attributes/key/fifths").text == "0"
+    assert ms[3].find("note/pitch/alter") is None         # the key's C# no longer applies

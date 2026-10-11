@@ -288,6 +288,21 @@ def fix_missing_key_cancel(path: Path, reading_json: Path,
     changes = 0
     for part in tree.getroot().findall("part"):
         measures = part.findall("measure")
+        # reading.json has one measure token per *printed* bar, but the XML writes a
+        # multi-rest as the tagged bar plus N-1 follower bars: map XML bars to tokens,
+        # skipping the followers (they have no token of their own).
+        tok: list[int | None] = []
+        nxt, skip = 0, 0
+        for m in measures:
+            if skip:
+                tok.append(None)
+                skip -= 1
+                continue
+            tok.append(nxt)
+            nxt += 1
+            mr = m.find("./attributes/measure-style/multiple-rest")
+            if mr is not None and (mr.text or "").strip().isdigit():
+                skip = max(int(mr.text) - 1, 0)
         key = 0
         old: int | None = None          # the wrongly carried key being cancelled
         for i, m in enumerate(measures):
@@ -296,7 +311,7 @@ def fix_missing_key_cancel(path: Path, reading_json: Path,
             if declared is not None:
                 key = int(declared.findtext("fifths") or 0)
                 old = None
-            elif i in opens and key != 0:
+            elif tok[i] is not None and tok[i] in opens and key != 0:
                 old = key
                 key = 0
                 if attrs is None:
