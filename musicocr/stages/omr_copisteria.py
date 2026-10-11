@@ -21,8 +21,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix_opening_pickup,
-                                        reveal_gaps)
+from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix_missing_key_cancel,
+                                        fix_opening_pickup, inherit_unprinted_time, reveal_gaps)
 from musicocr.copisteria_second_pass import gap_bars, merge_second_pass
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
@@ -95,39 +95,54 @@ def run(ctx: PipelineContext) -> StageResult:
             cmd += ["--detector", detector]
         return cmd, repo
 
-    def _second_pass(cmd, img: Path, **kw) -> None:
-        """Re-read a page that has gaps with extra detections from a larger scale."""
+    def _second_pass_at(cmd, img: Path, scale: float, first: bool, **kw) -> bool:
+        """One re-detection at ``scale`` x the input size; True when it filled a gap bar."""
         pdir = img.parent
         out_xml = pdir / f"{img.stem}.musicxml"
-        if not out_xml.exists() or not gap_bars(out_xml):
-            return
         base = sorted(pdir.glob(f"{img.stem}.dets_*.json"))
         if len(base) != 1:
-            return
-        work = pdir / "second_pass"
+            return False
+        work = pdir / ("second_pass" if first else f"second_pass_{scale:g}")
         work.mkdir(exist_ok=True)
         for f in (img, *pdir.glob(f"{img.stem}.texts.json"), *pdir.glob(f"{img.stem}.geom.json")):
             (work / f.name).write_bytes(f.read_bytes())
         script = Path(__file__).resolve().parent.parent / "second_pass_detect.py"
         res = run_cmd_lenient(
             [py, str(script), str(work / img.name), str(base[0]), str(work / base[0].name),
-             str(ctx.config.omr.copisteria.second_pass_scale)], cwd=repo, **kw)
+             str(scale)], cwd=repo, **kw)
         if res is None or res.returncode != 0 or not (work / base[0].name).exists():
-            ctx.log(f"  {img.stem}: second pass skipped (larger-scale detection failed)")
-            return
+            ctx.log(f"  {img.stem}: second pass x{scale:g} skipped (larger-scale detection failed)")
+            return False
         cmd2 = [py, "-m", "copisteria.pipeline", str(work / img.name), "--out", str(work)]
         cmd2 += cmd[cmd.index("--out") + 2:]          # e.g. --detector
         run_cmd_lenient(cmd2, cwd=repo, **kw)
         second = work / f"{img.stem}.musicxml"
         if not second.exists():
-            ctx.log(f"  {img.stem}: second pass skipped (no output)")
-            return
+            ctx.log(f"  {img.stem}: second pass x{scale:g} skipped (no output)")
+            return False
         merged = work / f"{img.stem}.merged.musicxml"
         n, why = merge_second_pass(out_xml, second, merged)
-        ctx.log(f"  {img.stem}: second pass {'used' if n else 'not used'}: {why}")
+        ctx.log(f"  {img.stem}: second pass x{scale:g} {'used' if n else 'not used'}: {why}")
         if n:
-            out_xml.rename(pdir / f"{img.stem}.pass1.musicxml")
-            merged.rename(out_xml)
+            pass1 = pdir / f"{img.stem}.pass1.musicxml"
+            if not pass1.exists():
+                out_xml.rename(pass1)
+            merged.replace(out_xml)
+        return bool(n)
+
+    def _second_pass(cmd, img: Path, **kw) -> None:
+        """Re-read a page that has gaps with extra detections from a larger scale; gaps a
+        scale cannot fill are retried at the other scales (the detector's blind spots
+        differ per input size)."""
+        out_xml = img.parent / f"{img.stem}.musicxml"
+        if not out_xml.exists() or not gap_bars(out_xml):
+            return
+        cfg = ctx.config.omr.copisteria
+        scales = [cfg.second_pass_scale, *cfg.second_pass_retry_scales]
+        for k, scale in enumerate(scales):
+            if k and not gap_bars(out_xml):
+                break
+            _second_pass_at(cmd, img, scale, first=(k == 0), **kw)
 
     def runner(cmd, **kw):
         res = run_cmd_lenient(cmd, **kw)
@@ -142,6 +157,23 @@ def run(ctx: PipelineContext) -> StageResult:
         return res
 
     def postprocess(page: int, xml: Path) -> None:
+        # Reading-index based fixes first: bar indices still match reading.json here.
+        if ctx.config.omr.copisteria.fix_key_cancel:
+            try:
+                n = fix_missing_key_cancel(xml, xml.with_name(f"{xml.stem}.reading.json"),
+                                           log=ctx.log)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  page {page}: key-cancel fix failed ({type(exc).__name__}: {exc})")
+            else:
+                if n:
+                    ctx.log(f"  page {page}: key reset to C major at {n} staff start(s) "
+                            "that print no key signature")
+        if ctx.config.omr.copisteria.fix_time_inherit and page > 1:
+            prev = xml.parent.parent / f"p{page - 1:03d}" / f"p{page - 1:03d}.musicxml"
+            try:
+                n = inherit_unprinted_time(xml, prev, log=ctx.log)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  page {page}: time inherit failed ({type(exc).__name__}: {exc})")
         # Order matters: give bare-<forward> bars their rest first, so the
         # multi-rest fold sees real whole-measure rests.
         if ctx.config.omr.copisteria.fix_empty:

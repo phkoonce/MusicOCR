@@ -235,3 +235,138 @@ def reveal_gaps(path: Path, color: str = GAP_COLOR,
         ET.indent(tree, space="  ")
         tree.write(path, encoding="UTF-8", xml_declaration=True)
     return revealed
+
+
+# --- key signature that Copisteria never reads: C major / cancelled ------------------
+#
+# Every system of a printed part starts with its key signature -- except C major (or a
+# key just cancelled), which prints nothing (the cancelling naturals are not a symbol
+# Copisteria detects). Its measure head then says "key: not set" and the writer carries
+# the previous system's key forward, so Zerberus Horn 6's last 16 bars (printed in C
+# major after A major) come out with every C#/F#/G# of the old key signature.
+# The first bar of each staff always shows a clef; a staff-first bar with a clef but no
+# key reading therefore means "no accidentals in the key signature".
+
+_SHARP_STEPS = "FCGDAEB"
+_FLAT_STEPS = "BEADGCF"
+
+
+def _key_alter(step: str, fifths: int) -> int:
+    if fifths > 0:
+        return 1 if step in _SHARP_STEPS[:fifths] else 0
+    if fifths < 0:
+        return -1 if step in _FLAT_STEPS[:-fifths] else 0
+    return 0
+
+
+def staff_first_without_key(reading_json: Path) -> list[int]:
+    """0-based bar indices (in reading order = measure order) that open a staff (clef read)
+    but carry no key reading."""
+    import json
+    tokens = json.loads(Path(reading_json).read_text()).get("tokens", {})
+    bars = [t for t in tokens.values() if (t.get("cls") or {}).get("v") == "measure"]
+    out = []
+    for i, t in enumerate(bars):
+        if (t.get("clef") or {}).get("v") is not None and (t.get("key") or {}).get("v") is None \
+                and (t.get("key") or {}).get("p", 0) >= 0.9:
+            out.append(i)
+    return out
+
+
+def fix_missing_key_cancel(path: Path, reading_json: Path,
+                           log: Callable[[str], None] = print) -> int:
+    """Reset the key to C major where a staff opens with no key signature printed but
+    the writer carried a sharp/flat key over from the previous system.
+
+    Notes whose alteration only came from the old key signature (no ``<accidental>``)
+    lose it; explicitly accidental notes are kept. Returns the number of bars changed
+    (the bar that gets the new ``<key>`` counts once)."""
+    opens = set(staff_first_without_key(reading_json))
+    if not opens:
+        return 0
+    tree = ET.parse(path)
+    changes = 0
+    for part in tree.getroot().findall("part"):
+        measures = part.findall("measure")
+        key = 0
+        old: int | None = None          # the wrongly carried key being cancelled
+        for i, m in enumerate(measures):
+            attrs = m.find("attributes")
+            declared = attrs.find("key") if attrs is not None else None
+            if declared is not None:
+                key = int(declared.findtext("fifths") or 0)
+                old = None
+            elif i in opens and key != 0:
+                old = key
+                key = 0
+                if attrs is None:
+                    attrs = ET.Element("attributes")
+                    m.insert(0, attrs)
+                k = ET.Element("key")
+                ET.SubElement(k, "fifths").text = "0"
+                pos = 1 if attrs.find("divisions") is not None else 0
+                attrs.insert(pos, k)
+                changes += 1
+                log(f"  measure {m.get('number')}: staff opens with no key signature -> "
+                    f"C major (was carrying {old:+d})")
+            if old is None:
+                continue
+            for n in m.findall("note"):
+                p = n.find("pitch")
+                if p is None or n.find("accidental") is not None:
+                    continue
+                step = p.findtext("step") or ""
+                alt = p.find("alter")
+                if alt is not None and int(float(alt.text or 0)) == _key_alter(step, old) != 0:
+                    p.remove(alt)
+    if changes:
+        ET.indent(tree, space="  ")
+        tree.write(path, encoding="UTF-8", xml_declaration=True)
+    return changes
+
+
+# --- time signature the page never printed --------------------------------------------
+
+def _last_time(path: Path) -> tuple[int, int] | None:
+    last = None
+    for t in ET.parse(path).getroot().iter("time"):
+        try:
+            last = (int(t.findtext("beats")), int(t.findtext("beat-type")))
+        except (TypeError, ValueError):
+            pass
+    return last
+
+
+def inherit_unprinted_time(path: Path, prev_path: Path,
+                           log: Callable[[str], None] = print) -> int:
+    """A page that opens without a printed time signature continues the previous page's.
+
+    Copisteria then guesses a meter from the bar lengths, and 6/8 and 3/4 (same length)
+    are interchangeable to it (Zerberus Horn 6 got 3/4 on pages 2 and 4 of a 6/8
+    piece). When the guess is flagged ``print-object="no"`` and has the same bar
+    length as the previous page's last meter, that meter is used instead. Returns the
+    number of signatures replaced."""
+    prev = _last_time(prev_path) if prev_path.exists() else None
+    if prev is None:
+        return 0
+    tree = ET.parse(path)
+    done = 0
+    for part in tree.getroot().findall("part"):
+        first = part.find("measure")
+        t = first.find("attributes/time") if first is not None else None
+        if t is None or t.get("print-object") != "no":
+            continue
+        try:
+            cur = (int(t.findtext("beats")), int(t.findtext("beat-type")))
+        except (TypeError, ValueError):
+            continue
+        if cur == prev or cur[0] * prev[1] != prev[0] * cur[1]:
+            continue
+        t.find("beats").text, t.find("beat-type").text = str(prev[0]), str(prev[1])
+        done += 1
+        log(f"  time {cur[0]}/{cur[1]} (not printed) -> {prev[0]}/{prev[1]} "
+            f"(previous page's meter, same bar length)")
+    if done:
+        ET.indent(tree, space="  ")
+        tree.write(path, encoding="UTF-8", xml_declaration=True)
+    return done

@@ -78,12 +78,21 @@ fix_empty = true
 # (key-change bar with a spurious note, whose time change sits in the next bar).
 # Logged; musicocr/copisteria_fixes.py. validate's bar-count check reports the rest.
 fix_ghost_bars = true
+# A staff that opens with a clef but no key reading means "no key signature printed"
+# (C major / cancelled key); without this the previous system's sharps/flats carry over.
+fix_key_cancel = true
+# A page that opens without a printed time signature continues the previous page's
+# meter when the guess has the same bar length (6/8 vs 3/4).
+fix_time_inherit = true
 # When a page's first reading leaves gaps (symbols the detector missed), re-detect it
 # at second_pass_scale x the input size, add the extra notes/rests found, re-read, and
 # keep the result only if it changed nothing but the gap bars (otherwise the first
 # reading stays). Costs one extra run for pages that have gaps.
 second_pass = true
 second_pass_scale = 1.28
+# Gaps that scale could not fill are retried at these scales in turn (each size has
+# different blind spots; Zerberus Horn 6 p3's last gap bar only shows up at 1.12).
+second_pass_retry_scales = [1.12, 1.5, 1.75]
 # Page 1 only: Copisteria pads a pickup (upbeat) bar to a full bar with a hidden
 # rest when it misses the printed opening meter; drop the padding and show the meter.
 fix_pickup = true
