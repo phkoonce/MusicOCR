@@ -24,4 +24,4 @@ test = ["pytest>=7"]
 musicocr = "musicocr.cli:main"
 
 [tool.setuptools]
-packages = ["musicocr", "musicocr.stages"]
+packages = ["musicocr", "musicocr.stages", "musicocr.alignment"]

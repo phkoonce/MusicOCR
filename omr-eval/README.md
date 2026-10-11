@@ -18,6 +18,34 @@ and these scripts are now thin CLI wrappers around it, kept for ad-hoc work
 (e.g. cross-part total-duration comparison, which needs several parts' output
 at once and so isn't something a single pipeline run does on its own).
 
+## Combining parts into one score (alignment tools)
+
+Per-part homr output has no idea of the score's printed bar numbers (multi-rests
+collapse, time changes are lost), so parts do not line up. Two thin CLIs
+combine them into one multi-part MusicXML aligned to the printed bars; the
+shared logic is in `musicocr/alignment/` (spec loading, MusicXML builders, and
+the two alignment front-ends). Both take `<spec.py> <out.musicxml>`; see
+`--help` and the module docstrings for the spec interface.
+
+| Tool | How the bar structure is found |
+|---|---|
+| `align_combine.py` | Hand-written per part in the spec (`MULTIREST(p)`, `REST_BARS(p)`); homr's k-th measure = k-th printed unit, verified and reported. |
+| `align_systems.py` | Automatic: system-start bar numbers and multi-rest counts from the part PDFs' text layer (needs poppler) vs. homr's per-system measure counts; repairs are listed in `<out>.report.txt`. |
+
+They are two generations of one idea (`align_systems` supersedes the manual
+lists but needs the PDFs' text layer), not redundant: `align_combine` is the
+fallback for scans without a usable text layer.
+
+**Specs live in `omr-eval/specs/` and are local only.** They are hand-written,
+piece-specific and git-ignored (never `git add` them); examples on the author's
+machine are `zerberus.py` (for `align_systems`) and `last_airbender.py` (for
+`align_combine`).
+
+```bash
+.venv/bin/python omr-eval/align_systems.py omr-eval/specs/zerberus.py out.musicxml
+.venv/bin/python omr-eval/align_combine.py omr-eval/specs/last_airbender.py out.musicxml
+```
+
 ## Setup
 
 ```bash
