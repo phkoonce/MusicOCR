@@ -5,7 +5,8 @@ The final report links matching pairs.
 """
 from __future__ import annotations
 
-from musicocr.pipeline import PipelineContext, StageResult
+from musicocr.errors import StageResult
+from musicocr.pipeline import PipelineContext
 from musicocr.util import run_cmd
 
 

@@ -19,7 +19,8 @@ from __future__ import annotations
 
 import shutil
 
-from musicocr.pipeline import PipelineContext, StageError, StageResult
+from musicocr.errors import StageError, StageResult
+from musicocr.pipeline import PipelineContext
 from musicocr.transpose import transpose_file
 
 

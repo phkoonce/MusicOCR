@@ -19,10 +19,33 @@ config.toml.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Dict
 
-from musicocr.config import PreprocessOpts  # noqa: F401  (defined with the other config sections)
 from musicocr.util import run_cmd_lenient
+
+
+@dataclass
+class PreprocessOpts:
+    """``[preprocess]`` section; also the options object ``prepare_page`` takes."""
+    enabled: bool = False
+    dpi: int = 300
+    autocontrast: bool = True
+    autocontrast_cutoff: int = 1
+    unsharp: bool = True
+    unsharp_radius: float = 2.0
+    unsharp_percent: int = 150
+    median: int = 0            # 0 = off; else median-filter window (denoise)
+    deskew: bool = False       # projection-profile rotation to level the staves
+    max_skew: float = 5.0      # only correct skew within +/- this many degrees
+    crop_margins: bool = False  # trim the page down to the staff band
+    crop_pad_frac: float = 0.035  # keep this much page-height whitespace around it
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "PreprocessOpts":
+        f = {k: d[k] for k in d if k in cls.__dataclass_fields__}
+        return cls(**f)
 
 
 # --- geometry helpers -------------------------------------------------------

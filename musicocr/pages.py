@@ -1,4 +1,8 @@
-"""Shared helpers for OMR engine stages (Audiveris, homr)."""
+"""Page-spec helpers (engine-neutral).
+
+A page spec is a string of page numbers and ranges separated by spaces and/or
+commas, e.g. ``"1 4-5"`` or ``"1,4-5"``.
+"""
 from __future__ import annotations
 
 from musicocr.pipeline import PipelineContext

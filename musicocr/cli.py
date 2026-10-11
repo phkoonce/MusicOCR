@@ -27,6 +27,8 @@ def apply_run_overrides(config: Config, args) -> Config:
         omr = replace(omr, profile=args.profile)
     if args.merge is not None:
         omr = replace(omr, merge_pages=args.merge)
+    if args.constant:
+        omr = replace(omr, extra_constants=list(args.constant))
 
     pp = config.preprocess
     if args.preprocess is not None:
@@ -77,7 +79,6 @@ def cmd_run(args) -> int:
         config=config,
         book_name=book,
         pages=args.pages.replace(",", " ") if args.pages else None,
-        extra_constants=list(args.constant or []),
         force=args.force,
     )
 

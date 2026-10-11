@@ -14,7 +14,8 @@ engines write (``mxl_files``, ``mxl_by_page``, ``omr_failed_pages``,
 """
 from __future__ import annotations
 
-from musicocr.pipeline import PipelineContext, StageError, StageResult
+from musicocr.errors import StageError, StageResult
+from musicocr.pipeline import PipelineContext
 from musicocr.stages import omr_audiveris, omr_homr
 
 _ENGINES = {"homr": omr_homr, "audiveris": omr_audiveris}

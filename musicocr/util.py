@@ -9,7 +9,7 @@ import time
 from collections import namedtuple
 from pathlib import Path
 
-from musicocr.pipeline import StageError
+from musicocr.errors import StageError
 
 LenientResult = namedtuple("LenientResult", "returncode output timed_out")
 

@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from musicocr.pipeline import PipelineContext, StageResult
+from musicocr.errors import StageResult
+from musicocr.pipeline import PipelineContext
 
 
 def _projects(ctx: PipelineContext) -> list[Path]:

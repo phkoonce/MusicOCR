@@ -6,7 +6,8 @@ look), ``info`` (context).
 """
 from __future__ import annotations
 
-from musicocr.pipeline import PipelineContext, StageError, StageResult
+from musicocr.errors import StageError, StageResult
+from musicocr.pipeline import PipelineContext
 
 _TOL = 1e-6
 

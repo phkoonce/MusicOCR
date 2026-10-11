@@ -6,28 +6,24 @@ first failure unless ``keep_going`` is set. State flows between stages through
 ``ctx.artifacts`` (a typed :class:`Artifacts`) and files under ``ctx.workdir``.
 
 Adding a stage later (e.g. a GUI-correction round-trip) means writing one module
-with a ``run`` function and inserting its name into ``STAGE_ORDER``.
+with a ``run`` function and inserting its name into ``STAGE_ORDER`` (the stage
+registry in ``musicocr/stages/__init__.py``).
 """
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 from musicocr.artifacts import Artifacts
 from musicocr.config import Config
+from musicocr.errors import StageError, StageResult
 from musicocr.state import load_state, restore_missing, save_state
+from musicocr.stages import STAGE_ORDER, load_stage
 
-# Canonical order. `correct` sits between OMR and extract so a corrected .omr
-# project feeds the rest of the pipeline unchanged. `normalize` sits between
-# extract and validate so it works on the merged score and its fixes show up
-# in the same validate pass that would otherwise just flag them.
-# `transpose` (optional, off by default) follows normalize so it shifts the
-# already-cleaned score, and precedes validate/convert so the deliverables carry
-# the new pitch.
-STAGE_ORDER = ["ingest", "omr", "correct", "extract", "normalize", "transpose",
-               "validate", "convert", "qa"]
+__all__ = ["PipelineContext", "STAGE_ORDER", "StageError", "StageResult",
+           "resolve_slice", "run_pipeline"]
 
 
 @dataclass
@@ -36,40 +32,10 @@ class PipelineContext:
     workdir: Path
     config: Config
     book_name: str
-    pages: str | None = None          # Audiveris -sheets spec, e.g. "1 4-5"
-    extra_constants: list[str] = field(default_factory=list)
+    pages: str | None = None          # page spec, e.g. "1 4-5" (see musicocr.pages)
     force: bool = False
     artifacts: Artifacts = field(default_factory=Artifacts)
     log: Callable[[str], None] = print
-
-    def constants(self) -> list[str]:
-        return self.config.constants_for_profile() + list(self.extra_constants)
-
-
-@dataclass
-class StageResult:
-    name: str
-    status: str                       # "ok" | "skipped" | "paused" | "failed"
-    detail: str = ""
-    duration_s: float = 0.0
-    data: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def ok(self) -> bool:
-        return self.status in ("ok", "skipped")
-
-    @property
-    def paused(self) -> bool:
-        return self.status == "paused"
-
-
-class StageError(RuntimeError):
-    """Raised by a stage to signal a clean, reportable failure."""
-
-
-def _load_stage(name: str) -> Callable[[PipelineContext], StageResult]:
-    mod = __import__(f"musicocr.stages.{name}", fromlist=["run"])
-    return mod.run
 
 
 def resolve_slice(from_stage: str | None, to_stage: str | None) -> list[str]:
@@ -100,7 +66,7 @@ def run_pipeline(
 
     results: list[StageResult] = []
     for name in slc:
-        run = _load_stage(name)
+        run = load_stage(name)
         ctx.log(f"[{name}] starting")
         t0 = time.monotonic()
         try:

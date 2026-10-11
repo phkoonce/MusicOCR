@@ -16,8 +16,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from musicocr.pipeline import PipelineContext, StageError, StageResult
-from musicocr.stages._omr_common import resolve_pages
+from musicocr.errors import StageError, StageResult
+from musicocr.pipeline import PipelineContext
+from musicocr.pages import resolve_pages
 from musicocr.util import run_cmd_lenient
 
 
@@ -27,7 +28,7 @@ def _base_cmd(ctx: PipelineContext, tool: str, out_dir: Path) -> list[str]:
         cmd.append("-save")  # GUI round-trip needs the .omr; fragile on big books
     if ctx.force:
         cmd.append("-force")
-    for const in ctx.constants():
+    for const in ctx.config.audiveris_constants():
         cmd += ["-constant", const]
     return cmd
 

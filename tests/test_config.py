@@ -16,7 +16,7 @@ def _write(tmp_path, text):
 def _args(**kw):
     base = dict(engine=None, profile=None, merge=None, preprocess=None, deskew=None,
                 crop=None, transpose=None, transpose_instrument=None,
-                transpose_semitones=None)
+                transpose_semitones=None, constant=None)
     base.update(kw)
     return argparse.Namespace(**base)
 

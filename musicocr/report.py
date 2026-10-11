@@ -5,7 +5,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from musicocr.pipeline import PipelineContext, StageResult
+from musicocr.errors import StageResult
+from musicocr.pipeline import PipelineContext
 
 _SEV_ICON = {"error": "🔴", "warn": "🟡", "info": "🔵"}
 
@@ -33,7 +34,7 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
         "page_count": a.page_count,
         "omr_engine": ctx.config.omr.engine,
         "profile": ctx.config.omr.profile,
-        "constants": ctx.constants(),
+        "constants": ctx.config.audiveris_constants(),
         "preprocess": a.preprocess_summary,
         "merge_pages": ctx.config.omr.merge_pages,
         "stages": [

@@ -33,9 +33,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from musicocr.homr_fixes import fix_multirest_file
-from musicocr.pipeline import PipelineContext, StageError, StageResult
+from musicocr.errors import StageError, StageResult
+from musicocr.pipeline import PipelineContext
 from musicocr.preprocess import PreprocessOpts, prepare_page
-from musicocr.stages._omr_common import resolve_pages
+from musicocr.pages import resolve_pages
 from musicocr.util import run_cmd_lenient
 
 _HOMR_ENTRYPOINT = "import sys; from homr.main import main; sys.exit(main())"

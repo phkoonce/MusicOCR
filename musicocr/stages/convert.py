@@ -8,7 +8,8 @@ Formats (from config ``output.formats``):
 """
 from __future__ import annotations
 
-from musicocr.pipeline import PipelineContext, StageError, StageResult
+from musicocr.errors import StageError, StageResult
+from musicocr.pipeline import PipelineContext
 from musicocr.util import run_cmd_lenient
 
 _EXT = {"mscz": ".mscz", "midi": ".mid", "qa-pdf": ".pdf"}

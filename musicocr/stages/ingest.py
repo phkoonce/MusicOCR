@@ -5,7 +5,8 @@ import re
 import shutil
 from pathlib import Path
 
-from musicocr.pipeline import PipelineContext, StageError, StageResult
+from musicocr.errors import StageError, StageResult
+from musicocr.pipeline import PipelineContext
 from musicocr.preprocess import PreprocessOpts, prepare_page
 from musicocr.util import run_cmd
 

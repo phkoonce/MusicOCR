@@ -14,7 +14,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-from musicocr.pipeline import PipelineContext, StageError, StageResult
+from musicocr.errors import StageError, StageResult
+from musicocr.pipeline import PipelineContext
 
 
 def _unzip_mxl(mxl: Path, dest: Path) -> Path:
