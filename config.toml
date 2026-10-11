@@ -108,11 +108,11 @@ fill_empty_bars = true
 # reader leaves unmarked (the bar then shows a gap): run it via copisteria_run.py, which
 # tags the heads under the digit (and ignores small digits as multi-rest counts).
 text_tuplets = true
-# Fallback: synthesise a multiRest detection when a tall count digit (PDF text layer) sits over
-# an empty bar the larger-scale detection did not cover. OFF by default: it can mistake the
-# time signature's tall digit over an empty pickup bar for a count (Zerberus Horn 2: a bogus
-# "4-bar rest" at bar 1). The larger-scale detection already covers real multi-rests.
-synth_multirest = false
+# Fallback: synthesise a multiRest detection when a tall count digit (page text) sits over an
+# empty bar the detector read nothing in. The digit must be centred over its bar and not one of
+# a stacked pair (a time signature); with those guards it added nothing wrongly on any Zerberus
+# page tried, and recovers multi-rests the detector misses on scans (Airbender).
+synth_multirest = true
 # Note detections much smaller than the page's ordinary notes (< 0.8 x 0.9) are grace notes
 # (ruffs/flams); the detector sometimes labels them "not grace" and the reader then writes
 # real notes (overfull bar, dropped note). musicocr/page_text.py mark_small_graces.

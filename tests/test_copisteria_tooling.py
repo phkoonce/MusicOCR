@@ -401,3 +401,81 @@ def test_key_reset_skips_multirest_follower_bars(tmp_path):
     assert [m.find("attributes/key") is not None for m in ms] == [True, False, False, True]
     assert ms[3].find("attributes/key/fifths").text == "0"
     assert ms[3].find("note/pitch/alter") is None         # the key's C# no longer applies
+
+
+# ---- combine ---------------------------------------------------------------
+
+def _meas(*durs, attrs=""):
+    notes = "".join(f"<note><pitch><step>C</step><octave>4</octave></pitch><duration>{d}</duration></note>"
+                    for d in durs)
+    return ET.fromstring(f"<measure number='1'>{attrs}{notes}</measure>")
+
+
+def test_split_overlong_splits_at_bar_lines_only():
+    from musicocr.combine import split_overlong
+    two = _meas(6, 6, 6, 6, attrs="<attributes><key><fifths>1</fifths></key></attributes>")   # 2 bars of 6/8 at div 4: 12 each
+    got = split_overlong(two, 4, (6, 8))
+    assert got is not None and len(got) == 2
+    assert got[0].find("attributes") is not None and got[1].find("attributes") is None
+    assert [n.findtext("duration") for n in got[1].findall("note")] == ["6", "6"]
+    assert split_overlong(_meas(6, 6), 4, (6, 8)) is None             # a single bar
+    assert split_overlong(_meas(8, 8, 8), 4, (6, 8)) is None          # a note straddles the bar line
+
+
+def test_align_to_target_uses_only_the_needed_indels():
+    from musicocr.combine import align_to_target
+    src = [0, 1, 1, 0, 1]
+    slots = align_to_target(src, [0, 1, 0, 1])         # one bar too many -> exactly one deletion
+    assert len([s for s in slots if s is not None]) == 4 and slots == sorted(slots)
+    assert slots.count(None) == 0
+    slots = align_to_target([0, 1, 0], [0, 1, 1, 0])   # one bar short -> exactly one inserted slot
+    assert slots.count(None) == 1 and [s for s in slots if s is not None] == [0, 1, 2]
+
+
+def test_combine_cover_page_and_total_lower_bound(tmp_path):
+    from musicocr.combine import PartInput, combine
+    rest = '<note><rest measure="yes"/><duration>12</duration></note>'
+    def page(n, first=False):
+        attrs = ("<attributes><divisions>4</divisions><key><fifths>0</fifths></key>"
+                 "<time><beats>3</beats><beat-type>4</beat-type></time></attributes>") if first else ""
+        body = "".join(f'<measure number="{i + 1}">{attrs if i == 0 else ""}{rest}</measure>' for i in range(n))
+        return f'<score-partwise><part id="P1">{body}</part></score-partwise>'
+    parts = []
+    for pid in ("a", "b"):
+        files = []
+        for k, (n, first) in enumerate([(2, False), (4, True), (3, False)], 1):   # p1 = junk on a cover page
+            f = tmp_path / f"{pid}.p{k:03d}.musicxml"
+            f.write_text(page(n, first))
+            files.append(f)
+        parts.append(PartInput(pid, f"Horn {pid}", "", tmp_path / f"{pid}.pdf", files))
+        (tmp_path / f"{pid}.pdf").write_bytes(b"x")
+    score, report, summary = combine(
+        parts, "T", starts_of=lambda pdf: [None, 1, 5], last_start_of=lambda pdf: 7)
+    # cover page ignored; bars 1-4 on page 2, bars 5.. on page 3 (3 bars -> total 7)
+    assert summary["total"] == 7
+    assert any("hold no printed bars" in r for r in report)
+    assert any("ignored" in r for r in report)
+    assert len(score.findall("part")[0].findall("measure")) == 7
+
+
+def test_add_missing_multirest_dets_guards(tmp_path):
+    import json
+    from musicocr.page_text import add_missing_multirest_dets
+    meas = lambda x0, x1: {"cls": "measure", "conf": 0.99, "xyxy": [x0, 100, x1, 160]}  # noqa: E731
+    base = [meas(0, 1000), meas(1000, 1400)] + [  # staff space ~12 px (from the 60 px measures)
+        {"cls": "note_quarter", "conf": 0.99, "xyxy": [1100, 120, 1112, 140]}]          # bar 2 has a note
+    texts = [
+        {"text": "8", "xyxy": [490, 20, 520, 100]},       # centred over empty bar 1: a count
+        {"text": "4", "xyxy": [20, 20, 50, 100]},         # near bar 1's left edge: a time signature
+        {"text": "3", "xyxy": [1190, 20, 1220, 100]},     # over bar 2, which holds a note
+    ]
+    d, t = tmp_path / "p.dets_v7_1600.json", tmp_path / "p.texts.json"
+    d.write_text(json.dumps(base))
+    t.write_text(json.dumps(texts))
+    assert add_missing_multirest_dets(d, t) == 1
+    added = [x for x in json.loads(d.read_text()) if x["cls"] == "multiRest"]
+    assert len(added) == 1 and added[0]["xyxy"][0] < 30 and added[0]["xyxy"][2] > 970
+    # stacked pair (4 over 4) centred on a bar is a time signature, not a count
+    d.write_text(json.dumps(base))
+    t.write_text(json.dumps([{"text": "4", "xyxy": [490, 20, 520, 100]}, {"text": "4", "xyxy": [490, 60, 520, 140]}]))
+    assert add_missing_multirest_dets(d, t) == 0

@@ -195,17 +195,28 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> i
     content = [d for d in dets if d.get("cls", "").split("_")[0] in ("note", "rest", "mRest", "multiRest")
                and d.get("conf", 1.0) >= 0.5]
     added = 0
+    tall = [t["xyxy"] for t in texts if _DIGITS.fullmatch(str(t.get("text", "")).strip())
+            and t["xyxy"][3] - t["xyxy"][1] >= MIN_TALL_SP * sp]
+
+    def stacked(b) -> bool:
+        """Another tall digit right above/below it: the two numerals of a time signature."""
+        w, h = b[2] - b[0], b[3] - b[1]
+        return any(o is not b and abs((o[0] + o[2]) / 2 - (b[0] + b[2]) / 2) <= 0.6 * max(w, 1)
+                   and 0 < abs(o[1] - b[1]) <= 1.8 * h for o in tall)
+
     for t in texts:
         if not _DIGITS.fullmatch(str(t.get("text", "")).strip()):
             continue
         tx0, ty0, tx1, ty1 = t["xyxy"]
-        if (ty1 - ty0) < MIN_TALL_SP * sp:
+        if (ty1 - ty0) < MIN_TALL_SP * sp or stacked(t["xyxy"]):
             continue
         cx, cy = (tx0 + tx1) / 2, (ty0 + ty1) / 2
         for m in measures:
             x0, y0, x1, y1 = m["xyxy"]
             if not (x0 < cx < x1 and y0 - 8 * sp < cy < y0 + (y1 - y0) / 2):
                 continue
+            if abs(cx - (x0 + x1) / 2) > 0.2 * (x1 - x0):
+                break          # a count is centred over its bar; a time signature sits at its left edge
             if any(x0 <= (c["xyxy"][0] + c["xyxy"][2]) / 2 <= x1
                    and y0 - 3 * sp <= (c["xyxy"][1] + c["xyxy"][3]) / 2 <= y1 + 3 * sp for c in content):
                 break

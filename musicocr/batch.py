@@ -45,6 +45,7 @@ class Part:
     first_page: int
     last_page: int
     instrument: str = ""  # transposition-table name; empty = leave pitches as written
+    score: bool = True    # include in `musicocr combine` (False for e.g. percussion)
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,7 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
             first_page=_require(raw, "first_page", int),
             last_page=_require(raw, "last_page", int),
             instrument=raw.get("instrument", ""),
+            score=bool(raw.get("score", True)),
         )
         if part.first_page < 1 or part.last_page < part.first_page:
             raise BatchSpecError(f"batch spec: bad page range for part '{part.id}'")

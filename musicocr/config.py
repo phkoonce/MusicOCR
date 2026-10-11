@@ -62,7 +62,7 @@ class CopisteriaConfig:
     fix_half_tuplets: bool = True   # finish a duplet/triplet the model gave to only some of its notes
     fill_empty_bars: bool = True   # bars the detector read nothing in: re-detect one size up, add what is found there
     text_tuplets: bool = True   # small "2"/"3" digits from the text layer mark duplets/triplets (copisteria_run.py)
-    synth_multirest: bool = False   # synthesise a multiRest where a tall count digit sits over an empty bar (can mistake a time-signature digit)
+    synth_multirest: bool = True   # synthesise a multiRest where a tall, centred, non-stacked count digit sits over an empty bar
     small_graces: bool = False   # before reading: small noteheads the detector called "not grace" become grace notes
     fix_pickup: bool = True   # page 1: make a padded opening bar a real pickup, show its time signature
     reveal_gaps: bool = True   # gaps Copisteria left (missed symbols) -> visible coloured rests
@@ -101,7 +101,7 @@ class CopisteriaConfig:
                    fix_half_tuplets=bool(d.get("fix_half_tuplets", True)),
                    fill_empty_bars=bool(d.get("fill_empty_bars", True)),
                    text_tuplets=bool(d.get("text_tuplets", True)),
-                   synth_multirest=bool(d.get("synth_multirest", False)),
+                   synth_multirest=bool(d.get("synth_multirest", True)),
                    small_graces=bool(d.get("small_graces", False)),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),
                    multirest_form=form, ocr_backend=ocr_backend,

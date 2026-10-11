@@ -144,6 +144,25 @@ def cmd_compare(args) -> int:
     return 0
 
 
+def cmd_combine(args) -> int:
+    from musicocr import batch, combine_cli
+
+    try:
+        config = load_config(args.config)
+        spec = batch.load_spec(Path(args.batch))
+    except (ConfigError, batch.BatchSpecError, OSError) as exc:
+        print(f"combine error: {exc}", file=sys.stderr)
+        return 2
+    engine = args.engine or (spec.engines[0] if spec.engines else None)
+    out_dir = Path(args.output).expanduser() if args.output else \
+        spec.output_dir / "_combined" / (engine or "run")
+    only = set(args.only.split(",")) if args.only else None
+    combine_cli.run(spec, engine, out_dir, only=only,
+                    pdftotext=config.resolve_tool("pdftotext") or "pdftotext",
+                    musescore=config.resolve_tool("musescore") if args.convert else None)
+    return 0
+
+
 def cmd_transpose(args) -> int:
     from musicocr.transpose import transpose_file
 
@@ -307,6 +326,17 @@ def build_parser() -> argparse.ArgumentParser:
                    help="transpose each engine's score by this instrument's table entry")
     c.add_argument("--transpose-semitones", type=int, metavar="N")
     c.set_defaults(func=cmd_compare)
+
+    cb = sub.add_parser(
+        "combine", help="combine a batch's per-part results into one score aligned to the printed bars",
+        description="Derives bar structure from the part PDFs' text layer and key/meter from the "
+                    "parts themselves (no hand-written spec); see musicocr/combine.py.")
+    cb.add_argument("--batch", required=True, help="batch TOML (parts, labels, instruments)")
+    cb.add_argument("--engine", help="which engine's results to combine (default: the batch's first)")
+    cb.add_argument("--output", help="directory for the combined score (default: <batch output>/_combined/<engine>)")
+    cb.add_argument("--only", help="comma-separated part ids/keys to include")
+    cb.add_argument("--convert", action="store_true", help="also write .mscz via MuseScore")
+    cb.set_defaults(func=cmd_combine)
 
     t = sub.add_parser(
         "transpose",
