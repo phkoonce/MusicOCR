@@ -28,13 +28,13 @@ def _projects(ctx: PipelineContext) -> list[Path]:
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    if not ctx.config.correct_enabled:
+    if not ctx.config.stages.correct_enabled:
         return StageResult("correct", "skipped", "disabled (v1 runs fully automated)")
-    if ctx.config.omr_engine != "audiveris":
+    if ctx.config.omr.engine != "audiveris":
         return StageResult(
             "correct", "skipped",
             f"GUI correction round-trip is Audiveris-only ([omr] engine = "
-            f"{ctx.config.omr_engine!r})",
+            f"{ctx.config.omr.engine!r})",
         )
 
     projects = _projects(ctx)

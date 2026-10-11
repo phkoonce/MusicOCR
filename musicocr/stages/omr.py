@@ -21,7 +21,7 @@ _ENGINES = {"homr": omr_homr, "audiveris": omr_audiveris}
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    engine = ctx.config.omr_engine
+    engine = ctx.config.omr.engine
     mod = _ENGINES.get(engine)
     if mod is None:
         raise StageError(f"unknown [omr] engine {engine!r}; known: {sorted(_ENGINES)}")

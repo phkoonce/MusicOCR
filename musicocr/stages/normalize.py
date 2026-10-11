@@ -19,7 +19,7 @@ from musicocr.pipeline import PipelineContext, StageError, StageResult
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    if not ctx.config.normalize_enabled:
+    if not ctx.config.stages.normalize_enabled:
         return StageResult("normalize", "skipped", "disabled ([stages.normalize] enabled = false)")
 
     xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")

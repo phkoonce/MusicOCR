@@ -123,7 +123,7 @@ def run(ctx: PipelineContext) -> StageResult:
             _page_musicxml(mxl, t)
             parts.append(t)
         merged, skipped = (_concat(parts, master, ctx.log)
-                           if ctx.config.omr_merge_pages else (None, []))
+                           if ctx.config.omr.merge_pages else (None, []))
         ctx.artifacts.musicxml = merged or parts[0]
         ctx.artifacts.musicxml_pages = parts
         ctx.artifacts.merge_skipped = [str(p) for p in skipped]
@@ -150,7 +150,7 @@ def run(ctx: PipelineContext) -> StageResult:
         return StageResult("extract", "ok", f"{master.name} (1 page)")
 
     merged, skipped = (_concat(page_files, master, ctx.log)
-                       if ctx.config.omr_merge_pages else (None, []))
+                       if ctx.config.omr.merge_pages else (None, []))
     ctx.artifacts.merge_skipped = [str(p) for p in skipped]
     ctx.artifacts.musicxml = merged or page_files[0]
     ctx.artifacts.extract_merged = bool(merged)

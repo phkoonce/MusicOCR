@@ -37,7 +37,7 @@ def run(ctx: PipelineContext) -> StageResult:
 
     detail = f"{ctx.book_name}, {pages if pages is not None else '?'} page(s)"
 
-    opts = PreprocessOpts.from_dict(ctx.config.preprocess)
+    opts = ctx.config.preprocess
     if opts.enabled:
         detail += _preprocess(ctx, opts, pages)
 

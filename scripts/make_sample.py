@@ -54,7 +54,7 @@ def main() -> int:
 
     mscore = cfg.resolve_tool("musescore")
     if not mscore:
-        print(f"MuseScore not found at {cfg.musescore!r}", file=sys.stderr)
+        print(f"MuseScore not found at {cfg.tools.musescore!r}", file=sys.stderr)
         return 1
     pdf = samples / "sample.pdf"
     if pdf.exists():

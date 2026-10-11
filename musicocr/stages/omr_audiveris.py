@@ -23,7 +23,7 @@ from musicocr.util import run_cmd_lenient
 
 def _base_cmd(ctx: PipelineContext, tool: str, out_dir: Path) -> list[str]:
     cmd = [tool, "-batch", "-transcribe", "-export", "-output", str(out_dir)]
-    if ctx.config.correct_enabled:
+    if ctx.config.stages.correct_enabled:
         cmd.append("-save")  # GUI round-trip needs the .omr; fragile on big books
     if ctx.force:
         cmd.append("-force")
@@ -58,7 +58,7 @@ def _run_whole_book(ctx, tool, source_pdf) -> StageResult:
     if ctx.pages:
         cmd += ["-sheets", *ctx.pages.split()]
     cmd += ["--", str(source_pdf)]
-    res = run_cmd_lenient(cmd, timeout=ctx.config.omr_timeout, log=ctx.log)
+    res = run_cmd_lenient(cmd, timeout=ctx.config.omr.timeout, log=ctx.log)
     if res is None:
         raise StageError(f"could not launch Audiveris: {tool}")
     mxl = _mxls_in(ctx.workdir, recursive=False)
@@ -100,7 +100,7 @@ def _run_per_page(ctx, tool, source_pdf, pages: list[int]) -> StageResult:
         else:
             cmd = _base_cmd(ctx, tool, pdir) + ["-sheets", str(page),
                                                "--", str(source_pdf)]
-        res = run_cmd_lenient(cmd, timeout=ctx.config.omr_page_timeout, log=ctx.log)
+        res = run_cmd_lenient(cmd, timeout=ctx.config.omr.page_timeout, log=ctx.log)
         lg = _newest_log(pdir)
         if lg:
             logs.append(lg)
@@ -142,7 +142,7 @@ def run(ctx: PipelineContext) -> StageResult:
     tool = ctx.config.resolve_tool("audiveris")
     if not tool:
         raise StageError(
-            f"Audiveris not found at {ctx.config.audiveris!r} (edit config.toml [tools])"
+            f"Audiveris not found at {ctx.config.tools.audiveris!r} (edit config.toml [tools])"
         )
 
     source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
@@ -164,6 +164,6 @@ def run(ctx: PipelineContext) -> StageResult:
 
     pages = resolve_pages(ctx)
 
-    if ctx.config.omr_per_page and pages:
+    if ctx.config.omr.per_page and pages:
         return _run_per_page(ctx, tool, source_pdf, pages)
     return _run_whole_book(ctx, tool, source_pdf)

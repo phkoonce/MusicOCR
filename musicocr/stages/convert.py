@@ -46,14 +46,14 @@ def run(ctx: PipelineContext) -> StageResult:
             "(e.g. --from extract)"
         )
 
-    wanted = [f for f in ctx.config.formats if f in _EXT]
+    wanted = [f for f in ctx.config.output.formats if f in _EXT]
     if not wanted:
         return StageResult("convert", "skipped", "no MuseScore formats requested")
 
     tool = ctx.config.resolve_tool("musescore")
     if not tool:
         raise StageError(
-            f"MuseScore not found at {ctx.config.musescore!r} (edit config.toml [tools])"
+            f"MuseScore not found at {ctx.config.tools.musescore!r} (edit config.toml [tools])"
         )
 
     # When the extract stage couldn't merge multi-page output into one

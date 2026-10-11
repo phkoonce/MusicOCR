@@ -24,8 +24,8 @@ from musicocr.transpose import transpose_file
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    cfg = ctx.config.transpose
-    if not cfg.get("enabled"):
+    cfg = ctx.config.stages.transpose
+    if not cfg.enabled:
         return StageResult("transpose", "skipped", "disabled ([stages.transpose] enabled = false)")
 
     xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
@@ -54,9 +54,9 @@ def run(ctx: PipelineContext) -> StageResult:
             shutil.copy2(path, backup)
         res = transpose_file(
             backup, path,
-            semitones=cfg.get("semitones"),
-            instrument=cfg.get("instrument") or None,
-            clef=cfg.get("clef") or None,
+            semitones=cfg.semitones,
+            instrument=cfg.instrument or None,
+            clef=cfg.clef or None,
             log=lambda s, n=path.name: ctx.log(f"  {n}: {s}"),
         )
         stamps[str(path)] = path.stat().st_mtime_ns

@@ -31,11 +31,11 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
         "generated": datetime.now().isoformat(timespec="seconds"),
         "workdir": str(ctx.workdir),
         "page_count": a.page_count,
-        "omr_engine": ctx.config.omr_engine,
-        "profile": ctx.config.omr_profile,
+        "omr_engine": ctx.config.omr.engine,
+        "profile": ctx.config.omr.profile,
         "constants": ctx.constants(),
         "preprocess": a.preprocess_summary,
-        "merge_pages": ctx.config.omr_merge_pages,
+        "merge_pages": ctx.config.omr.merge_pages,
         "stages": [
             {"name": r.name, "status": r.status, "detail": r.detail,
              "duration_s": round(r.duration_s, 2)}

@@ -17,7 +17,7 @@ def _rasterize(tool, pdf, out_prefix, dpi, log):
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    if "qa-pdf" not in ctx.config.formats:
+    if "qa-pdf" not in ctx.config.output.formats:
         return StageResult("qa", "skipped", "qa-pdf not in output.formats")
 
     tool = ctx.config.resolve_tool("pdftoppm")
@@ -25,7 +25,7 @@ def run(ctx: PipelineContext) -> StageResult:
         return StageResult("qa", "skipped", "pdftoppm not found (brew install poppler)")
 
     qa_dir = ctx.workdir / "qa"
-    dpi = ctx.config.qa_dpi
+    dpi = ctx.config.output.qa_dpi
     source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
     render_pdfs = ctx.artifacts.render_pdfs or [
         ctx.artifacts.render_pdf or (ctx.workdir / "render.pdf")

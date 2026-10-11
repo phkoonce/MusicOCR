@@ -53,7 +53,7 @@ def _ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
     if not pdftoppm:
         return None
     source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
-    opts = PreprocessOpts.from_dict(ctx.config.preprocess)
+    opts = ctx.config.preprocess
     return prepare_page(source_pdf, page, dst, opts, pdftoppm, ctx.log)
 
 
@@ -61,7 +61,7 @@ def run(ctx: PipelineContext) -> StageResult:
     homr_python = ctx.config.resolve_tool("homr_python")
     if not homr_python:
         raise StageError(
-            f"homr not found at {ctx.config.homr_python!r} (edit config.toml "
+            f"homr not found at {ctx.config.tools.homr_python!r} (edit config.toml "
             "[tools], or run omr-eval/setup.sh to install it)"
         )
 
@@ -93,14 +93,14 @@ def run(ctx: PipelineContext) -> StageResult:
         if out_xml.exists():
             out_xml.unlink()
         cmd = [homr_python, "-c", _HOMR_ENTRYPOINT, str(img)]
-        res = run_cmd_lenient(cmd, timeout=ctx.config.omr_page_timeout, log=ctx.log)
+        res = run_cmd_lenient(cmd, timeout=ctx.config.omr.page_timeout, log=ctx.log)
         log_path = pdir / f"{stem}.log"
         if res is not None:
             log_path.write_text(res.output or "")
             logs.append(log_path)
 
         if out_xml.exists() and out_xml.stat().st_size > 0:
-            if ctx.config.homr_fix_multirest:
+            if ctx.config.omr.homr.fix_multirest:
                 try:
                     fixed = fix_multirest_file(out_xml, log=ctx.log)
                 except Exception as exc:  # noqa: BLE001

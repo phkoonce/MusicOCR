@@ -4,17 +4,51 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from musicocr import __version__
-from musicocr.config import ConfigError, load_config
+from musicocr.config import Config, ConfigError, load_config
 from musicocr.pipeline import PipelineContext, STAGE_ORDER, run_pipeline
 from musicocr.report import write_reports
 
 
 def _book_name(pdf: Path) -> str:
     return pdf.stem.replace(" ", "_")
+
+
+def apply_run_overrides(config: Config, args) -> Config:
+    """Return a copy of ``config`` with the ``run`` CLI flags applied."""
+    omr = config.omr
+    if args.engine:
+        omr = replace(omr, engine=args.engine)
+    if args.profile:
+        omr = replace(omr, profile=args.profile)
+    if args.merge is not None:
+        omr = replace(omr, merge_pages=args.merge)
+
+    pp = config.preprocess
+    if args.preprocess is not None:
+        pp = replace(pp, enabled=args.preprocess)
+    if args.deskew is not None:
+        pp = replace(pp, deskew=args.deskew)
+    if args.crop is not None:
+        pp = replace(pp, crop_margins=args.crop)
+    if (args.deskew or args.crop) and args.preprocess is None and not pp.enabled:
+        pp = replace(pp, enabled=True)
+        print("note: --deskew/--crop turn on the [preprocess] pass")
+
+    tr = config.stages.transpose
+    if args.transpose_instrument is not None:
+        tr = replace(tr, enabled=True, instrument=args.transpose_instrument, semitones=None)
+    if args.transpose_semitones is not None:
+        tr = replace(tr, enabled=True, semitones=args.transpose_semitones, instrument="")
+    if args.transpose is not None:
+        tr = replace(tr, enabled=args.transpose)
+
+    return replace(config, omr=omr, preprocess=pp,
+                   stages=replace(config.stages, transpose=tr))
 
 
 def cmd_run(args) -> int:
@@ -24,33 +58,7 @@ def cmd_run(args) -> int:
         print(f"config error: {exc}", file=sys.stderr)
         return 2
 
-    if args.engine:
-        config.omr_engine = args.engine
-    if args.profile:
-        config.omr_profile = args.profile
-    if args.merge is not None:
-        config.omr_merge_pages = args.merge
-
-    pp = dict(config.preprocess)
-    if args.preprocess is not None:
-        pp["enabled"] = args.preprocess
-    if args.deskew is not None:
-        pp["deskew"] = args.deskew
-    if args.crop is not None:
-        pp["crop_margins"] = args.crop
-    if (args.deskew or args.crop) and args.preprocess is None and not pp.get("enabled"):
-        pp["enabled"] = True
-        print("note: --deskew/--crop turn on the [preprocess] pass")
-    config.preprocess = pp
-
-    tr = dict(config.transpose)
-    if args.transpose_instrument is not None:
-        tr.update(enabled=True, instrument=args.transpose_instrument, semitones=None)
-    if args.transpose_semitones is not None:
-        tr.update(enabled=True, semitones=args.transpose_semitones, instrument="")
-    if args.transpose is not None:
-        tr["enabled"] = args.transpose
-    config.transpose = tr
+    config = apply_run_overrides(config, args)
     try:
         config.constants_for_profile()
     except ConfigError as exc:
@@ -147,17 +155,17 @@ def cmd_doctor(args) -> int:
 
     print(f"MusicOCR {__version__}")
     print(f"config: {config.path}")
-    print(f"OMR engine: {config.omr_engine}")
+    print(f"OMR engine: {config.omr.engine}")
     print("\ntools:")
     ok = True
-    engine_tool = "homr_python" if config.omr_engine == "homr" else "audiveris"
+    engine_tool = "homr_python" if config.omr.engine == "homr" else "audiveris"
     ok &= _check("homr (venv python)", config.resolve_tool("homr_python"))
     ok &= _check("Audiveris", config.resolve_tool("audiveris"), ["-version"])
     ok &= _check("MuseScore", config.resolve_tool("musescore"), ["--version"])
     ok &= _check("pdfinfo", config.resolve_tool("pdfinfo"), ["-v"])
     ok &= _check("pdftoppm", config.resolve_tool("pdftoppm"), ["-v"])
     if not config.resolve_tool(engine_tool):
-        print(f"  ✗ configured engine {config.omr_engine!r} is not available")
+        print(f"  ✗ configured engine {config.omr.engine!r} is not available")
         ok = False
 
     print("\npython deps:")
@@ -168,14 +176,14 @@ def cmd_doctor(args) -> int:
         print(f"  ✗ music21: {exc}")
         ok = False
 
-    print("\nprofiles:", ", ".join(sorted(config.profiles)))
+    print("\nprofiles:", ", ".join(sorted(config.omr.profiles)))
     print("stages:  ", " -> ".join(STAGE_ORDER),
-          f"\n         (correct: {'enabled' if config.correct_enabled else 'disabled'}"
-          f", normalize: {'enabled' if config.normalize_enabled else 'disabled'}"
-          f", transpose: {'enabled' if config.transpose.get('enabled') else 'disabled'})")
-    if config.omr_engine == "homr":
-        print(f"homr:     fix_multirest={'on' if config.homr_fix_multirest else 'off'}")
-    print("formats: ", ", ".join(config.formats))
+          f"\n         (correct: {'enabled' if config.stages.correct_enabled else 'disabled'}"
+          f", normalize: {'enabled' if config.stages.normalize_enabled else 'disabled'}"
+          f", transpose: {'enabled' if config.stages.transpose.enabled else 'disabled'})")
+    if config.omr.engine == "homr":
+        print(f"homr:     fix_multirest={'on' if config.omr.homr.fix_multirest else 'off'}")
+    print("formats: ", ", ".join(config.output.formats))
     return 0 if ok else 1
 
 

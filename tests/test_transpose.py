@@ -142,14 +142,14 @@ def test_tuba_treble_clef_depends_on_pitch():
 
 
 def test_stage_is_idempotent_and_restores_from_written_copy(tmp_path):
-    from musicocr.config import load_config
+    from musicocr.config import TransposeConfig, load_config
     from musicocr.pipeline import PipelineContext
     from musicocr.stages import transpose as stage
 
     xml = tmp_path / "book.musicxml"
     ET.ElementTree(_score("Voice", [("C", 0, 5)])).write(xml)
     cfg = load_config()
-    cfg.transpose = {"enabled": True, "instrument": "horn in f"}
+    cfg.stages.transpose = TransposeConfig(enabled=True, instrument="horn in f")
     ctx = PipelineContext(input_pdf=tmp_path / "x.pdf", workdir=tmp_path, config=cfg,
                           book_name="book", log=lambda s: None)
     ctx.artifacts.musicxml = xml
@@ -168,7 +168,7 @@ def test_stage_is_idempotent_and_restores_from_written_copy(tmp_path):
 
 
 def test_stage_disabled_and_unresolvable(tmp_path):
-    from musicocr.config import load_config
+    from musicocr.config import TransposeConfig, load_config
     from musicocr.pipeline import PipelineContext, StageError
     from musicocr.stages import transpose as stage
 
@@ -179,6 +179,6 @@ def test_stage_disabled_and_unresolvable(tmp_path):
                           book_name="book", log=lambda s: None)
     ctx.artifacts.musicxml = xml
     assert stage.run(ctx).status == "skipped"
-    cfg.transpose = {"enabled": True}              # no instrument, generic part name
+    cfg.stages.transpose = TransposeConfig(enabled=True)              # no instrument, generic part name
     with pytest.raises(StageError):
         stage.run(ctx)

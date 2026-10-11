@@ -329,7 +329,7 @@ def main() -> int:
         "audiveris": cfg.resolve_tool("audiveris"),
         "musescore": cfg.resolve_tool("musescore"),
         "pdftoppm": cfg.resolve_tool("pdftoppm"),
-        "timeout": cfg.omr_page_timeout,
+        "timeout": cfg.omr.page_timeout,
     }
     missing = [k for k in ("audiveris", "musescore", "pdftoppm") if not tools[k]]
     if missing:

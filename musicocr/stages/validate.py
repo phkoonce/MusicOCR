@@ -129,7 +129,7 @@ def run(ctx: PipelineContext) -> StageResult:
     if notes == 0:
         findings.append(_finding("error", "no-notes", "no notes recognised in the score"))
 
-    if ctx.config.omr_engine == "homr":
+    if ctx.config.omr.engine == "homr":
         # homr-specific: a dropped multi-rest (the model reads a printed "3" as
         # a plain bar) has no structural signature of its own -- see
         # musicocr.homr_fixes and omr-eval/README.md. Weak heuristic, expect
