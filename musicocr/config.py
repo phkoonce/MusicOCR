@@ -8,10 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from musicocr.preprocess import PreprocessOpts
 
-try:  # Python 3.11+
-    import tomllib
-except ModuleNotFoundError:  # Python 3.9 / 3.10
-    import tomli as tomllib  # type: ignore
+import tomllib
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.toml"

@@ -27,7 +27,7 @@ source .venv/bin/activate
 python -m musicocr doctor       # verify all tools are found
 ```
 
-Manual install: `pip install -e .` (add `.[test]` for pytest). An editable install is required: `config.toml` and the homr venv default are located relative to the repo checkout.
+Requires Python 3.11+ (setup.sh picks python3.13/3.12/3.11, or falls back to uv). Manual install: `pip install -e .` (add `.[test]` for pytest). An editable install is required: `config.toml` and the homr venv default are located relative to the repo checkout.
 
 ## Usage
 

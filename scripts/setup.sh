@@ -16,7 +16,19 @@ fi
 
 echo "==> python venv (.venv)"
 if [ ! -d .venv ]; then
-  python3 -m venv .venv
+  # Needs Python >= 3.11 (stdlib tomllib); prefer newest available.
+  PY=""
+  for c in python3.13 python3.12 python3.11; do
+    if command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
+  done
+  if [ -n "$PY" ]; then
+    "$PY" -m venv .venv
+  elif command -v uv >/dev/null 2>&1; then
+    uv venv --python 3.13 --seed .venv
+  else
+    echo "   Need Python >= 3.11 (python3.13/3.12/3.11 or uv) — e.g. brew install python@3.13" >&2
+    exit 1
+  fi
 fi
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -e ".[test]"

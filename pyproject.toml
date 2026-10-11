@@ -6,12 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "musicocr"
 version = "0.1.0"
 description = "PDF to MusicXML/MuseScore OMR pipeline"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
-    # music21 9.x requires Python >= 3.10; system Python here is 3.9.
+    # Kept at 8.x (tested green on Python 3.13); 9.x is allowed by Python but not adopted.
     "music21>=8,<9",
-    # Python 3.9 has no stdlib tomllib.
-    "tomli>=2 ; python_version < '3.11'",
     # Scan pre-processing (musicocr/preprocess.py): rasterise, deskew, crop, sharpen.
     "Pillow>=9",
     "numpy>=1.23",

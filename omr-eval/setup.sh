@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sets up isolated environments to trial pretrained OMR models against Audiveris.
-# Both need newer Python than the main project's 3.9 venv, hence separate venvs via uv.
+# Both need their own Python versions, hence separate venvs via uv (independent of the main project venv).
 set -euo pipefail
 cd "$(dirname "$0")"
 
