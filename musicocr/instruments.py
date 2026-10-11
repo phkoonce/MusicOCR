@@ -27,7 +27,12 @@ TRANSPOSITIONS: Dict[str, Semitones] = {
     "baritone horn": {"treble": -14, "bass": 0},
     "tenor horn": {"treble": -14, "bass": 0},
     "euphonium": {"treble": -14, "bass": 0},   # same convention as baritone horn
-    "tuba": 0,
+    # Plain "tuba" has no treble entry on purpose: treble-clef tuba parts are
+    # transposed by key (Eb: octave + major 6th; Bb: two octaves + major 2nd),
+    # so the part must say which.
+    "tuba": {"bass": 0},
+    "eb tuba": {"treble": -21, "bass": 0},
+    "bb tuba": {"treble": -26, "bass": 0},
     "trombone": 0,
     "bass trombone": 0,
     "trumpet": -2,
@@ -41,9 +46,10 @@ ALIASES: Dict[str, str] = {
     "baritone": "baritone horn",
     "bb baritone horn": "baritone horn",
     "tenor horn in bb": "tenor horn",
-    "eb tuba": "tuba",
-    "bb tuba": "tuba",
-    "bbb tuba": "tuba",
+    "tuba in eb": "eb tuba",
+    "tuba in bb": "bb tuba",
+    "bbb tuba": "bb tuba",
+    "tuba in bbb": "bb tuba",
     "bass tuba": "tuba",
     "trumpet in bb": "trumpet",
     "bb trumpet": "trumpet",

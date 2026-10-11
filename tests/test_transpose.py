@@ -85,7 +85,7 @@ def test_baritone_clef_dependent():
 
 
 def test_tuba_unchanged():
-    root = _score("Tuba", [("F", 0, 2)], fifths=-3)
+    root = _score("Tuba", [("F", 0, 2)], fifths=-3, clef=("F", "4"))
     transpose_score(root)
     assert _read(root) == [("F", 0, 2)] and _keys(root) == [-3]
 
@@ -128,3 +128,14 @@ def test_instrument_lookup():
         semitones_for("Baritone Horn", "c")
     with pytest.raises(ValueError):
         semitones_for("Trumpet in C")
+
+
+def test_tuba_treble_clef_depends_on_pitch():
+    assert semitones_for("Eb Tuba", "treble") == -21
+    assert semitones_for("Tuba in Bb 2", "treble") == -26
+    assert semitones_for("BBb Tuba", "bass") == 0
+    with pytest.raises(ValueError):
+        semitones_for("Tuba", "treble")   # ambiguous: Eb or Bb?
+    root = _score("Eb Tuba", [("C", 0, 5)])
+    transpose_score(root)
+    assert _read(root) == [("E", -1, 3)] and _keys(root) == [-3]   # C5 -> Eb3 (down 21)
