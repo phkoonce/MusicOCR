@@ -113,3 +113,29 @@ def test_suspicious_tuplets():
     part.append([ok, mixed, plain])
     found = suspicious_tuplet_measures(part)
     assert [m for m, _ in found] == [2] and "mixed" in found[0][1]
+
+
+def _dets_and_texts(tmp_path, digit_box, conf=0.65):
+    dets = [{"cls": "measure", "conf": 0.99, "xyxy": [0, 2270, 1000, 2366]},
+            {"cls": "multiRest", "conf": conf, "xyxy": [400, 2252, 900, 2332]},
+            {"cls": "multiRest", "conf": 0.5, "xyxy": [5000, 100, 5500, 180]}]
+    dp, tp = tmp_path / "p001.dets_v7_1600.json", tmp_path / "p001.texts.json"
+    dp.write_text(json.dumps(dets))
+    tp.write_text(json.dumps([{"text": "9", "xyxy": digit_box, "role": "words"}]))
+    return dp, tp
+
+
+def test_boost_multirest_dets_raises_only_covered(tmp_path):
+    dp, tp = _dets_and_texts(tmp_path, [600, 2100, 640, 2313])   # tall font box; centre 2206
+    assert page_text.boost_multirest_dets(dp, tp) == 1
+    d = json.loads(dp.read_text())
+    assert d[1]["conf"] == page_text.BOOSTED_CONF
+    assert d[2]["conf"] == 0.5                                    # no digit over it
+
+
+def test_boost_multirest_dets_ignores_distant_or_confident(tmp_path):
+    dp, tp = _dets_and_texts(tmp_path, [600, 1000, 640, 1050])    # far above
+    assert page_text.boost_multirest_dets(dp, tp) == 0
+    dp, tp = _dets_and_texts(tmp_path, [600, 2100, 640, 2313], conf=0.995)
+    assert page_text.boost_multirest_dets(dp, tp) == 0
+    assert page_text.boost_multirest_dets(tmp_path / "missing.json", tp) == 0

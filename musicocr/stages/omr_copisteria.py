@@ -24,7 +24,7 @@ from pathlib import Path
 from musicocr.copisteria_fixes import fill_empty_measures
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
-from musicocr.page_text import write_texts_json
+from musicocr.page_text import boost_multirest_dets, write_texts_json
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._omr_common import ensure_page_png as _ensure_page_png, run_raster_pages
 from musicocr.util import run_cmd_lenient
@@ -55,11 +55,26 @@ def run(ctx: PipelineContext) -> StageResult:
     pdftotext = ctx.config.resolve_tool("pdftotext")
     source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
 
+    def _boost_multirests(img: Path) -> None:
+        # Detect first (cached beside the page, the pipeline then reuses it), so a
+        # multiRest the evidence model would discard can be nudged. Best effort.
+        try:
+            code = ("import sys,pathlib;from copisteria.pipeline import detections;"
+                    "detections(pathlib.Path(sys.argv[1]))")
+            run_cmd_lenient([py, "-c", code, str(img)], timeout=ctx.config.omr.page_timeout,
+                            cwd=repo, log=ctx.log)
+            texts = img.with_name(f"{img.stem}.texts.json")
+            for dets in img.parent.glob(f"{img.stem}.dets_*.json"):
+                boost_multirest_dets(dets, texts, log=ctx.log)
+        except Exception as exc:  # noqa: BLE001
+            ctx.log(f"  {img.stem}: multiRest boost skipped ({type(exc).__name__}: {exc})")
+
     def build_cmd(img: Path, pdir: Path):
         if ctx.config.omr.copisteria.texts == "pdf-layer" and pdftotext and source_pdf.exists():
             n = write_texts_json(pdftotext, source_pdf, int(img.stem[1:]), img, log=ctx.log)
             if n:
                 ctx.log(f"  {img.stem}: {n} digit box(es) from the PDF text layer")
+                _boost_multirests(img)
         cmd = [py, "-m", "copisteria.pipeline", str(img), "--out", str(pdir)]
         if detector != "28m":
             cmd += ["--detector", detector]

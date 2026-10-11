@@ -73,3 +73,55 @@ def _image_size(png: Path) -> tuple[int, int]:
     from PIL import Image
     with Image.open(png) as im:
         return im.size
+
+
+# --- multi-rest detection prior ------------------------------------------------------
+#
+# Copisteria's evidence model re-judges every detected symbol and drops those it scores
+# below 0.5 "real". A wide multiRest H-bar detected at modest confidence (Zerberus Horn 1,
+# last bar: det 0.65 -> real 0.49) is discarded, so the bar becomes empty and the count
+# the text boxes carry is never looked up. The model's judgement leans on the detector's
+# own confidence, so where the PDF text layer independently shows a count digit over the
+# symbol we raise that confidence in the cached detections file before the model reads it.
+
+BOOSTED_CONF = 0.99
+
+
+def _staff_space(dets: list[dict]) -> float | None:
+    """Staff space from the median ``measure`` box height (a bar is four spaces tall)."""
+    hs = sorted(d["xyxy"][3] - d["xyxy"][1] for d in dets if d.get("cls") == "measure")
+    return hs[len(hs) // 2] / 4 if hs else None
+
+
+def boost_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
+    """Raise the confidence of ``multiRest`` detections that have a digit box over them.
+
+    "Over" mirrors Copisteria's own count lookup: horizontal overlap and the digit's
+    vertical centre between six staff spaces above the symbol and its mid-height.
+    Rewrites ``dets_path`` in place; returns the number of detections raised.
+    """
+    try:
+        dets = json.loads(dets_path.read_text())
+        texts = json.loads(texts_path.read_text())
+    except (OSError, ValueError):
+        return 0
+    sp = _staff_space(dets)
+    raised = 0
+    for d in dets:
+        if d.get("cls") != "multiRest" or d.get("conf", 1.0) >= BOOSTED_CONF:
+            continue
+        x0, y0, x1, y1 = d["xyxy"]
+        s = sp or (y1 - y0) * 0.3
+        for t in texts:
+            tx0, ty0, tx1, ty1 = t["xyxy"]
+            if (_DIGITS.fullmatch(str(t.get("text", "")).strip()) and tx1 > x0 and tx0 < x1
+                    and y0 - 6 * s < (ty0 + ty1) / 2 < y0 + (y1 - y0) / 2):
+                if log:
+                    log(f"  multiRest at ({x0:.0f},{y0:.0f}) conf {d['conf']:.2f} -> "
+                        f"{BOOSTED_CONF} (count digit {t['text']} over it)")
+                d["conf"] = BOOSTED_CONF
+                raised += 1
+                break
+    if raised:
+        dets_path.write_text(json.dumps(dets))
+    return raised
