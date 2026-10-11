@@ -57,8 +57,11 @@ class CopisteriaConfig:
     fix_empty: bool = True   # give bare-<forward> bars a whole-measure rest
     second_pass: bool = True   # re-detect gap pages one size up and re-read (accepted only if confined to gap bars)
     second_pass_scale: float = 1.28
+    second_pass_retry_scales: tuple = (1.12, 1.5, 1.75)   # tried in turn while gap bars remain
     fix_pickup: bool = True   # page 1: make a padded opening bar a real pickup, show its time signature
     reveal_gaps: bool = True   # gaps Copisteria left (missed symbols) -> visible coloured rests
+    fix_key_cancel: bool = True   # staff opens with no printed key sig -> C major
+    fix_time_inherit: bool = True # unprinted page-start meter continues the previous page's
     fix_ghost_bars: bool = True   # drop key/time-signature "bars" misread from cautionary signatures
     texts: str = "pdf-layer"   # "pdf-layer", "ocr", "auto" (layer if the PDF has one, else OCR) or "none"
     ocr_backend: str = "auto"   # texts = "ocr": "auto" (union of all that work), "rapidocr" or "vision"
@@ -81,10 +84,13 @@ class CopisteriaConfig:
         if form not in ("collapse", "expand", "keep"):
             raise ConfigError("[omr.copisteria] multirest_form must be 'collapse', 'expand' or 'keep'")
         return cls(detector=detector, texts=texts, fix_empty=bool(d.get("fix_empty", True)),
+                   fix_key_cancel=bool(d.get("fix_key_cancel", True)),
+                   fix_time_inherit=bool(d.get("fix_time_inherit", True)),
                    fix_ghost_bars=bool(d.get("fix_ghost_bars", True)),
                    fix_pickup=bool(d.get("fix_pickup", True)),
                    second_pass=bool(d.get("second_pass", True)),
                    second_pass_scale=float(d.get("second_pass_scale", 1.28)),
+                   second_pass_retry_scales=tuple(float(x) for x in d.get("second_pass_retry_scales", (1.12, 1.5, 1.75))),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),
                    multirest_form=form, ocr_backend=ocr_backend,
                    repo=str(d.get("repo", base.repo)))
