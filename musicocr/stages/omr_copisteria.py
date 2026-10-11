@@ -21,7 +21,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from musicocr.copisteria_fixes import drop_ghost_bars, fill_empty_measures
+from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix_opening_pickup,
+                                        reveal_gaps)
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
 from musicocr.page_text import (boost_multirest_dets, pdf_has_text, write_ocr_texts_json,
@@ -119,6 +120,22 @@ def run(ctx: PipelineContext) -> StageResult:
             else:
                 if ghosts:
                     ctx.log(f"  page {page}: dropped {ghosts} ghost bar(s)")
+        if ctx.config.omr.copisteria.fix_pickup and page == 1:
+            try:
+                n = fix_opening_pickup(xml, log=ctx.log)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  page {page}: pickup fix failed ({type(exc).__name__}: {exc})")
+            else:
+                if n:
+                    ctx.log(f"  page {page}: opening bar made a pickup / time signature shown")
+        if ctx.config.omr.copisteria.reveal_gaps:
+            try:
+                n = reveal_gaps(xml, log=lambda s: None)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  page {page}: gap reveal failed ({type(exc).__name__}: {exc})")
+            else:
+                if n:
+                    ctx.log(f"  page {page}: {n} gap(s) shown as coloured rests (likely dropped symbols)")
         form = ctx.config.omr.copisteria.multirest_form
         try:
             n = apply_multirest_form(xml, form, log=ctx.log)

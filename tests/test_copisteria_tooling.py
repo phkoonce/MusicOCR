@@ -203,3 +203,55 @@ def test_pdf_has_text(monkeypatch):
     monkeypatch.setattr(page_text, "run_cmd_lenient",
                         lambda *a, **k: LenientResult(0, "Horn in F\n", False))
     assert page_text.pdf_has_text("pdftotext", Path("x.pdf"), 1)
+
+
+# ---- pickup + gap reveal ---------------------------------------------------
+
+def test_fix_opening_pickup(tmp_path):
+    from musicocr.copisteria_fixes import fix_opening_pickup
+    xml = tmp_path / "p.musicxml"
+    xml.write_text("""<score-partwise><part id="P1">
+<measure number="1"><attributes><time print-object="no"><beats>4</beats><beat-type>4</beat-type></time></attributes>
+<note><rest/><duration>4</duration></note>
+<note print-object="no"><rest/><duration>12</duration></note></measure>
+<measure number="2"><note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration></note></measure>
+</part></score-partwise>""")
+    assert fix_opening_pickup(xml, log=lambda s: None) == 2
+    m1 = ET.parse(xml).getroot().find("part/measure")
+    assert [n.find("duration").text for n in m1.findall("note")] == ["4"]
+    assert m1.find("attributes/time").get("print-object") is None
+    assert fix_opening_pickup(xml, log=lambda s: None) == 0
+
+
+def test_pickup_keeps_bar_with_nothing_real(tmp_path):
+    from musicocr.copisteria_fixes import fix_opening_pickup
+    xml = tmp_path / "p.musicxml"
+    xml.write_text("""<score-partwise><part id="P1"><measure number="1">
+<note print-object="no"><rest/><duration>16</duration></note></measure></part></score-partwise>""")
+    assert fix_opening_pickup(xml, log=lambda s: None) == 0
+    assert len(ET.parse(xml).getroot().findall("part/measure/note")) == 1
+
+
+def test_reveal_gaps(tmp_path):
+    from musicocr.copisteria_fixes import GAP_COLOR, reveal_gaps
+    xml = tmp_path / "p.musicxml"
+    xml.write_text("""<score-partwise><part id="P1">
+<measure number="1"><note><pitch><step>C</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice></note>
+<forward><duration>2</duration><voice>1</voice></forward>
+<note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note></measure>
+<measure number="2"><note print-object="no" print-spacing="yes"><rest/><duration>4</duration></note>
+<note><pitch><step>E</step><octave>4</octave></pitch><duration>12</duration></note></measure>
+<measure number="3"><forward><duration>16</duration></forward></measure>
+<measure number="4"><note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration></note><backup><duration>8</duration></backup>
+<forward><duration>4</duration></forward></measure>
+</part></score-partwise>""")
+    assert reveal_gaps(xml, log=lambda s: None) == 2
+    ms = ET.parse(xml).getroot().findall("part/measure")
+    rest1 = ms[0].findall("note")[1]
+    assert rest1.find("rest") is not None and rest1.get("color") == GAP_COLOR
+    assert rest1.find("duration").text == "2" and rest1.find("voice").text == "1"
+    assert ms[0].find("forward") is None
+    hidden = ms[1].find("note")
+    assert hidden.get("print-object") is None and hidden.get("color") == GAP_COLOR
+    assert ms[2].find("forward") is not None        # empty bar untouched
+    assert ms[3].find("forward") is not None        # multi-voice bar untouched

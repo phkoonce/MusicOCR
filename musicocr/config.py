@@ -55,6 +55,8 @@ class HomrConfig:
 class CopisteriaConfig:
     detector: str = "28m"   # "28m" (default) or "2m" (smaller, faster)
     fix_empty: bool = True   # give bare-<forward> bars a whole-measure rest
+    fix_pickup: bool = True   # page 1: make a padded opening bar a real pickup, show its time signature
+    reveal_gaps: bool = True   # gaps Copisteria left (missed symbols) -> visible coloured rests
     fix_ghost_bars: bool = True   # drop key/time-signature "bars" misread from cautionary signatures
     texts: str = "pdf-layer"   # "pdf-layer", "ocr", "auto" (layer if the PDF has one, else OCR) or "none"
     ocr_backend: str = "auto"   # texts = "ocr": "auto" (union of all that work), "rapidocr" or "vision"
@@ -78,6 +80,8 @@ class CopisteriaConfig:
             raise ConfigError("[omr.copisteria] multirest_form must be 'collapse', 'expand' or 'keep'")
         return cls(detector=detector, texts=texts, fix_empty=bool(d.get("fix_empty", True)),
                    fix_ghost_bars=bool(d.get("fix_ghost_bars", True)),
+                   fix_pickup=bool(d.get("fix_pickup", True)),
+                   reveal_gaps=bool(d.get("reveal_gaps", True)),
                    multirest_form=form, ocr_backend=ocr_backend,
                    repo=str(d.get("repo", base.repo)))
 

@@ -191,6 +191,13 @@ the normal way to iterate without paying for another full OMR pass.
   measure units per system (or per page when the XML has no system marks, as
   Copisteria) are compared with the printed system-start bar numbers minus
   multi-rest counts (`musicocr/barcheck.py`), reporting ghost (extra) or missing bars.
+* **Pickup bar** (page 1 only, `fix_pickup`): when Copisteria misses the printed
+  opening meter it pads an upbeat bar to a full bar with a hidden rest and hides
+  the time signature; the padding is dropped and the meter shown.
+* **Gaps as coloured rests** (`reveal_gaps`): Copisteria draws nothing it did not
+  read, so a missed symbol leaves a gap (`<forward>`), which MuseScore shows as an
+  invisible rest. Each gap becomes a visible orange rest instead, so bars add up
+  and every probable dropped symbol is easy to find when hand-correcting.
 * `validate` flags `odd-tuplets` for any engine: bars with mixed tuplet ratios
   or a tuplet note shorter than a 32nd (Copisteria infers tuplets from spacing
   and can invent them while still summing to the right bar length).

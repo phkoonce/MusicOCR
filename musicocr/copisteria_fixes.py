@@ -150,3 +150,88 @@ def drop_ghost_bars(path: Path, log: Callable[[str], None] = print) -> int:
         ET.indent(tree, space="  ")
         tree.write(path, encoding="UTF-8", xml_declaration=True)
     return dropped
+
+
+GAP_COLOR = "#E67E00"
+
+
+def _is_hidden_rest(el: ET.Element) -> bool:
+    return el.tag == "note" and el.get("print-object") == "no" and el.find("rest") is not None
+
+
+def fix_opening_pickup(path: Path, log: Callable[[str], None] = print) -> int:
+    """Make the first bar of the score's first page a real pickup bar.
+
+    When Copisteria does not see the printed opening meter it treats the first bar
+    as a full bar and pads a short one (an upbeat) with a trailing *hidden* rest,
+    and it marks the time signature itself as not printed. A first page always
+    prints its meter, so: drop that trailing padding (leaving a short pickup bar)
+    and show the time signature. Returns the number of changes made.
+    """
+    tree = ET.parse(path)
+    changed = 0
+    for part in tree.getroot().findall("part"):
+        first = part.find("measure")
+        if first is None:
+            continue
+        for time in first.findall("./attributes/time"):
+            if time.get("print-object") == "no":
+                del time.attrib["print-object"]
+                changed += 1
+        kids = list(first)
+        while kids and (kids[-1].tag == "forward" or _is_hidden_rest(kids[-1])):
+            if not any(k.tag == "note" and not _is_hidden_rest(k) for k in kids[:-1]):
+                break   # nothing real before the padding: leave it
+            first.remove(kids.pop())
+            changed += 1
+            log(f"  measure {first.get('number')}: dropped trailing padding (pickup bar)")
+    if changed:
+        ET.indent(tree, space="  ")
+        tree.write(path, encoding="UTF-8", xml_declaration=True)
+    return changed
+
+
+def reveal_gaps(path: Path, color: str = GAP_COLOR,
+                log: Callable[[str], None] = print) -> int:
+    """Turn the gaps Copisteria leaves where it read nothing into visible, coloured rests.
+
+    Copisteria places notes at the onsets the model read and draws nothing else, so
+    a symbol it missed shows up as a gap (a ``<forward>``, or an explicit hidden
+    rest). Written as-is those become invisible rests in MuseScore. Making them
+    ordinary rests keeps the bar adding up and the colour marks every spot where
+    a symbol was probably dropped, for hand-correction. Multi-voice bars (any
+    ``<backup>``) are left alone. Returns the number of gaps revealed.
+    """
+    tree = ET.parse(path)
+    revealed = 0
+    for part in tree.getroot().findall("part"):
+        for measure in part.findall("measure"):
+            if measure.find("backup") is not None:
+                continue
+            kids = list(measure)
+            for i, el in enumerate(kids):
+                if el.tag == "forward":
+                    if not any(k.tag == "note" for k in kids):
+                        continue            # a wholly empty bar: fill_empty_measures' job
+                    note = ET.Element("note")
+                    ET.SubElement(note, "rest")
+                    ET.SubElement(note, "duration").text = el.findtext("duration") or "0"
+                    for tag in ("voice", "staff"):
+                        child = el.find(tag)
+                        if child is not None and child.text:
+                            ET.SubElement(note, tag).text = child.text
+                    note.set("color", color)
+                    measure.insert(list(measure).index(el), note)
+                    measure.remove(el)
+                elif _is_hidden_rest(el):
+                    for attr in ("print-object", "print-spacing"):
+                        el.attrib.pop(attr, None)
+                    el.set("color", color)
+                else:
+                    continue
+                revealed += 1
+                log(f"  measure {measure.get('number')}: gap revealed as a coloured rest")
+    if revealed:
+        ET.indent(tree, space="  ")
+        tree.write(path, encoding="UTF-8", xml_declaration=True)
+    return revealed

@@ -78,6 +78,12 @@ fix_empty = true
 # (key-change bar with a spurious note, whose time change sits in the next bar).
 # Logged; musicocr/copisteria_fixes.py. validate's bar-count check reports the rest.
 fix_ghost_bars = true
+# Page 1 only: Copisteria pads a pickup (upbeat) bar to a full bar with a hidden
+# rest when it misses the printed opening meter; drop the padding and show the meter.
+fix_pickup = true
+# Gaps where Copisteria read nothing (usually a dropped symbol) come out as hidden
+# rests in MuseScore; make them visible, orange-coloured rests so they are easy to find.
+reveal_gaps = true
 # Multi-measure-rest form of the output: "collapse" (default) folds a tagged rest
 # plus its N-1 following rest bars into one bar like homr writes (what the
 # align_* tools expect; bar numbers then drift from print), "expand" writes the
