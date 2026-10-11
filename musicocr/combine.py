@@ -23,6 +23,7 @@ carried is derived from the data.
 """
 from __future__ import annotations
 
+import copy
 import re
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -239,6 +240,59 @@ def part_info(label: str, instrument: str) -> Dict[str, Any]:
     return dict(name=label, abbr=label[:4].strip() + suffix, program=1)
 
 
+def copy_marks(src: ET.Element, dst: ET.Element, src_divisions: int, *, notes: bool = True) -> None:
+    """Copy a source bar's content into ``dst`` in document order: notes (as ``copy_notes``),
+    the directions (dynamics, hairpins) that sit between them, and double bars. A light-heavy
+    barline is dropped (the combined score writes its own final one). ``notes=False`` copies
+    only the directions/double bars, for a bar that is rewritten as a whole-bar rest."""
+    scale = DIV / src_divisions if src_divisions else 1
+    for ch in src:
+        if ch.tag == "note" and notes:
+            nn = copy.deepcopy(ch)
+            for e in nn.findall("stem"):
+                nn.remove(e)
+            du = nn.find("duration")
+            if du is not None and src_divisions != DIV:
+                du.text = str(round(int(du.text) * scale))
+            dst.append(nn)
+        elif ch.tag == "direction" or (ch.tag == "barline" and ch.findtext("bar-style") == "light-light"):
+            nn = copy.deepcopy(ch)
+            off = nn.find("offset")
+            if off is not None and off.text:
+                off.text = str(round(int(float(off.text)) * scale))
+            if nn.tag == "direction" and not notes:
+                for t in nn.findall("staff"):
+                    nn.remove(t)
+            dst.append(nn)
+
+
+def balance_wedges(measures: List[ET.Element]) -> int:
+    """Drop hairpin starts without a later stop and stops without an open start (a repaired or
+    dropped bar can orphan one). Returns how many were removed."""
+    opened: Optional[ET.Element] = None
+    owner: Dict[int, ET.Element] = {}
+    drop: List[Tuple[ET.Element, ET.Element]] = []
+    for m in measures:
+        for d in m.findall("direction"):
+            for w in d.iter("wedge"):
+                kind = w.get("type")
+                if kind in ("crescendo", "diminuendo"):
+                    if opened is not None:
+                        drop.append(owner[id(opened)])
+                    opened = w
+                    owner[id(w)] = (m, d)
+                elif kind == "stop":
+                    if opened is None:
+                        drop.append((m, d))
+                    opened = None
+    if opened is not None:
+        drop.append(owner[id(opened)])
+    for m, d in drop:
+        if d in list(m):
+            m.remove(d)
+    return len(drop)
+
+
 # ---- combine ----------------------------------------------------------------------
 
 def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftotext",
@@ -423,9 +477,11 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             length = bar_len(spec, b)
             if src is None or is_rest_only(src[0]):
                 full_bar = length == meter[0] * DIV * 4 // meter[1]
+                if src is not None:
+                    copy_marks(src[0], m, src[1], notes=False)
                 m.append(rest_measure(b, length, full_bar).find("note"))
             else:
-                copy_notes(src[0], m, src[1])
+                copy_marks(src[0], m, src[1])
                 bad = check_length(m, spec, b)
                 if bad:
                     report.append(f"  bar {b}: LENGTH {bad[0]:g} beats, expected {bad[1]:g}")
@@ -433,6 +489,9 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             prev_key, prev_met = key, meter
             out.append(m)
         built[n] = out
+        dropped = balance_wedges(out)
+        if dropped:
+            report.append(f"  dropped {dropped} unmatched hairpin(s)")
     summary["repairs"] = sum(1 for r in report if "-- check" in r.lower())
     score = build_score(spec, built, infos)
     # The notes stay as printed (written pitch); declare each part's transposition so the

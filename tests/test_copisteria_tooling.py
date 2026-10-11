@@ -510,3 +510,18 @@ def test_align_insertions_restricted_to_printed_spans():
     assert [i for i, s in enumerate(slots) if s is None] and all(i in (3, 4) for i, s in enumerate(slots) if s is None)
     assert slots.count(None) == 2
     assert slots.count(None) == free.count(None)
+
+
+def test_copy_marks_keeps_directions_and_drops_orphan_hairpins():
+    import xml.etree.ElementTree as ET
+    from musicocr.combine import balance_wedges, copy_marks
+    src = ET.fromstring(
+        '<measure number="1"><direction><direction-type><dynamics><p/></dynamics></direction-type></direction>'
+        '<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>'
+        '<direction><direction-type><wedge type="crescendo"/></direction-type></direction>'
+        '<barline location="right"><bar-style>light-light</bar-style></barline></measure>')
+    dst = ET.Element("measure")
+    copy_marks(src, dst, 4)
+    assert [c.tag for c in dst] == ["direction", "note", "direction", "barline"]
+    assert balance_wedges([dst]) == 1                      # the crescendo never stops
+    assert [c.tag for c in dst] == ["direction", "note", "barline"]
