@@ -307,3 +307,30 @@ def test_union_dets_adds_only_nonoverlapping_notes_and_rests():
            {"cls": "measure", "xyxy": box(100)}]          # not note/rest: ignored
     got = union_dets(base, big)
     assert [r["cls"] for r in got] == ["note_eighth", "note_eighth", "rest_quarter"]
+
+
+# ---- half-read tuplets -----------------------------------------------------
+
+def _n(dur, tm=False, beam="", typ="eighth"):
+    t = ("<time-modification><actual-notes>2</actual-notes><normal-notes>3</normal-notes>"
+         "</time-modification>") if tm else ""
+    b = f'<beam number="1">{beam}</beam>' if beam else ""
+    return (f"<note><pitch><step>A</step><octave>5</octave></pitch><duration>{dur}</duration>"
+            f"<voice>1</voice><type>{typ}</type>{t}<stem>down</stem>{b}</note>")
+
+
+def test_fix_half_tuplets_completes_duplet_and_leaves_others(tmp_path):
+    from musicocr.copisteria_fixes import fix_half_tuplets
+    attrs = ("<attributes><divisions>4</divisions><time><beats>6</beats><beat-type>8</beat-type>"
+             "</time></attributes>")
+    gap1 = "<note print-object=\"no\"><rest/><duration>1</duration></note>"
+    # 6 + duplet(3) + half-read duplet(2) + gap(1) = 12: finished -> 6 + 3 + 3
+    ok = attrs + _n(6, typ="quarter") + _n(3, True, "begin") + _n(2, False, "end") + gap1
+    # the notes would still not add up to the bar after scaling -> untouched
+    no = _n(4, typ="quarter") + _n(3, True, "begin") + _n(2, False, "end") + gap1
+    p = _xml(tmp_path, "t.xml", [ok, no])
+    assert fix_half_tuplets(p, log=lambda s: None) == 1
+    bars = ET.parse(p).getroot().findall("part/measure")
+    assert [n.findtext("duration") for n in bars[0].findall("note")] == ["6", "3", "3"]
+    assert bars[0].findall("note")[2].find("time-modification") is not None
+    assert len(bars[1].findall("note")) == 4
