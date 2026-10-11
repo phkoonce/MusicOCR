@@ -276,6 +276,8 @@ def test_copisteria_runs_from_repo_root_and_adopts_output(tmp_path, monkeypatch)
 
     def fake(cmd, **kw):
         from pathlib import Path
+        if "copisteria.pipeline" not in cmd:        # the detection prepass (python -c ...)
+            return LenientResult(0, "", False)
         seen.append((cmd, kw.get("cwd")))
         img = Path(cmd[cmd.index("copisteria.pipeline") + 1])
         # page 1 uses the expected name; page 2 a differently-named export

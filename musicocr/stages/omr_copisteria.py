@@ -19,6 +19,7 @@ transposing instruments or multi-rests -- hence the side-by-side evaluation
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix_opening_pickup,
@@ -26,9 +27,10 @@ from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix
 from musicocr.copisteria_second_pass import gap_bars, merge_second_pass
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
-from musicocr.page_text import (boost_multirest_dets, pdf_has_text, write_ocr_texts_json,
-                                write_texts_json)
+from musicocr.page_text import (boost_multirest_dets, mark_small_graces, pdf_has_text,
+                                write_ocr_texts_json, write_texts_json)
 from musicocr.pipeline import PipelineContext
+from musicocr.second_pass_detect import empty_bars
 from musicocr.stages._omr_common import ensure_page_png as _ensure_page_png, run_raster_pages
 from musicocr.util import run_cmd_lenient
 
@@ -58,9 +60,17 @@ def run(ctx: PipelineContext) -> StageResult:
     pdftotext = ctx.config.resolve_tool("pdftotext")
     source_pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
 
-    def _boost_multirests(img: Path) -> None:
-        # Detect first (cached beside the page, the pipeline then reuses it), so a
-        # multiRest the evidence model would discard can be nudged. Best effort.
+    script = Path(__file__).resolve().parent.parent / "second_pass_detect.py"
+
+    def _big_cache(img: Path) -> Path:
+        return img.with_name(f"{img.stem}.big_dets.json")
+
+    def _prepare_dets(img: Path, texts_found: bool) -> None:
+        # Detect first (cached beside the page, the pipeline then reuses it), then adjust the
+        # cached detections before the evidence model reads them: a multiRest it would discard
+        # is nudged (page text), small "not grace" notes become grace notes, and bars the
+        # detector found empty are filled from the larger input size. Best effort.
+        cfg = ctx.config.omr.copisteria
         try:
             code = ("import sys,pathlib;from copisteria.pipeline import detections;"
                     "detections(pathlib.Path(sys.argv[1]))")
@@ -68,9 +78,23 @@ def run(ctx: PipelineContext) -> StageResult:
                             cwd=repo, log=ctx.log)
             texts = img.with_name(f"{img.stem}.texts.json")
             for dets in img.parent.glob(f"{img.stem}.dets_*.json"):
-                boost_multirest_dets(dets, texts, log=ctx.log)
+                if texts_found:
+                    boost_multirest_dets(dets, texts, log=ctx.log)
+                if cfg.fix_empty_bars_dets and empty_bars(json.loads(dets.read_text())):
+                    res = run_cmd_lenient(
+                        [py, str(script), str(img), str(dets), str(dets), str(cfg.second_pass_scale),
+                         "empty-bars", str(_big_cache(img))],
+                        timeout=ctx.config.omr.page_timeout, cwd=repo, log=ctx.log)
+                    if res is None or res.returncode != 0:
+                        ctx.log(f"  {img.stem}: empty-bar repair skipped (larger-scale detection failed)")
+                    else:
+                        ctx.log(f"  {img.stem}: empty-bar repair: {(res.output.strip().splitlines() or [''])[-1]}")
+                if cfg.small_graces:        # after the repair, whose added notes may be small too
+                    n = mark_small_graces(dets)
+                    if n:
+                        ctx.log(f"  {img.stem}: {n} small note(s) marked as grace notes")
         except Exception as exc:  # noqa: BLE001
-            ctx.log(f"  {img.stem}: multiRest boost skipped ({type(exc).__name__}: {exc})")
+            ctx.log(f"  {img.stem}: detection prepass skipped ({type(exc).__name__}: {exc})")
 
     def build_cmd(img: Path, pdir: Path):
         mode = ctx.config.omr.copisteria.texts
@@ -89,7 +113,7 @@ def run(ctx: PipelineContext) -> StageResult:
             src = "OCR"
         if n:
             ctx.log(f"  {img.stem}: {n} digit box(es) from {src}")
-            _boost_multirests(img)
+        _prepare_dets(img, texts_found=bool(n))
         cmd = [py, "-m", "copisteria.pipeline", str(img), "--out", str(pdir)]
         if detector != "28m":
             cmd += ["--detector", detector]
@@ -108,13 +132,15 @@ def run(ctx: PipelineContext) -> StageResult:
         work.mkdir(exist_ok=True)
         for f in (img, *pdir.glob(f"{img.stem}.texts.json"), *pdir.glob(f"{img.stem}.geom.json")):
             (work / f.name).write_bytes(f.read_bytes())
-        script = Path(__file__).resolve().parent.parent / "second_pass_detect.py"
         res = run_cmd_lenient(
             [py, str(script), str(work / img.name), str(base[0]), str(work / base[0].name),
-             str(ctx.config.omr.copisteria.second_pass_scale)], cwd=repo, **kw)
+             str(ctx.config.omr.copisteria.second_pass_scale), "union", str(_big_cache(img))],
+            cwd=repo, **kw)
         if res is None or res.returncode != 0 or not (work / base[0].name).exists():
             ctx.log(f"  {img.stem}: second pass skipped (larger-scale detection failed)")
             return
+        if ctx.config.omr.copisteria.small_graces:
+            mark_small_graces(work / base[0].name)
         cmd2 = [py, "-m", "copisteria.pipeline", str(work / img.name), "--out", str(work)]
         cmd2 += cmd[cmd.index("--out") + 2:]          # e.g. --detector
         run_cmd_lenient(cmd2, cwd=repo, **kw)

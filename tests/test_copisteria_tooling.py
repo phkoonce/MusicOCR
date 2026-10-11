@@ -307,3 +307,48 @@ def test_union_dets_adds_only_nonoverlapping_notes_and_rests():
            {"cls": "measure", "xyxy": box(100)}]          # not note/rest: ignored
     got = union_dets(base, big)
     assert [r["cls"] for r in got] == ["note_eighth", "note_eighth", "rest_quarter"]
+
+
+def _det(cls, x0, y0, x1, y1, conf=0.99, grace="<na>", acc=0.0):
+    return {"cls": cls, "conf": conf, "xyxy": [x0, y0, x1, y1],
+            "attrs": {"grace": grace}, "attr_p": {"grace": 1.0},
+            "attr_dist": {"grace": {grace: 1.0 - acc, "acc": acc} if acc else {grace: 1.0}}}
+
+
+def test_mark_small_graces_sets_grace_on_clearly_small_notes(tmp_path):
+    import json
+
+    from musicocr.page_text import mark_small_graces
+    normal = [_det("note_quarter", 100 * i, 0, 100 * i + 34, 26) for i in range(8)]
+    small = _det("note_eighth", 900, 0, 922, 17, acc=0.05)                  # 22x17: a grace the detector missed
+    medium = _det("note_eighth", 1000, 0, 1033, 26)                         # ordinary
+    p = tmp_path / "p001.dets_v7_1600.json"
+    p.write_text(json.dumps(normal + [small, medium]))
+    assert mark_small_graces(p) == 1
+    out = json.loads(p.read_text())
+    assert out[-2]["attrs"]["grace"] == "acc" and out[-2]["attr_dist"]["grace"]["acc"] > 0.9
+    assert out[-1]["attrs"]["grace"] == "<na>" and out[0]["attrs"]["grace"] == "<na>"
+
+
+def test_mark_small_graces_needs_a_reference(tmp_path):
+    import json
+
+    from musicocr.page_text import mark_small_graces
+    p = tmp_path / "p001.dets_v7_1600.json"
+    p.write_text(json.dumps([_det("note_eighth", 0, 0, 22, 17), _det("note_quarter", 50, 0, 84, 26)]))
+    assert mark_small_graces(p) == 0
+
+
+def test_fill_empty_bars_only_fills_measure_boxes_that_hold_nothing():
+    from musicocr.second_pass_detect import empty_bars, fill_empty_bars
+    box = lambda cls, x0, x1, conf=0.99: {"cls": cls, "conf": conf, "xyxy": [x0, 0, x1, 50]}  # noqa: E731
+    base = [box("measure", 0, 100), box("note_quarter", 40, 60),            # a bar with a note
+            box("measure", 100, 200),                                        # empty: its whole rest was missed
+            box("measure", 200, 300), box("multiRest", 220, 280)]            # a multi-rest bar
+    assert empty_bars(base) == [[100, 0, 200, 50]]
+    big = [box("mRest_measure", 140, 160), box("mRest_measure", 20, 30),     # second is in a bar with a note
+           box("note_half", 240, 260), box("mRest_measure", 110, 120, conf=0.5)]
+    got = fill_empty_bars(base, big)
+    assert [r["cls"] for r in got[len(base):]] == ["mRest_measure"]
+    assert got[len(base)]["xyxy"][0] == 140
+    assert fill_empty_bars([box("measure", 0, 100), box("note_quarter", 40, 60)], big)[2:] == []

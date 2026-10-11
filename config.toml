@@ -84,6 +84,15 @@ fix_ghost_bars = true
 # reading stays). Costs one extra run for pages that have gaps.
 second_pass = true
 second_pass_scale = 1.28
+# Before reading a page, a measure box the detector found EMPTY (a whole-bar rest or the only
+# note of a bar undetected) is filled from the larger-size detection (note/rest/whole-rest,
+# conf >= 0.9; musicocr/second_pass_detect.py): an empty bar otherwise makes Copisteria merge
+# it into its neighbour (a lost bar). Runs the larger-size detector only for such pages.
+fix_empty_bars_dets = true
+# Note detections much smaller than the page's ordinary notes (< 0.8 x 0.9) are grace notes
+# (ruffs/flams); the detector sometimes labels them "not grace" and the reader then writes
+# real notes (overfull bar, dropped note). musicocr/page_text.py mark_small_graces.
+small_graces = true
 # Page 1 only: Copisteria pads a pickup (upbeat) bar to a full bar with a hidden
 # rest when it misses the printed opening meter; drop the padding and show the meter.
 fix_pickup = true
