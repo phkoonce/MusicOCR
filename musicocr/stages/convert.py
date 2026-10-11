@@ -39,7 +39,7 @@ def _convert(tool, src, dst, log):
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    xml = ctx.artifacts.get("musicxml") or (ctx.workdir / f"{ctx.book_name}.musicxml")
+    xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
     if not xml.exists():
         raise StageError(
             f"no .musicxml at {xml.name}; run the extract stage first "
@@ -60,15 +60,15 @@ def run(ctx: PipelineContext) -> StageResult:
     # continuous score, `musicxml` is only the first page — converting just
     # that file would silently drop every later page from the deliverable.
     # Convert every page's MusicXML instead, one file per page.
-    pages = ctx.artifacts.get("musicxml_pages") or []
-    merged = ctx.artifacts.get("extract_merged", True)
+    pages = ctx.artifacts.musicxml_pages or []
+    merged = ctx.artifacts.extract_merged
     sources = (
         [(p.stem.rsplit(".", 1)[-1], p) for p in pages]
         if not merged and len(pages) > 1
         else [(None, xml)]
     )
 
-    outputs = ctx.artifacts.setdefault("outputs", {})
+    outputs = ctx.artifacts.outputs
     produced = []
     for suffix, src in sources:
         for fmt in wanted:
@@ -86,8 +86,8 @@ def run(ctx: PipelineContext) -> StageResult:
     if "qa-pdf" in wanted:
         qa_out = outputs["qa-pdf"]
         render_pdfs = qa_out if isinstance(qa_out, list) else [qa_out]
-        ctx.artifacts["render_pdfs"] = render_pdfs
-        ctx.artifacts["render_pdf"] = render_pdfs[0]
+        ctx.artifacts.render_pdfs = render_pdfs
+        ctx.artifacts.render_pdf = render_pdfs[0]
     if not merged and len(pages) > 1:
         ctx.log(f"  note: pages did not merge into one score — "
                  f"converted {len(pages)} pages separately instead of dropping the rest")

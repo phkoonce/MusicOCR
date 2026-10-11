@@ -22,12 +22,13 @@ def run(ctx: PipelineContext) -> StageResult:
     if not ctx.config.normalize_enabled:
         return StageResult("normalize", "skipped", "disabled ([stages.normalize] enabled = false)")
 
-    xml = ctx.artifacts.get("musicxml") or (ctx.workdir / f"{ctx.book_name}.musicxml")
+    xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
     if not xml.exists():
         raise StageError(
             f"no .musicxml at {xml.name}; run the extract stage first (e.g. --from extract)"
         )
-    ctx.artifacts.setdefault("musicxml", xml)
+    if ctx.artifacts.musicxml is None:
+        ctx.artifacts.musicxml = xml
 
     try:
         from music21 import converter

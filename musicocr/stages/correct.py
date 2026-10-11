@@ -21,7 +21,7 @@ from musicocr.pipeline import PipelineContext, StageResult
 
 
 def _projects(ctx: PipelineContext) -> list[Path]:
-    single = ctx.artifacts.get("omr_project")
+    single = ctx.artifacts.omr_project
     if single:
         return [Path(single)]
     return sorted(ctx.workdir.glob("pages/p*/*.omr"))
@@ -38,7 +38,7 @@ def run(ctx: PipelineContext) -> StageResult:
         )
 
     projects = _projects(ctx)
-    failed = ctx.artifacts.get("omr_failed_pages", []) or []
+    failed = ctx.artifacts.omr_failed_pages or []
 
     lines = [
         "",

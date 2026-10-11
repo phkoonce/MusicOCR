@@ -152,7 +152,7 @@ def test_stage_is_idempotent_and_restores_from_written_copy(tmp_path):
     cfg.transpose = {"enabled": True, "instrument": "horn in f"}
     ctx = PipelineContext(input_pdf=tmp_path / "x.pdf", workdir=tmp_path, config=cfg,
                           book_name="book", log=lambda s: None)
-    ctx.artifacts["musicxml"] = xml
+    ctx.artifacts.musicxml = xml
 
     assert stage.run(ctx).status == "ok"
     first = xml.read_text()
@@ -177,7 +177,7 @@ def test_stage_disabled_and_unresolvable(tmp_path):
     cfg = load_config()
     ctx = PipelineContext(input_pdf=tmp_path / "x.pdf", workdir=tmp_path, config=cfg,
                           book_name="book", log=lambda s: None)
-    ctx.artifacts["musicxml"] = xml
+    ctx.artifacts.musicxml = xml
     assert stage.run(ctx).status == "skipped"
     cfg.transpose = {"enabled": True}              # no instrument, generic part name
     with pytest.raises(StageError):

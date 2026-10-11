@@ -28,19 +28,20 @@ def run(ctx: PipelineContext) -> StageResult:
     if not cfg.get("enabled"):
         return StageResult("transpose", "skipped", "disabled ([stages.transpose] enabled = false)")
 
-    xml = ctx.artifacts.get("musicxml") or (ctx.workdir / f"{ctx.book_name}.musicxml")
+    xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
     if not xml.exists():
         raise StageError(
             f"no .musicxml at {xml.name}; run the extract stage first (e.g. --from extract)"
         )
-    ctx.artifacts.setdefault("musicxml", xml)
+    if ctx.artifacts.musicxml is None:
+        ctx.artifacts.musicxml = xml
 
     targets = [xml]
-    pages = ctx.artifacts.get("musicxml_pages") or []
-    if not ctx.artifacts.get("extract_merged", True) and len(pages) > 1:
+    pages = ctx.artifacts.musicxml_pages or []
+    if not ctx.artifacts.extract_merged and len(pages) > 1:
         targets = list(pages)          # convert/qa use the per-page files in that case
 
-    stamps = ctx.artifacts.setdefault("transpose_stamps", {})
+    stamps = ctx.artifacts.transpose_stamps
     backup_dir = ctx.workdir / "written"
     backup_dir.mkdir(parents=True, exist_ok=True)
 

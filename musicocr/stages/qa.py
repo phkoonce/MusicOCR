@@ -26,9 +26,9 @@ def run(ctx: PipelineContext) -> StageResult:
 
     qa_dir = ctx.workdir / "qa"
     dpi = ctx.config.qa_dpi
-    source_pdf = ctx.artifacts.get("source_pdf") or (ctx.workdir / "source.pdf")
-    render_pdfs = ctx.artifacts.get("render_pdfs") or [
-        ctx.artifacts.get("render_pdf") or (ctx.workdir / "render.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
+    render_pdfs = ctx.artifacts.render_pdfs or [
+        ctx.artifacts.render_pdf or (ctx.workdir / "render.pdf")
     ]
 
     src_pages, omr_pages = [], []
@@ -39,7 +39,7 @@ def run(ctx: PipelineContext) -> StageResult:
             prefix = qa_dir / f"omr-{render_pdf.stem}" if len(render_pdfs) > 1 else qa_dir / "omr"
             omr_pages.extend(_rasterize(tool, render_pdf, prefix, dpi, ctx.log))
 
-    ctx.artifacts["qa_pages"] = {
+    ctx.artifacts.qa_pages = {
         "src": [str(p) for p in src_pages],
         "omr": [str(p) for p in omr_pages],
     }

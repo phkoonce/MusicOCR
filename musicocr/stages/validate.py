@@ -1,6 +1,6 @@
 """Stage 6: sanity-check the MusicXML with music21. Reports only, no fixes.
 
-Findings are stashed on ``ctx.artifacts['validation']`` for the final report.
+Findings are stashed on ``ctx.artifacts.validation`` for the final report.
 Severities: ``error`` (almost certainly wrong), ``warn`` (suspicious / worth a
 look), ``info`` (context).
 """
@@ -68,13 +68,14 @@ def _check_part(part, p_index, findings):
 
 
 def run(ctx: PipelineContext) -> StageResult:
-    xml = ctx.artifacts.get("musicxml") or (ctx.workdir / f"{ctx.book_name}.musicxml")
+    xml = ctx.artifacts.musicxml or (ctx.workdir / f"{ctx.book_name}.musicxml")
     if not xml.exists():
         raise StageError(
             f"no .musicxml at {xml.name}; run the extract stage first "
             "(e.g. --from extract)"
         )
-    ctx.artifacts.setdefault("musicxml", xml)
+    if ctx.artifacts.musicxml is None:
+        ctx.artifacts.musicxml = xml
 
     try:
         from music21 import converter, stream
@@ -142,7 +143,7 @@ def run(ctx: PipelineContext) -> StageResult:
 
     counts = {s: sum(1 for f in findings if f["severity"] == s)
               for s in ("error", "warn", "info")}
-    ctx.artifacts["validation"] = {"findings": findings, "stats": stats, "counts": counts}
+    ctx.artifacts.validation = {"findings": findings, "stats": stats, "counts": counts}
 
     detail = f"{counts['error']} error, {counts['warn']} warn, {counts['info']} info"
     status = "ok"

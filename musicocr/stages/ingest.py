@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 import shutil
+from pathlib import Path
 
 from musicocr.pipeline import PipelineContext, StageError, StageResult
 from musicocr.preprocess import PreprocessOpts, prepare_page
@@ -29,10 +30,10 @@ def run(ctx: PipelineContext) -> StageResult:
     local_pdf = ctx.workdir / "source.pdf"
     if not local_pdf.exists() or local_pdf.stat().st_mtime < ctx.input_pdf.stat().st_mtime:
         shutil.copy2(ctx.input_pdf, local_pdf)
-    ctx.artifacts["source_pdf"] = local_pdf
+    ctx.artifacts.source_pdf = local_pdf
 
     pages = _page_count(ctx)
-    ctx.artifacts["page_count"] = pages
+    ctx.artifacts.page_count = pages
 
     detail = f"{ctx.book_name}, {pages if pages is not None else '?'} page(s)"
 
@@ -58,12 +59,12 @@ def _preprocess(ctx: PipelineContext, opts: PreprocessOpts, pages: int | None) -
         if dst.exists() and not ctx.force:
             prepped[p] = str(dst)
             continue
-        out = prepare_page(ctx.artifacts["source_pdf"], p, dst, opts, pdftoppm, ctx.log)
+        out = prepare_page(ctx.artifacts.source_pdf, p, dst, opts, pdftoppm, ctx.log)
         if out:
-            prepped[p] = str(out)
+            prepped[p] = Path(out)
         else:
             ctx.log(f"  preprocess: page {p} rasterise failed")
-    ctx.artifacts["prepped_pages"] = {int(k): v for k, v in prepped.items()}
+    ctx.artifacts.prepped_pages = {int(k): v for k, v in prepped.items()}
     passes = ["autocontrast"] if opts.autocontrast else []
     if opts.deskew:
         passes.append("deskew")
@@ -72,6 +73,6 @@ def _preprocess(ctx: PipelineContext, opts: PreprocessOpts, pages: int | None) -
     if opts.unsharp:
         passes.append("unsharp")
     summary = f"{len(prepped)} page(s) @ {opts.dpi} DPI ({', '.join(passes) or 'raster only'})"
-    ctx.artifacts["preprocess_summary"] = summary
+    ctx.artifacts.preprocess_summary = summary
     ctx.log(f"  preprocess: {summary}")
     return f"  [preprocess: {summary}]"

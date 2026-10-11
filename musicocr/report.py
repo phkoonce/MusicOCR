@@ -19,22 +19,22 @@ def _rel(p, base: Path) -> str:
 
 def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
     a = ctx.artifacts
-    val = a.get("validation", {})
+    val = a.validation
     outputs = {k: ([str(p) for p in v] if isinstance(v, list) else str(v))
-               for k, v in a.get("outputs", {}).items()}
-    if a.get("musicxml"):
+               for k, v in a.outputs.items()}
+    if a.musicxml:
         outputs["musicxml"] = str(a["musicxml"])
-    page_files = [str(p) for p in a.get("musicxml_pages", [])]
+    page_files = [str(p) for p in a.musicxml_pages]
     return {
         "book": ctx.book_name,
         "input_pdf": str(ctx.input_pdf),
         "generated": datetime.now().isoformat(timespec="seconds"),
         "workdir": str(ctx.workdir),
-        "page_count": a.get("page_count"),
+        "page_count": a.page_count,
         "omr_engine": ctx.config.omr_engine,
         "profile": ctx.config.omr_profile,
         "constants": ctx.constants(),
-        "preprocess": a.get("preprocess_summary", ""),
+        "preprocess": a.preprocess_summary,
         "merge_pages": ctx.config.omr_merge_pages,
         "stages": [
             {"name": r.name, "status": r.status, "detail": r.detail,
@@ -43,12 +43,12 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
         ],
         "outputs": outputs,
         "page_files": page_files,
-        "omr_project": str(a.get("omr_project") or ""),
-        "omr_log": str(a.get("omr_log") or ""),
-        "omr_failed_pages": a.get("omr_failed_pages", []),
-        "merge_skipped": [Path(p).name for p in a.get("merge_skipped", [])],
+        "omr_project": str(a.omr_project or ""),
+        "omr_log": str(a.omr_log or ""),
+        "omr_failed_pages": a.omr_failed_pages,
+        "merge_skipped": [Path(p).name for p in a.merge_skipped],
         "validation": val,
-        "qa_pages": a.get("qa_pages", {}),
+        "qa_pages": a.qa_pages,
     }
 
 

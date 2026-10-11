@@ -19,7 +19,7 @@ def resolve_pages(ctx: PipelineContext) -> list[int]:
     """Which page numbers to transcribe: ``ctx.pages`` if given, else 1..page_count."""
     if ctx.pages:
         return expand_pages(ctx.pages)
-    page_count = ctx.artifacts.get("page_count")
+    page_count = ctx.artifacts.page_count
     if page_count:
         return list(range(1, page_count + 1))
     return []

@@ -62,25 +62,25 @@ def _run_whole_book(ctx, tool, source_pdf) -> StageResult:
     if res is None:
         raise StageError(f"could not launch Audiveris: {tool}")
     mxl = _mxls_in(ctx.workdir, recursive=False)
-    ctx.artifacts["omr_log"] = _newest_log(ctx.workdir)
+    ctx.artifacts.omr_log = _newest_log(ctx.workdir)
     if not mxl:
         tail = (res.output or "").strip().splitlines()[-15:]
         raise StageError(
             "Audiveris exported no .mxl (whole-book mode). One bad page aborts "
-            f"the book — set [omr] per_page = true. Log: {ctx.artifacts['omr_log']}"
+            f"the book — set [omr] per_page = true. Log: {ctx.artifacts.omr_log}"
             "\n    " + "\n    ".join(tail)
         )
-    ctx.artifacts["mxl_files"] = mxl
-    ctx.artifacts["mxl_by_page"] = {0: mxl}
-    ctx.artifacts["omr_failed_pages"] = []
+    ctx.artifacts.mxl_files = mxl
+    ctx.artifacts.mxl_by_page = {0: mxl}
+    ctx.artifacts.omr_failed_pages = []
     omr = _iter_omr(ctx.workdir, recursive=False)
-    ctx.artifacts["omr_project"] = omr[-1] if omr else None
+    ctx.artifacts.omr_project = omr[-1] if omr else None
     return StageResult("omr", "ok", f"{len(mxl)} .mxl (whole book)")
 
 
 def _run_per_page(ctx, tool, source_pdf, pages: list[int]) -> StageResult:
     pages_root = ctx.workdir / "pages"
-    prepped = ctx.artifacts.get("prepped_pages") or {}
+    prepped = ctx.artifacts.prepped_pages or {}
     by_page: dict[int, list[Path]] = {}
     failed: list[int] = []
     logs: list[Path] = []
@@ -115,19 +115,19 @@ def _run_per_page(ctx, tool, source_pdf, pages: list[int]) -> StageResult:
             ctx.log(f"  page {page} ({i}/{len(pages)}): FAILED — {why}")
 
     all_mxl = [p for page in sorted(by_page) for p in by_page[page]]
-    ctx.artifacts["mxl_files"] = all_mxl
-    ctx.artifacts["mxl_by_page"] = by_page
-    ctx.artifacts["omr_failed_pages"] = failed
-    ctx.artifacts["omr_log"] = logs[-1] if logs else None
+    ctx.artifacts.mxl_files = all_mxl
+    ctx.artifacts.mxl_by_page = by_page
+    ctx.artifacts.omr_failed_pages = failed
+    ctx.artifacts.omr_log = logs[-1] if logs else None
     # per-page .omr projects only exist when -save was passed (correct enabled)
     per_page_omr = _iter_omr(pages_root)
-    ctx.artifacts["omr_project"] = per_page_omr[-1] if per_page_omr else None
+    ctx.artifacts.omr_project = per_page_omr[-1] if per_page_omr else None
 
     if not all_mxl:
         raise StageError(
             f"Audiveris transcribed none of {len(pages)} page(s). The scan may be "
             "too low-resolution or not a score. "
-            f"Last log: {ctx.artifacts['omr_log']}"
+            f"Last log: {ctx.artifacts.omr_log}"
         )
 
     ok = len(by_page)
@@ -145,7 +145,7 @@ def run(ctx: PipelineContext) -> StageResult:
             f"Audiveris not found at {ctx.config.audiveris!r} (edit config.toml [tools])"
         )
 
-    source_pdf = ctx.artifacts.get("source_pdf") or (ctx.workdir / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
     if not source_pdf.exists():
         raise StageError("no source PDF in workdir; run the ingest stage first")
 
@@ -154,12 +154,12 @@ def run(ctx: PipelineContext) -> StageResult:
     existing = _mxls_in(ctx.workdir, recursive=False)
     if existing and not ctx.force:
         ctx.log("  reusing existing whole-book Audiveris output (--force to re-run)")
-        ctx.artifacts["mxl_files"] = existing
-        ctx.artifacts["mxl_by_page"] = {0: existing}
-        ctx.artifacts["omr_failed_pages"] = []
+        ctx.artifacts.mxl_files = existing
+        ctx.artifacts.mxl_by_page = {0: existing}
+        ctx.artifacts.omr_failed_pages = []
         omr = _iter_omr(ctx.workdir, recursive=False)
-        ctx.artifacts["omr_project"] = omr[-1] if omr else None
-        ctx.artifacts["omr_log"] = _newest_log(ctx.workdir)
+        ctx.artifacts.omr_project = omr[-1] if omr else None
+        ctx.artifacts.omr_log = _newest_log(ctx.workdir)
         return StageResult("omr", "skipped", f"{len(existing)} .mxl already present")
 
     pages = resolve_pages(ctx)

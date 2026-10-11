@@ -3,7 +3,7 @@
 Each stage is a callable ``run(ctx) -> StageResult``. Stages are ordered; the
 runner executes a contiguous slice (``--from`` / ``--to``) and stops on the
 first failure unless ``keep_going`` is set. State flows between stages through
-``ctx.artifacts`` (a plain dict) and files under ``ctx.workdir``.
+``ctx.artifacts`` (a typed :class:`Artifacts`) and files under ``ctx.workdir``.
 
 Adding a stage later (e.g. a GUI-correction round-trip) means writing one module
 with a ``run`` function and inserting its name into ``STAGE_ORDER``.
@@ -15,8 +15,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from musicocr.artifacts import Artifacts
 from musicocr.config import Config
-from musicocr.state import load_state, save_state
+from musicocr.state import load_state, restore_missing, save_state
 
 # Canonical order. `correct` sits between OMR and extract so a corrected .omr
 # project feeds the rest of the pipeline unchanged. `normalize` sits between
@@ -38,7 +39,7 @@ class PipelineContext:
     pages: str | None = None          # Audiveris -sheets spec, e.g. "1 4-5"
     extra_constants: list[str] = field(default_factory=list)
     force: bool = False
-    artifacts: dict[str, Any] = field(default_factory=dict)
+    artifacts: Artifacts = field(default_factory=Artifacts)
     log: Callable[[str], None] = print
 
     def constants(self) -> list[str]:
@@ -93,10 +94,9 @@ def run_pipeline(
     # Re-entering mid-pipeline: reload artifacts saved by earlier stages.
     if slc and slc[0] != STAGE_ORDER[0] and ctx.workdir.exists():
         prior = load_state(ctx.workdir)
-        for k, v in prior.items():
-            ctx.artifacts.setdefault(k, v)
-        if prior:
-            ctx.log(f"  (restored {len(prior)} artifact(s) from a previous run)")
+        restored = restore_missing(ctx.artifacts, prior)
+        if restored:
+            ctx.log(f"  (restored {restored} artifact(s) from a previous run)")
 
     results: list[StageResult] = []
     for name in slc:

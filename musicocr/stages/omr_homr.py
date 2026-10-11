@@ -43,7 +43,7 @@ _HOMR_ENTRYPOINT = "import sys; from homr.main import main; sys.exit(main())"
 
 def _ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
     """Write a rasterised page image to `dst`, reusing ingest's prepped copy if any."""
-    prepped = ctx.artifacts.get("prepped_pages") or {}
+    prepped = ctx.artifacts.prepped_pages or {}
     existing = prepped.get(page) or prepped.get(str(page))
     if existing and Path(existing).exists():
         dst.write_bytes(Path(existing).read_bytes())
@@ -52,7 +52,7 @@ def _ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
     pdftoppm = ctx.config.resolve_tool("pdftoppm")
     if not pdftoppm:
         return None
-    source_pdf = ctx.artifacts.get("source_pdf") or (ctx.workdir / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
     opts = PreprocessOpts.from_dict(ctx.config.preprocess)
     return prepare_page(source_pdf, page, dst, opts, pdftoppm, ctx.log)
 
@@ -117,16 +117,16 @@ def run(ctx: PipelineContext) -> StageResult:
             ctx.log(f"  page {page} ({i}/{len(pages)}): FAILED — {why}")
 
     all_files = [p for page in sorted(by_page) for p in by_page[page]]
-    ctx.artifacts["mxl_files"] = all_files
-    ctx.artifacts["mxl_by_page"] = by_page
-    ctx.artifacts["omr_failed_pages"] = failed
-    ctx.artifacts["omr_log"] = logs[-1] if logs else None
-    ctx.artifacts["omr_project"] = None
+    ctx.artifacts.mxl_files = all_files
+    ctx.artifacts.mxl_by_page = by_page
+    ctx.artifacts.omr_failed_pages = failed
+    ctx.artifacts.omr_log = logs[-1] if logs else None
+    ctx.artifacts.omr_project = None
 
     if not all_files:
         raise StageError(
             f"homr transcribed none of {len(pages)} page(s). "
-            f"Last log: {ctx.artifacts['omr_log']}"
+            f"Last log: {ctx.artifacts.omr_log}"
         )
 
     detail = f"{len(all_files)} .musicxml from {len(by_page)}/{len(pages)} page(s)"

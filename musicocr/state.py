@@ -1,73 +1,131 @@
 """Persist pipeline artifacts between stages so ``--from <stage>`` keeps context.
 
-A single ``.musicocr-state.json`` in the work dir. Only a whitelist of keys is
-saved, with enough type info to rebuild ``Path`` objects on load.
+A single ``.musicocr-state.json`` in the work dir. Serialisation is derived from
+the type annotations on :class:`musicocr.artifacts.Artifacts`, so adding a field
+there needs no change here. ``Path`` values become strings, ``int`` dict keys
+become JSON string keys; the layout matches earlier releases.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
+import logging
+import typing
 from pathlib import Path
+from typing import Any
+
+from musicocr.artifacts import Artifacts
 
 STATE_FILE = ".musicocr-state.json"
 
-_PATH_KEYS = {"source_pdf", "omr_log", "omr_project", "musicxml", "render_pdf"}
-_PATH_LIST_KEYS = {"mxl_files", "musicxml_pages", "render_pdfs"}
-_PATH_DICT_KEYS = {"outputs"}            # {str: path | [path, ...]}
-_PAGE_MAP_KEYS = {"mxl_by_page"}         # {int: [path, ...]}
-_INT_PATH_MAP_KEYS = {"prepped_pages"}   # {int: path}
-_PLAIN_KEYS = {"page_count", "omr_failed_pages", "validation", "qa_pages",
-               "merge_skipped", "extract_merged", "transpose_stamps"}
-
-_ALL = (_PATH_KEYS | _PATH_LIST_KEYS | _PATH_DICT_KEYS | _PAGE_MAP_KEYS
-        | _INT_PATH_MAP_KEYS | _PLAIN_KEYS)
+log = logging.getLogger(__name__)
 
 
-def save_state(workdir: Path, artifacts: dict) -> None:
+def _encode(v: Any, tp: Any) -> Any:
+    origin = typing.get_origin(tp)
+    args = typing.get_args(tp)
+    if v is None:
+        return None
+    if origin is typing.Union:
+        # Optional[X] / Union[Path, List[Path]]: pick the member matching the value.
+        for a in args:
+            ao = typing.get_origin(a) or a
+            if a is not type(None) and isinstance(ao, type) and isinstance(v, ao):
+                return _encode(v, a)
+        return v
+    if tp is Path:
+        return str(v)
+    if origin in (list, typing.List):
+        return [_encode(x, args[0] if args else Any) for x in v]
+    if origin in (dict, typing.Dict):
+        kt, vt = args if args else (Any, Any)
+        return {str(k): _encode(x, vt) for k, x in v.items()}
+    return v
+
+
+def _decode(v: Any, tp: Any) -> Any:
+    origin = typing.get_origin(tp)
+    args = typing.get_args(tp)
+    if v is None:
+        return None
+    if origin is typing.Union:
+        for a in args:
+            if a is type(None):
+                continue
+            ao = typing.get_origin(a) or a
+            if (ao is list and isinstance(v, list)) or (ao is dict and isinstance(v, dict)) \
+                    or (ao is Path and isinstance(v, str)):
+                return _decode(v, a)
+        return v
+    if tp is Path:
+        return Path(v)
+    if origin in (list, typing.List):
+        return [_decode(x, args[0] if args else Any) for x in v]
+    if origin in (dict, typing.Dict):
+        kt, vt = args if args else (Any, Any)
+        return {(int(k) if kt is int else k): _decode(x, vt) for k, x in v.items()}
+    return v
+
+
+def _fields() -> list:
+    hints = typing.get_type_hints(Artifacts)
+    return [(f, hints[f.name]) for f in dataclasses.fields(Artifacts)
+            if f.metadata.get("persist", True)]
+
+
+def artifacts_to_json(art: Artifacts) -> dict:
+    """Return the JSON-ready dict for ``art`` (unset / None fields omitted)."""
     out: dict = {}
-    for k in _ALL:
-        if k not in artifacts or artifacts[k] is None:
-            continue
-        v = artifacts[k]
-        if k in _PATH_KEYS:
-            out[k] = str(v)
-        elif k in _PATH_LIST_KEYS:
-            out[k] = [str(p) for p in v]
-        elif k in _PATH_DICT_KEYS:
-            out[k] = {kk: ([str(p) for p in vv] if isinstance(vv, list) else str(vv))
-                      for kk, vv in v.items()}
-        elif k in _PAGE_MAP_KEYS:
-            out[k] = {str(pg): [str(p) for p in paths] for pg, paths in v.items()}
-        elif k in _INT_PATH_MAP_KEYS:
-            out[k] = {str(pg): str(p) for pg, p in v.items()}
-        else:
-            out[k] = v
+    for f, tp in _fields():
+        v = getattr(art, f.name)
+        if v is not None:
+            out[f.name] = _encode(v, tp)
+    return out
+
+
+def artifacts_from_json(raw: dict) -> Artifacts:
+    """Rebuild an :class:`Artifacts` from saved JSON; unknown keys are ignored."""
+    kwargs = {}
+    for f, tp in _fields():
+        if f.name in raw:
+            kwargs[f.name] = _decode(raw[f.name], tp)
+    return Artifacts(**kwargs)
+
+
+def save_state(workdir: Path, artifacts: Artifacts) -> None:
+    # Serialisation bugs (TypeError) must surface; only I/O failure is tolerated.
+    text = json.dumps(artifacts_to_json(artifacts), indent=2)
     try:
-        (workdir / STATE_FILE).write_text(json.dumps(out, indent=2))
-    except (OSError, TypeError):
-        pass
+        (workdir / STATE_FILE).write_text(text)
+    except OSError as exc:
+        log.warning("could not write %s: %s", workdir / STATE_FILE, exc)
 
 
-def load_state(workdir: Path) -> dict:
+def load_state(workdir: Path) -> Artifacts:
+    """Load saved artifacts; a missing or unreadable state file yields defaults."""
     fp = workdir / STATE_FILE
     if not fp.exists():
-        return {}
+        return Artifacts()
     try:
         raw = json.loads(fp.read_text())
-    except (OSError, ValueError):
-        return {}
-    art: dict = {}
-    for k, v in raw.items():
-        if k in _PATH_KEYS:
-            art[k] = Path(v)
-        elif k in _PATH_LIST_KEYS:
-            art[k] = [Path(p) for p in v]
-        elif k in _PATH_DICT_KEYS:
-            art[k] = {kk: ([Path(p) for p in vv] if isinstance(vv, list) else Path(vv))
-                      for kk, vv in v.items()}
-        elif k in _PAGE_MAP_KEYS:
-            art[k] = {int(pg): [Path(p) for p in paths] for pg, paths in v.items()}
-        elif k in _INT_PATH_MAP_KEYS:
-            art[k] = {int(pg): Path(p) for pg, p in v.items()}
-        else:
-            art[k] = v
-    return art
+    except (OSError, ValueError) as exc:
+        log.warning("ignoring unreadable %s: %s", fp, exc)
+        return Artifacts()
+    return artifacts_from_json(raw)
+
+
+def restore_missing(current: Artifacts, prior: Artifacts) -> int:
+    """Copy ``prior`` values into ``current`` for fields still at their default.
+
+    Returns how many fields were restored.
+    """
+    n = 0
+    for f, _tp in _fields():
+        default = Artifacts.__dataclass_fields__[f.name]
+        dv = (default.default_factory() if default.default_factory is not dataclasses.MISSING
+              else default.default)
+        pv = getattr(prior, f.name)
+        if getattr(current, f.name) == dv and pv != dv:
+            setattr(current, f.name, pv)
+            n += 1
+    return n
