@@ -254,7 +254,7 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
         else out_dir / key / f"{key}.musicxml"
     if produced.exists() and produced.stat().st_size > 0:
         minutes = (time.time() - started) / 60
-        return {"status": DONE, "note": f"{minutes:.1f} min, rc={rc}; see {_rel(out_dir / key, spec.root)}/report.md"}
+        return {"status": DONE, "note": f"{minutes:.1f} min, rc={rc}; see {_rel(out_dir / key, spec.root)}/{"compare.md" if spec.engines else "report.md"}"}
     return {"status": FAILED, "note": f"rc={rc}; see {_rel(out_dir / (key + '.run.log'), spec.root)}"}
 
 
