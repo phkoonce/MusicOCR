@@ -450,7 +450,8 @@ def test_combine_cover_page_and_total_lower_bound(tmp_path):
         parts.append(PartInput(pid, f"Horn {pid}", "", tmp_path / f"{pid}.pdf", files))
         (tmp_path / f"{pid}.pdf").write_bytes(b"x")
     score, report, summary = combine(
-        parts, "T", starts_of=lambda pdf: [None, 1, 5], last_start_of=lambda pdf: 7)
+        parts, "T", starts_of=lambda pdf: [None, 1, 5], last_start_of=lambda pdf: 7,
+        spans_of=lambda pdf: [])
     # cover page ignored; bars 1-4 on page 2, bars 5.. on page 3 (3 bars -> total 7)
     assert summary["total"] == 7
     assert any("hold no printed bars" in r for r in report)
@@ -479,3 +480,29 @@ def test_add_missing_multirest_dets_guards(tmp_path):
     d.write_text(json.dumps(base))
     t.write_text(json.dumps([{"text": "4", "xyxy": [490, 20, 520, 100]}, {"text": "4", "xyxy": [490, 60, 520, 140]}]))
     assert add_missing_multirest_dets(d, t) == 0
+
+
+def test_printed_multirest_span_regex():
+    from musicocr.combine import _RANGE
+    assert _RANGE.fullmatch("58–60") and _RANGE.fullmatch("98 — 101")
+    assert not _RANGE.fullmatch("1-4")          # hyphen: not a multi-rest label
+
+
+def test_align_inserts_after_the_first_bar_of_a_rest_run():
+    from musicocr.combine import align_to_target
+    # source: note bar, rest bar (carries the time-signature declaration); target: a 3-bar rest run
+    slots = align_to_target([0, 1, 0], [0, 1, 1, 1, 0])
+    assert slots[0] == 0 and slots[1] == 1 and slots[4] == 2      # the run keeps its first bar first
+    assert slots.count(None) == 2
+
+
+def test_align_insertions_restricted_to_printed_spans():
+    from musicocr.combine import align_to_target
+    src = [0, 0, 1, 0]                         # note, note, rest(=multi-rest read as one bar), note
+    ref = [0.5] * 6
+    free = align_to_target(src, ref)           # no hint: insertion lands wherever it is cheapest
+    ins = [2.0, 2.0, 2.0, 0.01, 0.01, 2.0]     # only bars 4-5 (index 3,4) can have lost bars
+    slots = align_to_target(src, ref, ins)
+    assert [i for i, s in enumerate(slots) if s is None] and all(i in (3, 4) for i, s in enumerate(slots) if s is None)
+    assert slots.count(None) == 2
+    assert slots.count(None) == free.count(None)

@@ -128,13 +128,29 @@ def printed_last_system_start(pdf: Path, pdftotext: str = "pdftotext") -> Option
     return None
 
 
+_RANGE = re.compile(r"(\d+)\s*[\u2013\u2014]\s*(\d+)")
+
+
+def printed_multirest_spans(pdf: Path, pdftotext: str = "pdftotext") -> List[Tuple[int, int]]:
+    """Bar ranges printed under multi-rests ("58\u201360") in the text layer, when the engraver
+    prints them. En/em dash only: a hyphen is too often something else ("1-4")."""
+    out: List[Tuple[int, int]] = []
+    for pg in range(1, pdf_page_count(str(pdf)) + 1):
+        for *_, w in pdf_words(str(pdf), pg, pdftotext):
+            m = _RANGE.fullmatch(w.strip())
+            if m and int(m.group(2)) > int(m.group(1)):
+                out.append((int(m.group(1)), int(m.group(2))))
+    return sorted(set(out))
+
+
 # ---- alignment --------------------------------------------------------------------
 
 def _rest_flag(src: Src) -> float:
     return 1.0 if is_rest_only(src[0]) else 0.0
 
 
-def align_to_target(rest_src: Sequence[float], ref: Sequence[float]) -> List[Optional[int]]:
+def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
+                    ins_cost: Optional[Sequence[float]] = None) -> List[Optional[int]]:
     """Map each of ``len(ref)`` target slots to a source bar index (None = synthesise a rest).
 
     Needleman-Wunsch over the rest-only pattern: matching costs the disagreement with the
@@ -144,6 +160,8 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float]) -> List[Opt
     deletions only when it is long), so a one-bar error never becomes a rearrangement.
     """
     n, m = len(rest_src), len(ref)
+    # ``ins_cost`` (per slot) overrides the default insertion cost: a part that prints its
+    # multi-rest spans can only have lost bars inside them
     allow_del, allow_ins = n >= m, n <= m
     INF = 1e18
     D = [[INF] * (m + 1) for _ in range(n + 1)]
@@ -161,7 +179,10 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float]) -> List[Opt
                 if c < D[i + 1][j]:
                     D[i + 1][j], B[i + 1][j] = c, "d"
             if j < m and allow_ins:
-                c = d + 0.2 + 0.8 * (1 - ref[j])
+                # a hair cheaper later in the page: a lost bar is inserted *after* its run's
+                # first bar, so a key/meter declaration stays on the first bar of the run
+                base = ins_cost[j] if ins_cost is not None else 0.2 + 0.8 * (1 - ref[j])
+                c = d + base + 1e-4 * (m - j) / max(m, 1)
                 if c < D[i][j + 1]:
                     D[i][j + 1], B[i][j + 1] = c, "i"
     slots: List[Optional[int]] = [None] * m
@@ -223,9 +244,11 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             read_pages: Callable[[Path], List[Src]] = read_page,
             starts_of: Callable[[Path], List[Optional[int]]] = None,
             last_start_of: Callable[[Path], Optional[int]] = None,
+            spans_of: Callable[[Path], List[Tuple[int, int]]] = None,
             ) -> Tuple[ET.Element, List[str], Dict[str, Any]]:
     starts_of = starts_of or (lambda pdf: printed_page_starts(pdf, pdftotext))
     last_start_of = last_start_of or (lambda pdf: printed_last_system_start(pdf, pdftotext))
+    spans_of = spans_of or (lambda pdf: printed_multirest_spans(pdf, pdftotext))
     report: List[str] = []
     data: Dict[str, Dict[str, Any]] = {}
     for p in parts:
@@ -259,7 +282,9 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             pages, starts = [[s for pg in pages for s in pg]], [1]
             report.append(f"{p.pid}: no printed bar numbers (scan?) -> checked against the "
                           f"other parts' total only")
-        data[p.pid] = dict(p=p, pages=pages, starts=starts)
+        spans = spans_of(p.pdf) if p.pdf and p.pdf.exists() else []
+        data[p.pid] = dict(p=p, pages=pages, starts=starts, spans=spans,
+                           rests={b for a, e in spans for b in range(a, e + 1)})
 
     # score-wide total: start of a part's last page + the bars it found there
     totals = [d["starts"][-1] - 1 + len(d["pages"][-1]) for d in data.values()
@@ -268,12 +293,15 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         raise ValueError("no part has a readable printed bar number; cannot derive the structure")
     # the last printed system starts at bar L, so the piece has at least L bars
     lasts = [last_start_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
-    lower = max([x for x in lasts if x] or [0])
-    cand = [t for t in totals if t >= lower] or totals
-    total = _plurality(cand, cand[0])
-    if len(set(cand)) > 1:       # several candidates: a tie goes to the larger (a short total drops real bars)
+    ends = [e for d in data.values() for _, e in d["spans"]]
+    lower = max([x for x in lasts if x] + ends + [0])
+    cand = [t for t in totals if t >= lower]
+    if cand:
         top = Counter(cand).most_common()
-        total = max(t for t, c in top if c == top[0][1])
+        total = max(t for t, c in top if c == top[0][1])     # a tie goes to the larger total
+    else:                        # every part is short (lost multi-rests): the print's own lower bound
+        total = lower
+        report.append(f"score: no part reaches the printed lower bound ({lower}); using it")
     report.append(f"score: {len(data)} parts, {total} bars "
                   f"(last-page totals {dict(Counter(totals))})")
 
@@ -314,15 +342,19 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                 report.append(f"  {pid} page starting bar {a}: no printed bars (cover/text page?) "
                               f"-> {len(pg)} measure(s) ignored")
                 continue
-            r = [ref.get(a + j) for j in range(t)]
-            if sum(x is not None for x in r) >= max(t // 2, 1):
+            r = [1.0 if (a + j) in d["rests"] else ref.get(a + j) for j in range(t)]
+            if sum(x is not None for x in r) >= max(t // 4, 1):
+                ins = [0.01 if (a + j) in d["rests"] else 2.0 for j in range(t)] if d["rests"] else None
                 slots = align_to_target([_rest_flag(s) for s in pg],
-                                        [0.5 if x is None else x for x in r])
+                                        [0.5 if x is None else x for x in r], ins)
                 dropped = sorted(set(range(len(pg))) - {s for s in slots if s is not None})
                 added = [a + j for j, s in enumerate(slots) if s is None]
+                outside = [b for b in added if d["rests"] and b not in d["rests"]]
                 report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
                               f" -> aligned to the other parts' rest pattern; dropped source bar(s) "
-                              f"{[a + k for k in dropped]}, inserted rest bar(s) at {added} -- check")
+                              f"{[a + k for k in dropped]}, inserted rest bar(s) at {added}"
+                              + (f", {len(outside)} of them outside the printed multi-rests {outside}"
+                                 if outside else "") + " -- check")
                 seq.extend(None if s is None else pg[s] for s in slots)
             else:
                 seq.extend((pg + [None] * t)[:t])
