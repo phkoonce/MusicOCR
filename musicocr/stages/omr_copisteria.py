@@ -27,8 +27,9 @@ from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix
 from musicocr.copisteria_second_pass import gap_bars, merge_second_pass
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
-from musicocr.page_text import (boost_multirest_dets, pdf_has_text, write_ocr_texts_json,
-                                write_texts_json)
+from musicocr.page_text import (add_missing_multirest_dets, boost_multirest_dets, pdf_has_text,
+                                write_ocr_texts_json, write_texts_json)
+from musicocr.second_pass_detect import empty_measures
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._omr_common import ensure_page_png as _ensure_page_png, run_raster_pages
 from musicocr.util import run_cmd_lenient
@@ -59,9 +60,12 @@ def run(ctx: PipelineContext) -> StageResult:
     pdftotext = ctx.config.resolve_tool("pdftotext")
     source_pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
 
-    def _boost_multirests(img: Path) -> None:
-        # Detect first (cached beside the page, the pipeline then reuses it), so a
-        # multiRest the evidence model would discard can be nudged. Best effort.
+    run_script = Path(__file__).resolve().parent.parent / "copisteria_run.py"
+    fill_script = Path(__file__).resolve().parent.parent / "second_pass_detect.py"
+
+    def _prepare_dets(img: Path, have_texts: bool) -> None:
+        # Detect first (cached beside the page, the pipeline then reuses it) so the cached
+        # detections can be amended before the model reads them. Best effort.
         try:
             code = ("import sys,pathlib;from copisteria.pipeline import detections;"
                     "detections(pathlib.Path(sys.argv[1]))")
@@ -69,9 +73,31 @@ def run(ctx: PipelineContext) -> StageResult:
                             cwd=repo, log=ctx.log)
             texts = img.with_name(f"{img.stem}.texts.json")
             for dets in img.parent.glob(f"{img.stem}.dets_*.json"):
-                boost_multirest_dets(dets, texts, log=ctx.log)
+                if ctx.config.omr.copisteria.fill_empty_bars:
+                    _fill_empty_bars(img, dets)
+                if have_texts:
+                    add_missing_multirest_dets(dets, texts, log=ctx.log)
+                    boost_multirest_dets(dets, texts, log=ctx.log)
         except Exception as exc:  # noqa: BLE001
-            ctx.log(f"  {img.stem}: multiRest boost skipped ({type(exc).__name__}: {exc})")
+            ctx.log(f"  {img.stem}: detection prep skipped ({type(exc).__name__}: {exc})")
+
+    def _fill_empty_bars(img: Path, dets: Path) -> None:
+        """A bar the detector read nothing in is lost whole (Copisteria drops empty first/last
+        stretches of a system as 'not a bar'); re-detect one size up and add what is found in it."""
+        import json
+        before = json.loads(dets.read_text())
+        if not empty_measures(before):
+            return
+        res = run_cmd_lenient(
+            [py, str(fill_script), str(img), str(dets), str(dets),
+             str(ctx.config.omr.copisteria.second_pass_scale), "--empty-bars"],
+            timeout=ctx.config.omr.page_timeout, cwd=repo, log=ctx.log)
+        if res is None or res.returncode != 0:
+            ctx.log(f"  {img.stem}: empty-bar fill skipped (larger-scale detection failed)")
+            return
+        n = len(json.loads(dets.read_text())) - len(before)
+        ctx.log(f"  {img.stem}: {len(empty_measures(before))} empty bar(s) in the detections; "
+                f"{n} symbol(s) added from the larger-scale detection")
 
     def build_cmd(img: Path, pdir: Path):
         mode = ctx.config.omr.copisteria.texts
@@ -90,11 +116,17 @@ def run(ctx: PipelineContext) -> StageResult:
             src = "OCR"
         if n:
             ctx.log(f"  {img.stem}: {n} digit box(es) from {src}")
-            _boost_multirests(img)
-        cmd = [py, "-m", "copisteria.pipeline", str(img), "--out", str(pdir)]
+        _prepare_dets(img, bool(n))
+        cmd = _page_cmd(img, pdir)
         if detector != "28m":
             cmd += ["--detector", detector]
         return cmd, repo
+
+    def _page_cmd(img: Path, pdir: Path) -> list:
+        cmd = [py, str(run_script), str(img), "--out", str(pdir)]
+        if not ctx.config.omr.copisteria.text_tuplets:
+            cmd.append("--no-text-tuplets")
+        return cmd
 
     def _second_pass_at(cmd, img: Path, scale: float, first: bool, **kw) -> bool:
         """One re-detection at ``scale`` x the input size; True when it filled a gap bar."""
@@ -116,7 +148,7 @@ def run(ctx: PipelineContext) -> StageResult:
         if res is None or res.returncode != 0 or not (work / base[0].name).exists():
             ctx.log(f"  {img.stem}: second pass x{scale:g} skipped (larger-scale detection failed)")
             return False
-        cmd2 = [py, "-m", "copisteria.pipeline", str(work / img.name), "--out", str(work)]
+        cmd2 = _page_cmd(work / img.name, work)
         cmd2 += cmd[cmd.index("--out") + 2:]          # e.g. --detector
         run_cmd_lenient(cmd2, cwd=repo, **kw)
         second = work / f"{img.stem}.musicxml"
@@ -150,7 +182,7 @@ def run(ctx: PipelineContext) -> StageResult:
     def runner(cmd, **kw):
         res = run_cmd_lenient(cmd, **kw)
         # copisteria names output after the input stem; normalise just in case.
-        img = Path(cmd[cmd.index("copisteria.pipeline") + 1])
+        img = Path(cmd[2])
         _adopt_output(img, img.parent)
         if ctx.config.omr.copisteria.second_pass:
             try:

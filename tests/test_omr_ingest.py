@@ -276,8 +276,10 @@ def test_copisteria_runs_from_repo_root_and_adopts_output(tmp_path, monkeypatch)
 
     def fake(cmd, **kw):
         from pathlib import Path
+        if "-c" in cmd:          # the detection pre-step, not the page read
+            return LenientResult(0, "", False)
         seen.append((cmd, kw.get("cwd")))
-        img = Path(cmd[cmd.index("copisteria.pipeline") + 1])
+        img = Path(cmd[2])       # [python, copisteria_run.py, <page.png>, --out, <dir>, ...]
         # page 1 uses the expected name; page 2 a differently-named export
         name = "p001.musicxml" if img.stem == "p001" else "weird.musicxml"
         (img.parent / name).write_text("<score-partwise/>")

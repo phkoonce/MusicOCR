@@ -99,6 +99,15 @@ second_pass_extra_scales = [1.75]
 # A duplet/triplet Copisteria gave the time-modification to only some of its notes leaves a
 # gap; finish it when one unmodified neighbour accounts for the gap exactly.
 fix_half_tuplets = true
+# A bar the detector read nothing in is lost from the output altogether (Copisteria drops
+# empty first/last stretches of a system as "not a bar"; no gap shows). Where the cached
+# detections hold such an empty bar, re-detect at second_pass_scale x and add the
+# note/rest/whole-rest/multi-rest detections found inside it (second_pass_detect.py --empty-bars).
+fill_empty_bars = true
+# Small "2"/"3" digits in the PDF text layer mark duplets/triplets that Copisteria's
+# reader leaves unmarked (the bar then shows a gap): run it via copisteria_run.py, which
+# tags the heads under the digit (and ignores small digits as multi-rest counts).
+text_tuplets = true
 # Page 1 only: Copisteria pads a pickup (upbeat) bar to a full bar with a hidden
 # rest when it misses the printed opening meter; drop the padding and show the meter.
 fix_pickup = true

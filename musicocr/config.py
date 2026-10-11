@@ -60,6 +60,8 @@ class CopisteriaConfig:
     second_pass_retry_scales: tuple = (1.12, 1.5)   # tried in turn while gap bars remain
     second_pass_extra_scales: tuple = (1.75,)   # more input sizes unioned in (blind spots depend on the size)
     fix_half_tuplets: bool = True   # finish a duplet/triplet the model gave to only some of its notes
+    fill_empty_bars: bool = True   # bars the detector read nothing in: re-detect one size up, add what is found there
+    text_tuplets: bool = True   # small "2"/"3" digits from the text layer mark duplets/triplets (copisteria_run.py)
     fix_pickup: bool = True   # page 1: make a padded opening bar a real pickup, show its time signature
     reveal_gaps: bool = True   # gaps Copisteria left (missed symbols) -> visible coloured rests
     fix_key_cancel: bool = True   # staff opens with no printed key sig -> C major
@@ -95,6 +97,8 @@ class CopisteriaConfig:
                    second_pass_retry_scales=tuple(float(x) for x in d.get("second_pass_retry_scales", (1.12, 1.5))),
                    second_pass_extra_scales=tuple(float(x) for x in d.get("second_pass_extra_scales", base.second_pass_extra_scales)),
                    fix_half_tuplets=bool(d.get("fix_half_tuplets", True)),
+                   fill_empty_bars=bool(d.get("fill_empty_bars", True)),
+                   text_tuplets=bool(d.get("text_tuplets", True)),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),
                    multirest_form=form, ocr_backend=ocr_backend,
                    repo=str(d.get("repo", base.repo)))
