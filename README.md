@@ -205,6 +205,28 @@ the normal way to iterate without paying for another full OMR pass.
   (`musicocr/copisteria_second_pass.py`). The first reading is kept as
   `pNNN.pass1.musicxml`. Lowering confidence cutoffs does not help: the missing
   symbols are not low-confidence detections.
+* **Multi-scale second pass** (`second_pass_extra_scales` = 1.75, plus
+  `second_pass_retry_scales` for gaps still open): the detector's blind spots
+  depend on the input size, so several sizes are unioned in; gap bars still
+  unfilled are retried at the other scales.
+* **Lost bars** (`fill_empty_bars`): a measure box the detector found *empty*
+  (a whole-bar rest or a bar's only note undetected) makes Copisteria merge it
+  into its neighbour -- a lost bar with no gap to see. Such pages are re-detected
+  one size up and the confident note/rest/multi-rest detections inside the empty
+  box are added before reading.
+* **Unmarked duplets/triplets** (`text_tuplets`, `musicocr/copisteria_run.py`):
+  small "2"/"3" digits in the PDF text layer tag the note heads under them as
+  2:3 / 3:2 tuplets (Copisteria's decoder only offers triplets), and small
+  digits are no longer taken as multi-rest counts. `fix_half_tuplets` finishes
+  a duplet/triplet the model marked on only some of its notes.
+* **Key and meter carry-over**: `fix_key_cancel` resets to C major at a staff
+  start that prints no key signature (reading.json evidence; skips multi-rest
+  follower bars), `fix_time_inherit` makes a page's unprinted opening meter
+  continue the previous page's.
+* **Opt-in:** `small_graces` (size-based grace-note marking, tuned on timpani;
+  catches beamed eighths on horn parts, so off by default) and `synth_multirest`
+  (synthesise a multi-rest from a tall digit over an empty bar; can mistake a
+  time-signature digit).
 * **Gaps as coloured rests** (`reveal_gaps`): Copisteria draws nothing it did not
   read, so a missed symbol leaves a gap (`<forward>`), which MuseScore shows as an
   invisible rest. Each gap becomes a visible orange rest instead, so bars add up
