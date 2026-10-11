@@ -24,7 +24,7 @@ def build_report(ctx: PipelineContext, results: list[StageResult]) -> dict:
     outputs = {k: ([str(p) for p in v] if isinstance(v, list) else str(v))
                for k, v in a.outputs.items()}
     if a.musicxml:
-        outputs["musicxml"] = str(a["musicxml"])
+        outputs["musicxml"] = str(a.musicxml)
     page_files = [str(p) for p in a.musicxml_pages]
     return {
         "book": ctx.book_name,
