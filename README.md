@@ -163,7 +163,12 @@ the normal way to iterate without paying for another full OMR pass.
   (`[omr.copisteria] texts = "pdf-layer"`; `musicocr/page_text.py`), mapping
   the digit boxes onto the preprocessed page via the geometry `preprocess`
   records in `prepped/pNNN.geom.json` (DPI, deskew angle, crop offset).
-  Scanned PDFs have no text layer, so there the counts are still lost.
+  Scanned PDFs have no text layer; `texts = "ocr"` instead OCRs the prepped page
+  image (`musicocr/ocr_backends.py`, pluggable: RapidOCR from the homr venv and/or
+  macOS Vision through a tiny Swift helper compiled on first use; `ocr_backend`
+  picks one or the union, the default, since each misses some isolated numerals) and
+  `texts = "auto"` picks the PDF layer when the page has one, else OCR. Without
+  either, scanned multi-rest counts are lost.
 * **Multi-rest form.** With counts, Copisteria writes the standard expanded form
   (a tagged bar plus N−1 following rest bars, so bar numbers match print);
   homr writes one collapsed bar per multi-rest. The pipeline's canonical form is

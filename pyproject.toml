@@ -24,5 +24,8 @@ musicocr = "musicocr.cli:main"
 [tool.setuptools]
 packages = ["musicocr", "musicocr.stages", "musicocr.alignment"]
 
+[tool.setuptools.package-data]
+musicocr = ["vision_ocr.swift"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

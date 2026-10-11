@@ -11,7 +11,9 @@ Only bare 1-3 digit words are kept. Notation fonts also show up in the text
 layer as junk glyph "words" (``œ``, ``˙``, ``&``, ``p``) and handing those to the
 reader as directions would duplicate the dynamics it already detects; digits
 are what the multi-rest logic needs and are otherwise ignored by the reader.
-Scanned PDFs have no text layer and yield nothing (an OCR source is future work).
+Scanned PDFs have no text layer; for those ``write_ocr_texts_json`` runs OCR
+(``musicocr.ocr_backends``, macOS Vision by default) directly on the prepared page
+image, so its boxes need no geometry mapping.
 """
 from __future__ import annotations
 
@@ -67,6 +69,44 @@ def write_texts_json(pdftotext: str, pdf: Path, page: int, png: Path, log=None) 
         return 0
     dst.write_text(json.dumps(kept))
     return len(kept)
+
+
+def pdf_has_text(pdftotext: str, pdf: Path, page: int, log=None) -> bool:
+    """True if ``page`` (1-based) has any text layer at all (scans have none)."""
+    res = run_cmd_lenient([pdftotext, "-f", str(page), "-l", str(page), str(pdf), "-"],
+                          timeout=60, log=log)
+    return bool(res and res.returncode == 0 and res.output.strip())
+
+
+def digit_boxes_from_words(words: list[dict]) -> list[dict]:
+    """Keep bare 1-3 digit OCR words, dropping implausibly wide boxes (OCR often
+    reads clefs/braces/staff fragments as digits inside a huge box)."""
+    out = []
+    for w in words:
+        text = str(w.get("text", "")).strip()
+        if not _DIGITS.fullmatch(text):
+            continue
+        x0, y0, x1, y1 = (float(v) for v in w["xyxy"])
+        if (x1 - x0) > 1.0 * (y1 - y0) * len(text):
+            continue
+        out.append({"text": text, "xyxy": [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)],
+                    "role": "words"})
+    return out
+
+
+def write_ocr_texts_json(png: Path, backend: str = "auto", log=None, **opts) -> int:
+    """OCR the prepared page image and write ``<png stem>.texts.json`` (digits only).
+
+    Returns the box count; 0 (and removes any stale file) when nothing was found.
+    """
+    from musicocr.ocr_backends import ocr_words
+    dst = png.with_name(f"{png.stem}.texts.json")
+    boxes = digit_boxes_from_words(ocr_words(png, backend, log=log, **opts))
+    if not boxes:
+        dst.unlink(missing_ok=True)
+        return 0
+    dst.write_text(json.dumps(boxes))
+    return len(boxes)
 
 
 def _image_size(png: Path) -> tuple[int, int]:

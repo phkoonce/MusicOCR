@@ -139,3 +139,67 @@ def test_boost_multirest_dets_ignores_distant_or_confident(tmp_path):
     dp, tp = _dets_and_texts(tmp_path, [600, 2100, 640, 2313], conf=0.995)
     assert page_text.boost_multirest_dets(dp, tp) == 0
     assert page_text.boost_multirest_dets(tmp_path / "missing.json", tp) == 0
+
+
+# --- OCR page-text source ---------------------------------------------------------------
+
+def test_digit_boxes_from_words_filters_noise():
+    words = [{"text": "8", "xyxy": [10, 10, 40, 60]},
+             {"text": "Allegro", "xyxy": [0, 0, 100, 30]},
+             {"text": "64", "xyxy": [190, 1030, 667, 1231]},       # clef misread, far too wide
+             {"text": "1234", "xyxy": [0, 0, 80, 50]}]
+    got = page_text.digit_boxes_from_words(words)
+    assert [b["text"] for b in got] == ["8"] and got[0]["role"] == "words"
+
+
+def test_write_ocr_texts_json(tmp_path, monkeypatch):
+    from musicocr import ocr_backends
+    png = tmp_path / "p001.png"
+    seen = {}
+
+    def fake(p, backend="auto", log=None):
+        seen["args"] = (p, backend)
+        return [{"text": "5", "xyxy": [100, 200, 130, 250]}, {"text": "Tpt.", "xyxy": [0, 0, 9, 9]}]
+    monkeypatch.setattr(ocr_backends, "ocr_words", fake)
+    assert page_text.write_ocr_texts_json(png) == 1
+    assert json.loads((tmp_path / "p001.texts.json").read_text()) == [
+        {"text": "5", "xyxy": [100.0, 200.0, 130.0, 250.0], "role": "words"}]
+    monkeypatch.setattr(ocr_backends, "ocr_words", lambda *a, **k: [])
+    assert page_text.write_ocr_texts_json(png) == 0
+    assert not (tmp_path / "p001.texts.json").exists()
+
+
+def test_ocr_words_backend_selection(tmp_path):
+    from musicocr import ocr_backends
+    ocr_backends.BACKENDS["fake"] = lambda p, log=None, **o: [{"text": "3", "xyxy": [0, 0, 1, 2]}]
+    ocr_backends.BACKENDS["broken"] = lambda p, log=None, **o: 1 / 0
+    try:
+        assert ocr_backends.ocr_words(tmp_path / "x.png", "fake")[0]["text"] == "3"
+        assert ocr_backends.ocr_words(tmp_path / "x.png", "broken") == []
+        assert ocr_backends.ocr_words(tmp_path / "x.png", "nonexistent") == []
+        ocr_backends.BACKENDS["fake2"] = lambda p, log=None, **o: [
+            {"text": "3", "xyxy": [0, 0, 1.1, 2]}, {"text": "7", "xyxy": [5, 5, 9, 9]}]
+        got = ocr_backends.ocr_words(tmp_path / "x.png", "auto")      # union, de-duplicated
+        assert sorted(w["text"] for w in got) == ["3", "7"]
+    finally:
+        for k in ("fake", "fake2", "broken"):
+            ocr_backends.BACKENDS.pop(k, None)
+
+
+def test_texts_config_values():
+    from musicocr.config import ConfigError, CopisteriaConfig
+    for v in ("pdf-layer", "ocr", "auto", "none"):
+        assert CopisteriaConfig.from_dict({"texts": v}).texts == v
+    with pytest.raises(ConfigError):
+        CopisteriaConfig.from_dict({"texts": "tesseract"})
+    with pytest.raises(ConfigError):
+        CopisteriaConfig.from_dict({"ocr_backend": "tesseract"})
+
+
+def test_pdf_has_text(monkeypatch):
+    monkeypatch.setattr(page_text, "run_cmd_lenient",
+                        lambda *a, **k: LenientResult(0, "  \n", False))
+    assert not page_text.pdf_has_text("pdftotext", Path("x.pdf"), 1)
+    monkeypatch.setattr(page_text, "run_cmd_lenient",
+                        lambda *a, **k: LenientResult(0, "Horn in F\n", False))
+    assert page_text.pdf_has_text("pdftotext", Path("x.pdf"), 1)

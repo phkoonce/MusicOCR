@@ -24,7 +24,8 @@ from pathlib import Path
 from musicocr.copisteria_fixes import drop_ghost_bars, fill_empty_measures
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
-from musicocr.page_text import boost_multirest_dets, write_texts_json
+from musicocr.page_text import (boost_multirest_dets, pdf_has_text, write_ocr_texts_json,
+                                write_texts_json)
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._omr_common import ensure_page_png as _ensure_page_png, run_raster_pages
 from musicocr.util import run_cmd_lenient
@@ -70,11 +71,23 @@ def run(ctx: PipelineContext) -> StageResult:
             ctx.log(f"  {img.stem}: multiRest boost skipped ({type(exc).__name__}: {exc})")
 
     def build_cmd(img: Path, pdir: Path):
-        if ctx.config.omr.copisteria.texts == "pdf-layer" and pdftotext and source_pdf.exists():
-            n = write_texts_json(pdftotext, source_pdf, int(img.stem[1:]), img, log=ctx.log)
-            if n:
-                ctx.log(f"  {img.stem}: {n} digit box(es) from the PDF text layer")
-                _boost_multirests(img)
+        mode = ctx.config.omr.copisteria.texts
+        page = int(img.stem[1:])
+        have_pdf = bool(pdftotext and source_pdf.exists())
+        if mode == "auto":
+            mode = "pdf-layer" if have_pdf and pdf_has_text(pdftotext, source_pdf, page,
+                                                            log=ctx.log) else "ocr"
+        n = 0
+        if mode == "pdf-layer" and have_pdf:
+            n = write_texts_json(pdftotext, source_pdf, page, img, log=ctx.log)
+            src = "the PDF text layer"
+        elif mode == "ocr":
+            n = write_ocr_texts_json(img, ctx.config.omr.copisteria.ocr_backend, log=ctx.log,
+                                     python=ctx.config.resolve_tool("homr_python"))
+            src = "OCR"
+        if n:
+            ctx.log(f"  {img.stem}: {n} digit box(es) from {src}")
+            _boost_multirests(img)
         cmd = [py, "-m", "copisteria.pipeline", str(img), "--out", str(pdir)]
         if detector != "28m":
             cmd += ["--detector", detector]

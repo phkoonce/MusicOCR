@@ -56,7 +56,8 @@ class CopisteriaConfig:
     detector: str = "28m"   # "28m" (default) or "2m" (smaller, faster)
     fix_empty: bool = True   # give bare-<forward> bars a whole-measure rest
     fix_ghost_bars: bool = True   # drop key/time-signature "bars" misread from cautionary signatures
-    texts: str = "pdf-layer"   # page-text source: "pdf-layer" (multi-rest counts) or "none"
+    texts: str = "pdf-layer"   # "pdf-layer", "ocr", "auto" (layer if the PDF has one, else OCR) or "none"
+    ocr_backend: str = "auto"   # texts = "ocr": "auto" (union of all that work), "rapidocr" or "vision"
     multirest_form: str = "collapse"   # "collapse" (homr's form), "expand", or "keep"
     repo: str = str(REPO_ROOT / "omr-eval" / "copisteria" / "repo")
 
@@ -67,14 +68,17 @@ class CopisteriaConfig:
         if detector not in ("28m", "2m"):
             raise ConfigError("[omr.copisteria] detector must be '28m' or '2m'")
         texts = str(d.get("texts", base.texts))
-        if texts not in ("pdf-layer", "none"):
-            raise ConfigError("[omr.copisteria] texts must be 'pdf-layer' or 'none'")
+        if texts not in ("pdf-layer", "ocr", "auto", "none"):
+            raise ConfigError("[omr.copisteria] texts must be 'pdf-layer', 'ocr', 'auto' or 'none'")
+        ocr_backend = str(d.get("ocr_backend", base.ocr_backend))
+        if ocr_backend not in ("auto", "rapidocr", "vision"):
+            raise ConfigError("[omr.copisteria] ocr_backend must be 'auto', 'rapidocr' or 'vision'")
         form = str(d.get("multirest_form", base.multirest_form))
         if form not in ("collapse", "expand", "keep"):
             raise ConfigError("[omr.copisteria] multirest_form must be 'collapse', 'expand' or 'keep'")
         return cls(detector=detector, texts=texts, fix_empty=bool(d.get("fix_empty", True)),
                    fix_ghost_bars=bool(d.get("fix_ghost_bars", True)),
-                   multirest_form=form,
+                   multirest_form=form, ocr_backend=ocr_backend,
                    repo=str(d.get("repo", base.repo)))
 
 
