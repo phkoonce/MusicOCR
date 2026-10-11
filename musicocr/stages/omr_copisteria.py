@@ -23,6 +23,7 @@ from pathlib import Path
 
 from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix_opening_pickup,
                                         reveal_gaps)
+from musicocr.copisteria_second_pass import gap_bars, merge_second_pass
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
 from musicocr.page_text import (boost_multirest_dets, pdf_has_text, write_ocr_texts_json,
@@ -94,11 +95,50 @@ def run(ctx: PipelineContext) -> StageResult:
             cmd += ["--detector", detector]
         return cmd, repo
 
+    def _second_pass(cmd, img: Path, **kw) -> None:
+        """Re-read a page that has gaps with extra detections from a larger scale."""
+        pdir = img.parent
+        out_xml = pdir / f"{img.stem}.musicxml"
+        if not out_xml.exists() or not gap_bars(out_xml):
+            return
+        base = sorted(pdir.glob(f"{img.stem}.dets_*.json"))
+        if len(base) != 1:
+            return
+        work = pdir / "second_pass"
+        work.mkdir(exist_ok=True)
+        for f in (img, *pdir.glob(f"{img.stem}.texts.json"), *pdir.glob(f"{img.stem}.geom.json")):
+            (work / f.name).write_bytes(f.read_bytes())
+        script = Path(__file__).resolve().parent.parent / "second_pass_detect.py"
+        res = run_cmd_lenient(
+            [py, str(script), str(work / img.name), str(base[0]), str(work / base[0].name),
+             str(ctx.config.omr.copisteria.second_pass_scale)], cwd=repo, **kw)
+        if res is None or res.returncode != 0 or not (work / base[0].name).exists():
+            ctx.log(f"  {img.stem}: second pass skipped (larger-scale detection failed)")
+            return
+        cmd2 = [py, "-m", "copisteria.pipeline", str(work / img.name), "--out", str(work)]
+        cmd2 += cmd[cmd.index("--out") + 2:]          # e.g. --detector
+        run_cmd_lenient(cmd2, cwd=repo, **kw)
+        second = work / f"{img.stem}.musicxml"
+        if not second.exists():
+            ctx.log(f"  {img.stem}: second pass skipped (no output)")
+            return
+        merged = work / f"{img.stem}.merged.musicxml"
+        n, why = merge_second_pass(out_xml, second, merged)
+        ctx.log(f"  {img.stem}: second pass {'used' if n else 'not used'}: {why}")
+        if n:
+            out_xml.rename(pdir / f"{img.stem}.pass1.musicxml")
+            merged.rename(out_xml)
+
     def runner(cmd, **kw):
         res = run_cmd_lenient(cmd, **kw)
         # copisteria names output after the input stem; normalise just in case.
         img = Path(cmd[cmd.index("copisteria.pipeline") + 1])
         _adopt_output(img, img.parent)
+        if ctx.config.omr.copisteria.second_pass:
+            try:
+                _second_pass(cmd, img, timeout=kw.get("timeout", 900), log=kw.get("log"))
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  {img.stem}: second pass failed ({type(exc).__name__}: {exc})")
         return res
 
     def postprocess(page: int, xml: Path) -> None:

@@ -255,3 +255,55 @@ def test_reveal_gaps(tmp_path):
     assert hidden.get("print-object") is None and hidden.get("color") == GAP_COLOR
     assert ms[2].find("forward") is not None        # empty bar untouched
     assert ms[3].find("forward") is not None        # multi-voice bar untouched
+
+
+# ---- second pass -----------------------------------------------------------
+
+def _xml(tmp_path, name, bars):
+    p = tmp_path / name
+    body = "".join(f'<measure number="{i + 1}">{b}</measure>' for i, b in enumerate(bars))
+    p.write_text(f'<score-partwise><part id="P1">{body}</part></score-partwise>')
+    return p
+
+
+NOTE = "<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>"
+GAP = "<forward><duration>4</duration></forward>"
+
+
+def test_merge_second_pass_replaces_only_filled_gap_bars(tmp_path):
+    from musicocr.copisteria_second_pass import gap_bars, merge_second_pass
+    first = _xml(tmp_path, "a.xml", [NOTE + NOTE, NOTE + GAP + NOTE, NOTE + GAP + NOTE])
+    # bar 2 filled; bar 3 still has a gap; bar 1 differs but is not a gap bar (ignored)
+    second = _xml(tmp_path, "b.xml", [NOTE, NOTE + NOTE + NOTE, NOTE + GAP + NOTE])
+    out = tmp_path / "m.xml"
+    n, why = merge_second_pass(first, second, out)
+    assert n == 1 and "1 of 2" in why
+    assert gap_bars(out) == [2]                       # bar 2 now whole, bar 3 still a gap
+    bars = ET.parse(out).getroot().findall("part/measure")
+    assert [len(b.findall("note")) for b in bars] == [2, 3, 2]   # bar 1 kept from the first reading
+    assert [b.get("number") for b in bars] == ["1", "2", "3"]
+
+
+def test_merge_second_pass_guards(tmp_path):
+    from musicocr.copisteria_second_pass import merge_second_pass
+    out = tmp_path / "m.xml"
+    first = _xml(tmp_path, "a.xml", [NOTE + GAP + NOTE, NOTE])
+    assert merge_second_pass(first, _xml(tmp_path, "b.xml", [NOTE]), out)[0] == 0      # bar count
+    assert merge_second_pass(first, _xml(tmp_path, "c.xml", [NOTE + GAP + NOTE, NOTE]), out)[0] == 0
+    assert not out.exists()
+    d = _xml(tmp_path, "d.xml", [NOTE + NOTE + NOTE, NOTE])
+    d.write_text(d.read_text().replace("<measure number=\"1\">",
+                 '<measure number="1"><attributes><key><fifths>1</fifths></key></attributes>', 1))
+    assert merge_second_pass(first, d, out)[0] == 0                                   # attributes differ
+
+
+def test_union_dets_adds_only_nonoverlapping_notes_and_rests():
+    from musicocr.second_pass_detect import union_dets
+    box = lambda x: [x, 0, x + 10, 10]  # noqa: E731
+    base = [{"cls": "note_eighth", "xyxy": box(0)}]
+    big = [{"cls": "note_eighth", "xyxy": box(1)},        # overlaps a base note: skipped
+           {"cls": "note_eighth", "xyxy": box(50)},       # new note: added
+           {"cls": "rest_quarter", "xyxy": box(0)},       # different family: added
+           {"cls": "measure", "xyxy": box(100)}]          # not note/rest: ignored
+    got = union_dets(base, big)
+    assert [r["cls"] for r in got] == ["note_eighth", "note_eighth", "rest_quarter"]

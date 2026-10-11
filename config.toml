@@ -78,6 +78,12 @@ fix_empty = true
 # (key-change bar with a spurious note, whose time change sits in the next bar).
 # Logged; musicocr/copisteria_fixes.py. validate's bar-count check reports the rest.
 fix_ghost_bars = true
+# When a page's first reading leaves gaps (symbols the detector missed), re-detect it
+# at second_pass_scale x the input size, add the extra notes/rests found, re-read, and
+# keep the result only if it changed nothing but the gap bars (otherwise the first
+# reading stays). Costs one extra run for pages that have gaps.
+second_pass = true
+second_pass_scale = 1.28
 # Page 1 only: Copisteria pads a pickup (upbeat) bar to a full bar with a hidden
 # rest when it misses the printed opening meter; drop the padding and show the meter.
 fix_pickup = true

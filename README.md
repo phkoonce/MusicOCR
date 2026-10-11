@@ -194,6 +194,17 @@ the normal way to iterate without paying for another full OMR pass.
 * **Pickup bar** (page 1 only, `fix_pickup`): when Copisteria misses the printed
   opening meter it pads an upbeat bar to a full bar with a hidden rest and hides
   the time signature; the padding is dropped and the meter shown.
+* **Second pass for gaps** (`second_pass`, `second_pass_scale`): the detector
+  has blind spots at its default input size (e.g. the first eighth after a
+  dotted quarter), but sees those notes at ~1.0 confidence one size up (which in
+  turn reads bars worse). For a page whose first reading left gaps, the page is
+  re-detected at `second_pass_scale`x, the extra note/rest detections are added
+  to the cached detections (`musicocr/second_pass_detect.py`), the page is
+  re-read, and the new version of each gap bar is spliced into the first reading
+  only where it fills the gap and keeps the bar's attributes
+  (`musicocr/copisteria_second_pass.py`). The first reading is kept as
+  `pNNN.pass1.musicxml`. Lowering confidence cutoffs does not help: the missing
+  symbols are not low-confidence detections.
 * **Gaps as coloured rests** (`reveal_gaps`): Copisteria draws nothing it did not
   read, so a missed symbol leaves a gap (`<forward>`), which MuseScore shows as an
   invisible rest. Each gap becomes a visible orange rest instead, so bars add up
