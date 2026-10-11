@@ -108,6 +108,10 @@ fill_empty_bars = true
 # reader leaves unmarked (the bar then shows a gap): run it via copisteria_run.py, which
 # tags the heads under the digit (and ignores small digits as multi-rest counts).
 text_tuplets = true
+# Note detections much smaller than the page's ordinary notes (< 0.8 x 0.9) are grace notes
+# (ruffs/flams); the detector sometimes labels them "not grace" and the reader then writes
+# real notes (overfull bar, dropped note). musicocr/page_text.py mark_small_graces.
+small_graces = true
 # Page 1 only: Copisteria pads a pickup (upbeat) bar to a full bar with a hidden
 # rest when it misses the printed opening meter; drop the padding and show the meter.
 fix_pickup = true

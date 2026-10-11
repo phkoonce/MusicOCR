@@ -221,3 +221,56 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> i
     if added:
         dets_path.write_text(json.dumps(dets))
     return added
+
+
+# --- small noteheads are grace notes -------------------------------------------------
+#
+# The detector classifies a beamed pair of small notes before a normal note (a ruff /
+# flam, very common in timpani and drum parts) as grace notes through its ``grace``
+# attribute, but for a few of them it says "none" with a low "acc" probability although
+# the notehead is plainly ~60% of the size of the page's ordinary ones. The evidence model
+# follows the detector and then writes them as real notes (the bar overflows, the next
+# note is dropped, a gap appears). Where a note detection is much smaller than the page's
+# ordinary notes we therefore set its grace attribute in the cached detections file before
+# the model reads it.
+
+GRACE_ACC_P = 0.97
+GRACE_W_RATIO = 0.8         # width below this x the page's median ordinary note ...
+GRACE_H_RATIO = 0.9         # ... and height below this (graces are ~0.62 x 0.62, ordinary notes >= 0.95)
+GRACE_MIN_REFERENCE = 6     # ordinary notes needed to trust the median
+
+
+def mark_small_graces(dets_path: Path, log=None) -> int:
+    """Set ``grace = acc`` on note detections clearly smaller than the page's ordinary notes.
+
+    Rewrites ``dets_path`` in place; returns the number of detections changed.
+    """
+    try:
+        dets = json.loads(dets_path.read_text())
+    except (OSError, ValueError):
+        return 0
+    notes = [d for d in dets if str(d.get("cls", "")).startswith("note_") and d.get("conf", 1.0) >= 0.5]
+    ordinary = [d for d in notes if d.get("attrs", {}).get("grace", "<na>") in ("<na>", "none")
+                and d.get("attr_dist", {}).get("grace", {}).get("acc", 0.0) < 0.5]
+    if len(ordinary) < GRACE_MIN_REFERENCE:
+        return 0
+    ws = sorted(d["xyxy"][2] - d["xyxy"][0] for d in ordinary)
+    hs = sorted(d["xyxy"][3] - d["xyxy"][1] for d in ordinary)
+    # the median ordinary note: the small ones are a minority on any page
+    mw, mh = ws[len(ws) // 2], hs[len(hs) // 2]
+    changed = 0
+    for d in ordinary:
+        w, h = d["xyxy"][2] - d["xyxy"][0], d["xyxy"][3] - d["xyxy"][1]
+        if w < GRACE_W_RATIO * mw and h < GRACE_H_RATIO * mh:
+            d.setdefault("attrs", {})["grace"] = "acc"
+            d.setdefault("attr_p", {})["grace"] = GRACE_ACC_P
+            d.setdefault("attr_dist", {})["grace"] = {"<na>": round((1 - GRACE_ACC_P) * 0.7, 4),
+                                                       "acc": GRACE_ACC_P,
+                                                       "unacc": round((1 - GRACE_ACC_P) * 0.3, 4)}
+            changed += 1
+            if log:
+                log(f"  small note at ({d['xyxy'][0]:.0f},{d['xyxy'][1]:.0f}) {w:.0f}x{h:.0f} "
+                    f"vs median {mw:.0f}x{mh:.0f}: grace")
+    if changed:
+        dets_path.write_text(json.dumps(dets))
+    return changed
