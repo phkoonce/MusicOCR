@@ -34,6 +34,7 @@ class Tools:
     musescore: str = ""
     pdfinfo: str = "pdfinfo"
     pdftoppm: str = "pdftoppm"
+    pdftotext: str = "pdftotext"
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Tools":
@@ -53,6 +54,8 @@ class HomrConfig:
 @dataclass
 class CopisteriaConfig:
     detector: str = "28m"   # "28m" (default) or "2m" (smaller, faster)
+    fix_empty: bool = True   # give bare-<forward> bars a whole-measure rest
+    texts: str = "pdf-layer"   # page-text source: "pdf-layer" (multi-rest counts) or "none"
     repo: str = str(REPO_ROOT / "omr-eval" / "copisteria" / "repo")
 
     @classmethod
@@ -61,7 +64,11 @@ class CopisteriaConfig:
         detector = str(d.get("detector", base.detector))
         if detector not in ("28m", "2m"):
             raise ConfigError("[omr.copisteria] detector must be '28m' or '2m'")
-        return cls(detector=detector, repo=str(d.get("repo", base.repo)))
+        texts = str(d.get("texts", base.texts))
+        if texts not in ("pdf-layer", "none"):
+            raise ConfigError("[omr.copisteria] texts must be 'pdf-layer' or 'none'")
+        return cls(detector=detector, texts=texts, fix_empty=bool(d.get("fix_empty", True)),
+                   repo=str(d.get("repo", base.repo)))
 
 
 @dataclass

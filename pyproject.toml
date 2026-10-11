@@ -23,3 +23,6 @@ musicocr = "musicocr.cli:main"
 
 [tool.setuptools]
 packages = ["musicocr", "musicocr.stages", "musicocr.alignment"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

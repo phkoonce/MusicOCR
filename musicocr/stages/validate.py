@@ -70,6 +70,28 @@ def _check_part(part, p_index, findings):
     return len(measures)
 
 
+def suspicious_tuplet_measures(part) -> list[tuple[int, str]]:
+    """Measures whose tuplets look like a misread rather than real notation: more
+    than one tuplet ratio in one bar, or a note shorter than a 32nd inside a tuplet.
+    Engines (notably Copisteria, which infers tuplets from spacing) can invent
+    these while still summing to the right bar length, so the duration check
+    misses them."""
+    out: list[tuple[int, str]] = []
+    for m in part.getElementsByClass("Measure"):
+        ratios, tiny = set(), False
+        for n in m.recurse().notesAndRests:
+            for t in n.duration.tuplets:
+                ratios.add((t.numberNotesActual, t.numberNotesNormal))
+                if n.duration.quarterLength < 0.125:
+                    tiny = True
+        if len(ratios) > 1:
+            out.append((m.number, "mixed tuplet ratios "
+                        + ", ".join(f"{a}:{b}" for a, b in sorted(ratios)) + " in one bar"))
+        elif tiny:
+            out.append((m.number, "tuplet containing a note shorter than a 32nd"))
+    return out
+
+
 def run(ctx: PipelineContext) -> StageResult:
     xml = require_musicxml(ctx)
     score = load_score(
@@ -102,6 +124,8 @@ def run(ctx: PipelineContext) -> StageResult:
         "tuplets": tuplets,
         "accidentals": accidentals,
     }
+    for m_no, why in suspicious_tuplet_measures(parts[0] if parts else score):
+        findings.append(_finding("warn", "odd-tuplets", f"m.{m_no}: {why}", measure=m_no))
     if notes and tuplets / max(notes, 1) > 0.25:
         findings.append(_finding(
             "warn", "many-tuplets",

@@ -21,7 +21,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from musicocr.copisteria_fixes import fill_empty_measures
 from musicocr.errors import StageError, StageResult
+from musicocr.page_text import write_texts_json
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._omr_common import ensure_page_png as _ensure_page_png, run_raster_pages
 from musicocr.util import run_cmd_lenient
@@ -49,7 +51,14 @@ def run(ctx: PipelineContext) -> StageResult:
         )
     detector = ctx.config.omr.copisteria.detector
 
+    pdftotext = ctx.config.resolve_tool("pdftotext")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
+
     def build_cmd(img: Path, pdir: Path):
+        if ctx.config.omr.copisteria.texts == "pdf-layer" and pdftotext and source_pdf.exists():
+            n = write_texts_json(pdftotext, source_pdf, int(img.stem[1:]), img, log=ctx.log)
+            if n:
+                ctx.log(f"  {img.stem}: {n} digit box(es) from the PDF text layer")
         cmd = [py, "-m", "copisteria.pipeline", str(img), "--out", str(pdir)]
         if detector != "28m":
             cmd += ["--detector", detector]
@@ -62,5 +71,16 @@ def run(ctx: PipelineContext) -> StageResult:
         _adopt_output(img, img.parent)
         return res
 
+    def postprocess(page: int, xml: Path) -> None:
+        if not ctx.config.omr.copisteria.fix_empty:
+            return
+        try:
+            fixed = fill_empty_measures(xml, log=ctx.log)
+        except Exception as exc:  # noqa: BLE001
+            ctx.log(f"  page {page}: empty-bar fix failed ({type(exc).__name__}: {exc})")
+            return
+        if fixed:
+            ctx.log(f"  page {page}: gave {fixed} empty bar(s) a whole-measure rest")
+
     return run_raster_pages(ctx, label="Copisteria", ensure_png=_ensure_page_png,
-                            runner=runner, build_cmd=build_cmd)
+                            runner=runner, build_cmd=build_cmd, postprocess=postprocess)

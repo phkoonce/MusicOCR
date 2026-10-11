@@ -48,6 +48,57 @@ class PreprocessOpts:
         return cls(**f)
 
 
+@dataclass
+class PageGeometry:
+    """How a prepared page image relates to its PDF page, so coordinates taken
+    from the PDF (e.g. its text layer, in points) can be mapped onto the image.
+
+    The image is the rasterised page (``dpi``), rotated by ``rotate`` degrees
+    counter-clockwise about its centre (PIL's convention, deskew), then cropped
+    from row ``crop_top``. ``src_size`` is the size before rotate/crop.
+    Persisted as ``<image>.geom.json`` beside the image.
+    """
+    dpi: int = 300
+    src_size: tuple = (0, 0)
+    rotate: float = 0.0
+    crop_top: int = 0
+
+    @staticmethod
+    def path_for(png: Path) -> Path:
+        return png.with_suffix(".geom.json")
+
+    def save(self, png: Path) -> None:
+        import json
+        self.path_for(png).write_text(json.dumps(
+            {"dpi": self.dpi, "src_size": list(self.src_size),
+             "rotate": self.rotate, "crop_top": self.crop_top}))
+
+    @classmethod
+    def load(cls, png: Path) -> "PageGeometry | None":
+        import json
+        try:
+            d = json.loads(cls.path_for(png).read_text())
+            return cls(int(d["dpi"]), tuple(d["src_size"]), float(d["rotate"]), int(d["crop_top"]))
+        except (OSError, ValueError, KeyError):
+            return None
+
+    def pdf_box_to_image(self, box) -> tuple[float, float, float, float]:
+        """Map a PDF-point box (x0, y0, x1, y1; origin top-left) to image pixels."""
+        import math
+        k = self.dpi / 72.0
+        x0, y0, x1, y1 = (v * k for v in box)
+        pts = [(x0, y0), (x1, y0), (x0, y1), (x1, y1)]
+        if self.rotate:
+            cx, cy = self.src_size[0] / 2, self.src_size[1] / 2
+            t = math.radians(self.rotate)
+            c, s = math.cos(t), math.sin(t)
+            pts = [(cx + (x - cx) * c + (y - cy) * s, cy - (x - cx) * s + (y - cy) * c)
+                   for x, y in pts]
+        xs = [p[0] for p in pts]
+        ys = [p[1] - self.crop_top for p in pts]
+        return min(xs), min(ys), max(xs), max(ys)
+
+
 # --- geometry helpers -------------------------------------------------------
 #
 # Both work on a boolean "ink" array (True = dark pixel) and are cheap because
@@ -171,6 +222,7 @@ def prepare_page(pdf: Path, page: int, dst_png: Path, opts: PreprocessOpts,
         return None
 
     im = Image.open(raw).convert("L")
+    geom = PageGeometry(dpi=opts.dpi, src_size=im.size)
     if opts.median and opts.median > 1:
         im = im.filter(ImageFilter.MedianFilter(size=opts.median))
     if opts.autocontrast:
@@ -184,6 +236,7 @@ def prepare_page(pdf: Path, page: int, dst_png: Path, opts: PreprocessOpts,
             _say(f"  preprocess p{page}: deskew failed ({type(exc).__name__}), skipped")
         if abs(angle) >= 0.2:
             im = im.rotate(angle, resample=Image.BICUBIC, expand=False, fillcolor=255)
+            geom.rotate = angle
             _say(f"  preprocess p{page}: deskew {angle:+.2f}°")
 
     if opts.crop_margins:
@@ -196,6 +249,7 @@ def prepare_page(pdf: Path, page: int, dst_png: Path, opts: PreprocessOpts,
             top, bot = band
             kept = (bot - top) / im.height
             im = im.crop((0, top, im.width, bot))
+            geom.crop_top = top
             _say(f"  preprocess p{page}: cropped margins, kept rows {top}–{bot} "
                  f"({kept:.0%} of page height)")
 
@@ -203,4 +257,5 @@ def prepare_page(pdf: Path, page: int, dst_png: Path, opts: PreprocessOpts,
         im = im.filter(ImageFilter.UnsharpMask(
             radius=opts.unsharp_radius, percent=opts.unsharp_percent, threshold=2))
     im.save(dst_png)
+    geom.save(dst_png)
     return dst_png

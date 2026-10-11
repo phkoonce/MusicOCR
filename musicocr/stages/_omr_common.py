@@ -19,7 +19,7 @@ from typing import Callable, Optional
 from musicocr.errors import StageError, StageResult
 from musicocr.pages import resolve_pages
 from musicocr.pipeline import PipelineContext
-from musicocr.preprocess import prepare_page
+from musicocr.preprocess import PageGeometry, prepare_page
 
 
 def ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
@@ -28,6 +28,9 @@ def ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
     existing = prepped.get(page) or prepped.get(str(page))
     if existing and Path(existing).exists():
         dst.write_bytes(Path(existing).read_bytes())
+        geom = PageGeometry.path_for(Path(existing))
+        if geom.exists():
+            PageGeometry.path_for(dst).write_bytes(geom.read_bytes())
         return dst
 
     pdftoppm = ctx.config.resolve_tool("pdftoppm")

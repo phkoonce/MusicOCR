@@ -16,6 +16,7 @@ musescore = "/Applications/MuseScore 4.app/Contents/MacOS/mscore"
 # poppler utilities (installed via `brew install poppler`)
 pdfinfo = "pdfinfo"
 pdftoppm = "pdftoppm"
+pdftotext = "pdftotext"
 
 [omr]
 # Which engine transcribes pages:
@@ -60,6 +61,13 @@ fix_multirest = true
 [omr.copisteria]
 # Symbol detector: "28m" (default, more accurate) or "2m" (smaller, faster).
 detector = "28m"
+# Page text handed to Copisteria as <page>.texts.json. "pdf-layer" reads digit
+# boxes from the PDF's text layer (born-digital PDFs only) so multi-measure
+# rests keep their counts; without it they come out as plain bars. "none" skips.
+texts = "pdf-layer"
+# Copisteria writes a bar it found no content for as a bare <forward>; give it a
+# whole-measure rest (musicocr/copisteria_fixes.py), like homr's fix_multirest.
+fix_empty = true
 # Clone Copisteria runs from (it looks for models/ relative to its repo root).
 # repo = "/path/to/omr-eval/copisteria/repo"
 

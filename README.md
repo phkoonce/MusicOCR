@@ -155,6 +155,26 @@ Stages, in order: `ingest → omr → correct → extract → normalize → tran
 validate → convert → qa` (`transpose` is optional, off by default). Re-running `--from extract` after editing the `.mxl`/`.omr` is
 the normal way to iterate without paying for another full OMR pass.
 
+### Copisteria-specific pre/post-processing
+
+* **Page text → multi-rest counts.** Copisteria only reads the count over a
+  multi-measure rest from OCR text boxes (`pNNN.texts.json`). For born-digital
+  PDFs the `omr` stage builds that file from the PDF's text layer
+  (`[omr.copisteria] texts = "pdf-layer"`; `musicocr/page_text.py`), mapping
+  the digit boxes onto the preprocessed page via the geometry `preprocess`
+  records in `prepped/pNNN.geom.json` (DPI, deskew angle, crop offset).
+  Scanned PDFs have no text layer, so there the counts are still lost.
+* **Expanded multi-rests.** With counts, Copisteria writes the standard form (a
+  tagged bar plus N−1 following bars), so its bar numbers match the printed
+  ones; homr writes one collapsed bar per multi-rest. The two are not yet
+  normalised -- don't feed Copisteria output to the `align_*` tools unchanged.
+* **Empty bars** (bare `<forward>`, e.g. a multi-rest whose count it could not
+  place) get a whole-measure rest (`[omr.copisteria] fix_empty`,
+  `musicocr/copisteria_fixes.py`).
+* `validate` flags `odd-tuplets` for any engine: bars with mixed tuplet ratios
+  or a tuplet note shorter than a 32nd (Copisteria infers tuplets from spacing
+  and can invent them while still summing to the right bar length).
+
 ### homr-specific pre/post-processing
 
 `omr-eval/README.md` documents two recurring homr failure modes found across a
