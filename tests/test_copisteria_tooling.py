@@ -459,6 +459,7 @@ def test_combine_cover_page_and_total_lower_bound(tmp_path):
     assert len(score.findall("part")[0].findall("measure")) == 7
     # written pitch stays; the horn part declares its transposition (written -> concert)
     tr = score.find("part/measure/attributes/transpose")
+    assert score.findtext("part-list/score-part/score-instrument/instrument-sound") == "brass.french-horn"
     assert tr is not None and tr.findtext("chromatic") == "-7" and tr.findtext("diatonic") == "-4"
 
 

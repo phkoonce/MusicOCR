@@ -234,8 +234,8 @@ def part_info(label: str, instrument: str) -> Dict[str, Any]:
     num = re.search(r"(\d+)\s*$", label)
     suffix = f" {num.group(1)}" if num else ""
     if canon in INFO:
-        _, abbr, _, program = INFO[canon]
-        return dict(name=label, abbr=abbr.rstrip(".") + suffix, program=program)
+        _, abbr, sound, program = INFO[canon]
+        return dict(name=label, abbr=abbr.rstrip(".") + suffix, program=program, sound=sound)
     return dict(name=label, abbr=label[:4].strip() + suffix, program=1)
 
 

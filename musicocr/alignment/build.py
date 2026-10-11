@@ -138,6 +138,11 @@ def build_score(spec: Any, parts: Mapping[int, List[ET.Element]],
         sp = ET.SubElement(pl, "score-part", id=f"P{pid}")
         ET.SubElement(sp, "part-name").text = info["name"]
         ET.SubElement(sp, "part-abbreviation").text = info["abbr"]
+        if info.get("sound"):       # MuseScore picks the playback voice from instrument-sound
+            si = ET.SubElement(sp, "score-instrument", id=f"P{pid}-I1")
+            ET.SubElement(si, "instrument-name").text = info["name"]
+            ET.SubElement(si, "instrument-abbreviation").text = info["abbr"]
+            ET.SubElement(si, "instrument-sound").text = info["sound"]
         mi = ET.SubElement(sp, "midi-instrument", id=f"P{pid}-I1")
         ET.SubElement(mi, "midi-channel").text = str(pid)
         ET.SubElement(mi, "midi-program").text = str(info["program"])
