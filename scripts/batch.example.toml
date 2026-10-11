@@ -1,7 +1,8 @@
 # Example batch spec for scripts/batch_run.py. Copy to batches/<name>.toml
 # (git-ignored) and edit. The file stem <name> determines the derived paths:
 #   input/<name>/<key>.pdf          per-part PDFs
-#   output/<name>_state.json        resume state
+#   output/<name>/<key>/            per-part pipeline outputs (+ <key>.run.log)
+#   output/<name>/_state.json       resume state
 #   docs/<name>-progress.md         progress table (text outside the batch markers is kept)
 
 title = "My Piece"                       # heading of the progress doc
@@ -10,6 +11,7 @@ key_prefix = "MyPiece_"                  # pipeline key = key_prefix + part id
 
 # Optional overrides (paths relative to the repo root):
 # input_dir    = "input/my-piece"
+# output_dir   = "output/my-piece"
 # state_file   = "output/my-piece_state.json"
 # progress_doc = "docs/my-piece-progress.md"
 

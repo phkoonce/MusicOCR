@@ -30,9 +30,28 @@ def test_parse_spec_defaults_and_paths(tmp_path):
     assert spec.source_pdf == Path("~/x/demo.pdf").expanduser()
     assert [spec.key(p) for p in spec.parts] == ["Demo_a", "Demo_b"]
     assert spec.parts[1].label == "b"  # label defaults to id
-    assert spec.state_path == tmp_path / "output/demo_state.json"
+    assert spec.output_dir == tmp_path / "output/demo"
+    assert spec.state_path == tmp_path / "output/demo/_state.json"
     assert spec.doc_path == tmp_path / "docs/demo-progress.md"
     assert spec.input_dir == tmp_path / "input/demo"
+
+
+def test_run_part_writes_into_batch_output_dir(tmp_path, monkeypatch):
+    spec = _spec(tmp_path)
+    seen = {}
+
+    def fake_run(cmd, stdout=None, stderr=None):
+        seen["cmd"] = cmd
+        book = spec.output_dir / "Demo_a"
+        book.mkdir(parents=True)
+        (book / "Demo_a.musicxml").write_text("<x/>")
+        return type("R", (), {"returncode": 0})()
+
+    monkeypatch.setattr(batch.subprocess, "run", fake_run)
+    entry = batch.run_part(spec, spec.parts[0], tmp_path / "Demo_a.pdf")
+    assert seen["cmd"][seen["cmd"].index("--output") + 1] == str(spec.output_dir)
+    assert entry["status"] == batch.DONE and "output/demo/Demo_a/report.md" in entry["note"]
+    assert (spec.output_dir / "Demo_a.run.log").exists()
 
 
 def test_parse_spec_overrides(tmp_path):

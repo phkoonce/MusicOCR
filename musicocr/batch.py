@@ -2,7 +2,7 @@
 through the pipeline.
 
 A batch is described by a small TOML spec (see ``scripts/batch.example.toml``).
-State is kept in ``output/<name>_state.json`` and a human-readable progress doc is
+Part outputs go to ``output/<name>/<key>/`` (mirroring ``input/<name>/``); state is kept in ``output/<name>/_state.json`` and a human-readable progress doc is
 written to ``docs/<name>-progress.md``, where ``<name>`` is the spec file's stem.
 Finished parts are skipped on re-run, so the batch is safe to stop and resume.
 """
@@ -57,12 +57,13 @@ class BatchSpec:
     key_prefix: str
     parts: List[Part]
     input_dir: Path
+    output_dir: Path
     state_path: Path
     doc_path: Path
     root: Path = field(default=ROOT)
 
     def key(self, part: Part) -> str:
-        """Output/pipeline key of a part (``output/<key>/``, ``<key>.pdf``)."""
+        """Pipeline key of a part (``<output_dir>/<key>/``, ``<key>.pdf``)."""
         return f"{self.key_prefix}{part.id}"
 
 
@@ -102,6 +103,8 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
     def rel(key: str, default: str) -> Path:
         return root / data.get(key, default)
 
+    output_dir = rel("output_dir", f"output/{name}")
+
     return BatchSpec(
         name=name,
         title=data.get("title", name),
@@ -109,7 +112,8 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
         key_prefix=prefix,
         parts=parts,
         input_dir=rel("input_dir", f"input/{name}"),
-        state_path=rel("state_file", f"output/{name}_state.json"),
+        output_dir=output_dir,
+        state_path=rel("state_file", f"output/{name}/_state.json"),
         doc_path=rel("progress_doc", f"docs/{name}-progress.md"),
         root=root,
     )
@@ -162,7 +166,7 @@ def render_progress_doc(spec: BatchSpec, state: State, updated: str) -> str:
     return (
         f"# {spec.title} OMR progress\n\n"
         f"Auto-written by `musicocr.batch` from `{spec.name}.toml` (updated {updated}). "
-        f"Outputs in `output/<key>/`; per-part PDFs in `{_rel(spec.input_dir, spec.root)}/`. "
+        f"Outputs in `{_rel(spec.output_dir, spec.root)}/<key>/`; per-part PDFs in `{_rel(spec.input_dir, spec.root)}/`. "
         "Re-run the batch to resume.\n\n" + "\n".join(rows) + "\n"
     )
 
@@ -215,9 +219,10 @@ def split_pdf(spec: BatchSpec, part: Part) -> Path:
 def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
     """Run the pipeline CLI (``run.sh run``) on one part PDF; return its state entry."""
     key = spec.key(part)
-    out_dir = spec.root / "output"
+    out_dir = spec.output_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
     started = time.time()
-    cmd = [str(spec.root / "run.sh"), "run", str(pdf), "--keep-going"]
+    cmd = [str(spec.root / "run.sh"), "run", str(pdf), "--output", str(out_dir), "--keep-going"]
     if part.instrument:
         cmd += ["--transpose-instrument", part.instrument]
     with open(out_dir / f"{key}.run.log", "w") as log:
@@ -227,8 +232,8 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
     produced = out_dir / key / f"{key}.musicxml"
     if produced.exists() and produced.stat().st_size > 0:
         minutes = (time.time() - started) / 60
-        return {"status": DONE, "note": f"{minutes:.1f} min, rc={rc}; see output/{key}/report.md"}
-    return {"status": FAILED, "note": f"rc={rc}; see output/{key}.run.log"}
+        return {"status": DONE, "note": f"{minutes:.1f} min, rc={rc}; see {_rel(out_dir / key, spec.root)}/report.md"}
+    return {"status": FAILED, "note": f"rc={rc}; see {_rel(out_dir / (key + '.run.log'), spec.root)}"}
 
 
 def run_batch(
