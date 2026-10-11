@@ -133,6 +133,16 @@ python -m musicocr run INPUT.pdf \
   why it was adopted — it beat Audiveris consistently on monophonic
   wind/brass parts in local testing). Because it needs an image, it always
   rasterises pages regardless of `[preprocess] enabled`.
+* **`copisteria`** — [KobiMusic's reader](https://github.com/kobimusic/copisteria)
+  (page image → MusicXML with a learned evidence model; Apache-2.0). Own
+  Python 3.12 venv + repo clone under `omr-eval/copisteria/`, installed by
+  `omr-eval/setup.sh`; `[omr.copisteria] detector = "28m" | "2m"`. Its
+  published benchmarks are on multi-staff scores, so it is being evaluated
+  side by side with homr on parts. Also leaves `pNNN.reading.json` (per-symbol
+  evidence) and `pNNN.html` (viewer) beside each page's MusicXML.
+* **`legato2`** — reserved placeholder. LEGATO 2 (arXiv:2607.05769) has no
+  released code or weights yet; selecting it fails with an explanatory error.
+  See `musicocr/stages/omr_legato2.py` for the wiring checklist.
 * **`audiveris`** — the original classical pipeline. Still the better choice
   for full scores / multi-staff systems, and the only engine with a hand
   correction workflow (see below).

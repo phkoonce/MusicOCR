@@ -9,6 +9,9 @@ audiveris = "/Applications/Audiveris.app/Contents/MacOS/Audiveris"
 # elsewhere. Invoked by calling homr.main:main directly rather than the
 # installed console-script, so a moved venv's stale shebang doesn't matter.
 # homr_python = "/path/to/omr-eval/homr/.venv/bin/python"
+# Copisteria's own venv (Python 3.12) and repo clone, from omr-eval/setup.sh.
+# Defaults to <repo>/omr-eval/copisteria/.venv/bin/python.
+# copisteria_python = "/path/to/omr-eval/copisteria/.venv/bin/python"
 musescore = "/Applications/MuseScore 4.app/Contents/MacOS/mscore"
 # poppler utilities (installed via `brew install poppler`)
 pdfinfo = "pdfinfo"
@@ -20,6 +23,9 @@ pdftoppm = "pdftoppm"
 #                 mode, no [omr.profiles.*] tuning, no GUI correction. Needs
 #                 rasterised page images, so it always rasterises pages
 #                 regardless of [preprocess] enabled.
+#   "copisteria" - page-image reader with a learned evidence model (omr-eval/setup.sh).
+#                 Benchmarked by its authors on multi-staff scores, not yet on parts here.
+#   "legato2"   - placeholder; the model is not released (paper only).
 #   "audiveris" - classical segment-classify-reconstruct pipeline, tunable via
 #                 [omr.profiles.*] constants, the only engine with a GUI
 #                 hand-correction round-trip ([stages.correct]).
@@ -50,6 +56,12 @@ merge_pages = true
 # export right after homr writes it, before merge/validate see it. See
 # musicocr/homr_fixes.py and omr-eval/README.md's 2026-09-12 finding.
 fix_multirest = true
+
+[omr.copisteria]
+# Symbol detector: "28m" (default, more accurate) or "2m" (smaller, faster).
+detector = "28m"
+# Clone Copisteria runs from (it looks for models/ relative to its repo root).
+# repo = "/path/to/omr-eval/copisteria/repo"
 
 # Audiveris application "constants" (see `Audiveris -help`). Real tuning is
 # iterative: run once, inspect report.md + qa images, then add constants here.

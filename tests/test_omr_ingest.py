@@ -233,3 +233,61 @@ def test_ingest_preprocess_runs_per_page(tmp_path, monkeypatch):
     assert got == [1, 2]
     assert sorted(ctx.artifacts.prepped_pages) == [1]
     assert "preprocess: 1 page(s)" in res.detail and "deskew" in res.detail
+
+
+# ---- engine registry / copisteria / legato2 ---------------------------------
+
+def test_registry_matches_config_validation():
+    from musicocr.config import ConfigError, OmrConfig
+    from musicocr.engines import ENGINES, VALID_ENGINES
+    assert VALID_ENGINES == set(ENGINES) >= {"homr", "audiveris", "copisteria", "legato2"}
+    OmrConfig.from_dict({"engine": "legato2"})          # name is reserved
+    with pytest.raises(ConfigError):
+        OmrConfig.from_dict({"engine": "nope"})
+
+
+def test_legato2_placeholder_fails_clearly(tmp_path):
+    ctx = _ctx(tmp_path, omr={"engine": "legato2"})
+    with pytest.raises(StageError, match="legato2.*not usable yet"):
+        omr.run(ctx)
+
+
+def test_copisteria_missing_tool_raises(tmp_path):
+    ctx = _ctx(tmp_path, tools={"copisteria_python": str(tmp_path / "nope")})
+    with pytest.raises(StageError, match="Copisteria not found"):
+        omr.run(replace_engine(ctx, "copisteria"))
+
+
+def replace_engine(ctx, engine):
+    object.__setattr__(ctx.config.omr, "engine", engine)
+    return ctx
+
+
+def test_copisteria_runs_from_repo_root_and_adopts_output(tmp_path, monkeypatch):
+    from musicocr.stages import omr_copisteria
+    py = tmp_path / "py"
+    py.write_text("")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    ctx = _ctx(tmp_path, pages="1-2", tools={"copisteria_python": str(py)})
+    object.__setattr__(ctx.config.omr, "copisteria",
+                       type(ctx.config.omr.copisteria)(detector="2m", repo=str(repo)))
+    seen = []
+
+    def fake(cmd, **kw):
+        from pathlib import Path
+        seen.append((cmd, kw.get("cwd")))
+        img = Path(cmd[cmd.index("copisteria.pipeline") + 1])
+        # page 1 uses the expected name; page 2 a differently-named export
+        name = "p001.musicxml" if img.stem == "p001" else "weird.musicxml"
+        (img.parent / name).write_text("<score-partwise/>")
+        return LenientResult(0, "", False)
+
+    monkeypatch.setattr(omr_copisteria, "run_cmd_lenient", fake)
+    monkeypatch.setattr(omr_copisteria, "_ensure_page_png",
+                        lambda c, page, dst: (dst.write_bytes(b"png"), dst)[1])
+    res = omr_copisteria.run(ctx)
+    assert res.status == "ok" and ctx.artifacts.omr_failed_pages == []
+    assert [p.name for p in ctx.artifacts.mxl_files] == ["p001.musicxml", "p002.musicxml"]
+    assert all(cwd == repo for _, cwd in seen)
+    assert "--detector" in seen[0][0] and "2m" in seen[0][0]

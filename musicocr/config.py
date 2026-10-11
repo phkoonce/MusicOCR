@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from musicocr.engines import VALID_ENGINES
 from musicocr.preprocess import PreprocessOpts
 
 import tomllib
@@ -14,7 +15,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.toml"
 
 VALID_FORMATS = {"musicxml", "mscz", "midi", "qa-pdf"}
-VALID_ENGINES = {"homr", "audiveris"}
 
 
 VALID_CLEFS = ("treble", "bass", "c")
@@ -30,6 +30,7 @@ class ConfigError(RuntimeError):
 class Tools:
     audiveris: str = ""
     homr_python: str = str(REPO_ROOT / "omr-eval" / "homr" / ".venv" / "bin" / "python")
+    copisteria_python: str = str(REPO_ROOT / "omr-eval" / "copisteria" / ".venv" / "bin" / "python")
     musescore: str = ""
     pdfinfo: str = "pdfinfo"
     pdftoppm: str = "pdftoppm"
@@ -50,6 +51,20 @@ class HomrConfig:
 
 
 @dataclass
+class CopisteriaConfig:
+    detector: str = "28m"   # "28m" (default) or "2m" (smaller, faster)
+    repo: str = str(REPO_ROOT / "omr-eval" / "copisteria" / "repo")
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "CopisteriaConfig":
+        base = cls()
+        detector = str(d.get("detector", base.detector))
+        if detector not in ("28m", "2m"):
+            raise ConfigError("[omr.copisteria] detector must be '28m' or '2m'")
+        return cls(detector=detector, repo=str(d.get("repo", base.repo)))
+
+
+@dataclass
 class OmrConfig:
     engine: str = "homr"
     profile: str = "default"
@@ -59,6 +74,7 @@ class OmrConfig:
     merge_pages: bool = True
     profiles: Dict[str, List[str]] = field(default_factory=lambda: {"default": []})
     homr: HomrConfig = field(default_factory=HomrConfig)
+    copisteria: CopisteriaConfig = field(default_factory=CopisteriaConfig)
     # Extra Audiveris constants from the CLI (--constant); never read from TOML.
     extra_constants: List[str] = field(default_factory=list)
 
@@ -84,6 +100,7 @@ class OmrConfig:
             merge_pages=bool(d.get("merge_pages", True)),
             profiles=profiles,
             homr=HomrConfig.from_dict(d.get("homr", {}) or {}),
+            copisteria=CopisteriaConfig.from_dict(d.get("copisteria", {}) or {}),
         )
 
 

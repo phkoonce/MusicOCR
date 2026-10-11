@@ -10,6 +10,7 @@ from xml.etree import ElementTree as ET
 
 from musicocr import __version__
 from musicocr.config import Config, ConfigError, load_config
+from musicocr.engines import ENGINES
 from musicocr.pipeline import PipelineContext, STAGE_ORDER, run_pipeline
 from musicocr.report import write_reports
 
@@ -159,14 +160,20 @@ def cmd_doctor(args) -> int:
     print(f"OMR engine: {config.omr.engine}")
     print("\ntools:")
     ok = True
-    engine_tool = "homr_python" if config.omr.engine == "homr" else "audiveris"
-    ok &= _check("homr (venv python)", config.resolve_tool("homr_python"))
-    ok &= _check("Audiveris", config.resolve_tool("audiveris"), ["-version"])
+    current = ENGINES[config.omr.engine]
+    for eng in ENGINES.values():
+        if not eng.tool:
+            print(f"  - {eng.label}: {eng.note or 'unavailable'}")
+            continue
+        found = _check(eng.label, config.resolve_tool(eng.tool),
+                       ["-version"] if eng.name == "audiveris" else None)
+        if eng is current:
+            ok &= found   # only the configured engine must be present
     ok &= _check("MuseScore", config.resolve_tool("musescore"), ["--version"])
     ok &= _check("pdfinfo", config.resolve_tool("pdfinfo"), ["-v"])
     ok &= _check("pdftoppm", config.resolve_tool("pdftoppm"), ["-v"])
-    if not config.resolve_tool(engine_tool):
-        print(f"  ✗ configured engine {config.omr.engine!r} is not available")
+    if not current.available:
+        print(f"  ✗ configured engine {current.name!r} is not available: {current.note}")
         ok = False
 
     print("\npython deps:")
@@ -197,7 +204,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("input", help="input PDF")
     r.add_argument("--output", help="output root dir (default: ./output)")
     r.add_argument("--pages", help="page selection, e.g. '1,4-5' (Audiveris -sheets)")
-    r.add_argument("--engine", choices=["homr", "audiveris"],
+    r.add_argument("--engine", choices=sorted(ENGINES),
                    help="OMR engine (overrides config [omr] engine, default: homr)")
     r.add_argument("--profile", help="OMR profile from config.toml (Audiveris only)")
     r.add_argument("--constant", action="append", metavar="k=v",

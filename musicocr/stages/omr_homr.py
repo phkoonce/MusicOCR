@@ -22,6 +22,10 @@ Artifacts set on ``ctx`` mirror ``omr_audiveris`` so downstream stages
   * ``omr_log``          - newest homr stdout/stderr capture (per-page: the last one)
   * ``omr_project``      - always ``None`` (homr has no project file / GUI round-trip)
 
+The per-page loop is shared with the other raster engines
+(``musicocr.stages._omr_common``); this module supplies only the homr command
+line and its post-fix.
+
 Each page's raw export is also patched in place for homr's known empty-multirest
 generator bug (``[omr.homr] fix_multirest``, default on) -- see
 ``musicocr.homr_fixes`` and omr-eval/README.md's 2026-09-12 finding. This has to
@@ -32,30 +36,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from musicocr.homr_fixes import fix_multirest_file
 from musicocr.errors import StageError, StageResult
+from musicocr.homr_fixes import fix_multirest_file
 from musicocr.pipeline import PipelineContext
-from musicocr.preprocess import PreprocessOpts, prepare_page
-from musicocr.pages import resolve_pages
+from musicocr.stages._omr_common import ensure_page_png as _ensure_page_png, run_raster_pages
 from musicocr.util import run_cmd_lenient
 
 _HOMR_ENTRYPOINT = "import sys; from homr.main import main; sys.exit(main())"
-
-
-def _ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
-    """Write a rasterised page image to `dst`, reusing ingest's prepped copy if any."""
-    prepped = ctx.artifacts.prepped_pages or {}
-    existing = prepped.get(page) or prepped.get(str(page))
-    if existing and Path(existing).exists():
-        dst.write_bytes(Path(existing).read_bytes())
-        return dst
-
-    pdftoppm = ctx.config.resolve_tool("pdftoppm")
-    if not pdftoppm:
-        return None
-    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
-    opts = ctx.config.preprocess
-    return prepare_page(source_pdf, page, dst, opts, pdftoppm, ctx.log)
 
 
 def run(ctx: PipelineContext) -> StageResult:
@@ -66,72 +53,20 @@ def run(ctx: PipelineContext) -> StageResult:
             "[tools], or run omr-eval/setup.sh to install it)"
         )
 
-    pages = resolve_pages(ctx)
-    if not pages:
-        raise StageError("no pages to transcribe (unknown page count and no --pages)")
+    def build_cmd(img: Path, pdir: Path):
+        return [homr_python, "-c", _HOMR_ENTRYPOINT, str(img)], None
 
-    pages_root = ctx.workdir / "pages"
-    by_page: dict[int, list[Path]] = {}
-    failed: list[int] = []
-    logs: list[Path] = []
+    def postprocess(page: int, xml: Path) -> None:
+        if not ctx.config.omr.homr.fix_multirest:
+            return
+        try:
+            fixed = fix_multirest_file(xml, log=ctx.log)
+        except Exception as exc:  # noqa: BLE001
+            ctx.log(f"  page {page}: multirest fix failed ({type(exc).__name__}: {exc})")
+            return
+        if fixed:
+            ctx.log(f"  page {page}: fixed {fixed} empty multi-rest measure(s)")
 
-    for i, page in enumerate(pages, 1):
-        stem = f"p{page:03d}"
-        pdir = pages_root / stem
-        out_xml = pdir / f"{stem}.musicxml"
-        if out_xml.exists() and not ctx.force:
-            ctx.log(f"  page {page} ({i}/{len(pages)}): reuse {out_xml.name}")
-            by_page[page] = [out_xml]
-            continue
-
-        pdir.mkdir(parents=True, exist_ok=True)
-        img = pdir / f"{stem}.png"
-        if not _ensure_page_png(ctx, page, img):
-            failed.append(page)
-            ctx.log(f"  page {page} ({i}/{len(pages)}): FAILED — could not rasterise page")
-            continue
-
-        if out_xml.exists():
-            out_xml.unlink()
-        cmd = [homr_python, "-c", _HOMR_ENTRYPOINT, str(img)]
-        res = run_cmd_lenient(cmd, timeout=ctx.config.omr.page_timeout, log=ctx.log)
-        log_path = pdir / f"{stem}.log"
-        if res is not None:
-            log_path.write_text(res.output or "")
-            logs.append(log_path)
-
-        if out_xml.exists() and out_xml.stat().st_size > 0:
-            if ctx.config.omr.homr.fix_multirest:
-                try:
-                    fixed = fix_multirest_file(out_xml, log=ctx.log)
-                except Exception as exc:  # noqa: BLE001
-                    fixed = 0
-                    ctx.log(f"  page {page}: multirest fix failed ({type(exc).__name__}: {exc})")
-                if fixed:
-                    ctx.log(f"  page {page}: fixed {fixed} empty multi-rest measure(s)")
-            by_page[page] = [out_xml]
-            note = "" if (res and res.returncode == 0) else " (homr exited nonzero)"
-            ctx.log(f"  page {page} ({i}/{len(pages)}): 1 .musicxml{note}")
-        else:
-            failed.append(page)
-            why = "timed out" if (res and res.timed_out) else "no .musicxml written"
-            ctx.log(f"  page {page} ({i}/{len(pages)}): FAILED — {why}")
-
-    all_files = [p for page in sorted(by_page) for p in by_page[page]]
-    ctx.artifacts.mxl_files = all_files
-    ctx.artifacts.mxl_by_page = by_page
-    ctx.artifacts.omr_failed_pages = failed
-    ctx.artifacts.omr_log = logs[-1] if logs else None
-    ctx.artifacts.omr_project = None
-
-    if not all_files:
-        raise StageError(
-            f"homr transcribed none of {len(pages)} page(s). "
-            f"Last log: {ctx.artifacts.omr_log}"
-        )
-
-    detail = f"{len(all_files)} .musicxml from {len(by_page)}/{len(pages)} page(s)"
-    if failed:
-        detail += f"; failed: {failed}"
-        ctx.log(f"  WARNING: {len(failed)} page(s) not transcribed: {failed}")
-    return StageResult("omr", "ok", detail, data={"failed_pages": failed})
+    return run_raster_pages(ctx, label="homr", ensure_png=_ensure_page_png,
+                            runner=run_cmd_lenient, build_cmd=build_cmd,
+                            postprocess=postprocess)

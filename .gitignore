@@ -36,6 +36,9 @@ __pycache__/
 # omr-eval: per-piece alignment specs (hand-written, piece-specific) -- local only
 /omr-eval/specs/
 
+# omr-eval: Copisteria clone + downloaded model weights (setup.sh recreates)
+/omr-eval/copisteria/
+
 # Local batch specs (personal paths, piece-specific); the generic example is
 # scripts/batch.example.toml
 /batches/

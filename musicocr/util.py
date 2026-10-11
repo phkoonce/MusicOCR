@@ -50,6 +50,7 @@ def run_cmd_lenient(
     *,
     timeout: int = 300,
     env: dict | None = None,
+    cwd: str | os.PathLike | None = None,
     log=None,
 ) -> LenientResult | None:
     """Run a command without raising on non-zero exit.
@@ -69,7 +70,7 @@ def run_cmd_lenient(
     try:
         try:
             proc = subprocess.Popen(
-                cmd, stdout=tmp, stderr=subprocess.STDOUT, env=env,
+                cmd, stdout=tmp, stderr=subprocess.STDOUT, env=env, cwd=cwd,
                 start_new_session=True,
             )
         except FileNotFoundError:

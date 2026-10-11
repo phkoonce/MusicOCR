@@ -10,6 +10,16 @@ echo "== homr =="
 uv venv homr/.venv --python 3.12
 uv pip install --python homr/.venv/bin/python "homr[cpu]"
 
+echo "== copisteria =="
+# Needs Python 3.12 and runs from its own repo root (it finds models/ relative to cwd).
+[ -d copisteria/repo ] || git clone --depth 1 https://github.com/kobimusic/copisteria copisteria/repo
+uv venv copisteria/.venv --python 3.12
+uv pip install --python copisteria/.venv/bin/python -e copisteria/repo huggingface_hub
+copisteria/.venv/bin/python - <<'PY'
+from huggingface_hub import snapshot_download
+snapshot_download("kobimusic/copista-28m", allow_patterns=["*.pt"], local_dir="copisteria/repo/models")
+PY
+
 echo "== oemer =="
 uv venv oemer/.venv --python 3.11
 uv pip install --python oemer/.venv/bin/python oemer

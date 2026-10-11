@@ -6,6 +6,7 @@ look), ``info`` (context).
 """
 from __future__ import annotations
 
+from musicocr.engines import has_check
 from musicocr.errors import StageResult
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._common import load_score, require_musicxml
@@ -112,7 +113,7 @@ def run(ctx: PipelineContext) -> StageResult:
     if notes == 0:
         findings.append(_finding("error", "no-notes", "no notes recognised in the score"))
 
-    if ctx.config.omr.engine == "homr":
+    if has_check(ctx.config.omr.engine, "dropped_multirest"):
         # homr-specific: a dropped multi-rest (the model reads a printed "3" as
         # a plain bar) has no structural signature of its own -- see
         # musicocr.homr_fixes and omr-eval/README.md. Weak heuristic, expect
