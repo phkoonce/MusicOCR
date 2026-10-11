@@ -19,6 +19,7 @@ id = "fl1"
 label = "Flute 1"
 first_page = 5
 last_page = 7
+# instrument = "horn in f"   # optional: transpose to concert pitch (see `musicocr instruments`)
 
 [[parts]]
 id = "fl2"

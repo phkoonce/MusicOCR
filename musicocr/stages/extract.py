@@ -85,6 +85,11 @@ def run(ctx: PipelineContext) -> StageResult:
             ctx.log(f"  extracted {t.name}")
     ctx.artifacts.musicxml_pages = page_files
 
+    # Before merging, so music21 never sees a page without its governing signature.
+    from musicocr.timesig import fix_time_signatures_files
+
+    fix_time_signatures_files(page_files, log=ctx.log)
+
     if len(page_files) == 1:
         master.write_bytes(page_files[0].read_bytes())
         ctx.artifacts.musicxml = master

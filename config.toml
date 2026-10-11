@@ -105,13 +105,16 @@ enabled = false
 enabled = true
 
 [stages.transpose]
-# Optional: shift written pitch to concert pitch (or any interval) after
-# normalize, keys included. Off by default. Give `semitones` (all parts) or
+# Optional, off by default. `mode = "written"` (default) leaves the notes as
+# printed and sets the part's instrument name + <transpose>, so MuseScore shows
+# the written score and its concert-pitch toggle does the shift. `mode =
+# "concert"` instead rewrites pitches and keys at concert pitch. Give `semitones` (all parts) or
 # `instrument` (looked up in musicocr/instruments.py); with neither, each part
 # is identified by its <part-name>. `clef` ("treble"/"bass"/"c") overrides the
 # first-clef detection for clef-dependent instruments (baritone, tuba...).
 # CLI: --transpose / --no-transpose / --transpose-instrument / --transpose-semitones.
 enabled = false
+# mode = "written"
 # instrument = "horn in f"
 # semitones = -7
 # clef = "treble"

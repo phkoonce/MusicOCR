@@ -18,7 +18,7 @@ so "Horn in F 3" finds "horn in f").
 from __future__ import annotations
 
 import re
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Tuple, Union
 
 Semitones = Union[int, Dict[str, int]]
 
@@ -55,6 +55,23 @@ ALIASES: Dict[str, str] = {
     "bb trumpet": "trumpet",
     "bb clarinet": "clarinet in bb",
     "clarinet": "clarinet in bb",
+}
+
+# Display name, abbreviation, MusicXML instrument-sound and 1-based MIDI program,
+# written into the part so MuseScore picks the right instrument (and, with the
+# <transpose> element, its transposition). Keyed like ``TRANSPOSITIONS``.
+INFO: Dict[str, Tuple[str, str, str, int]] = {
+    "french horn": ("Horn in F", "Hn.", "brass.french-horn", 61),
+    "baritone horn": ("Baritone Horn", "Bar.", "brass.euphonium", 59),
+    "tenor horn": ("Tenor Horn", "T. Hn.", "brass.euphonium", 59),
+    "euphonium": ("Euphonium", "Euph.", "brass.euphonium", 59),
+    "tuba": ("Tuba", "Tba.", "brass.tuba", 59),
+    "eb tuba": ("Tuba in Eb", "Tba.", "brass.tuba", 59),
+    "bb tuba": ("Tuba in Bb", "Tba.", "brass.tuba", 59),
+    "trombone": ("Trombone", "Tbn.", "brass.trombone", 58),
+    "bass trombone": ("Bass Trombone", "B. Tbn.", "brass.trombone.bass", 58),
+    "trumpet": ("Trumpet in Bb", "Tpt.", "brass.trumpet", 57),
+    "clarinet in bb": ("Clarinet in Bb", "Cl.", "wind.reed.clarinet", 72),
 }
 
 _PART_NUMBER = re.compile(r"\s+(\d+(st|nd|rd|th)?|i{1,3}|iv)$")

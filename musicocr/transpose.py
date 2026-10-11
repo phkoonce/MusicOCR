@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 from xml.etree import ElementTree as ET
 
-from musicocr.instruments import semitones_for
+from musicocr.instruments import INFO, canonical_name, semitones_for
 
 # Line-of-fifths position of each natural note (F=-1 ... B=5) and its semitone.
 _STEPS = "FCGDAEB"
@@ -121,6 +121,61 @@ def transpose_part(part: ET.Element, semitones: int) -> PartResult:
     return PartResult(part.get("id", ""), "", semitones, shift, notes)
 
 
+# Diatonic steps spanned by an interval of 0..11 semitones (tritone -> fifth).
+_DIATONIC = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6]
+
+
+def _declare_transpose(part: ET.Element, semitones: int) -> None:
+    """Replace the part's <transpose> with one for ``semitones`` (written -> concert)."""
+    for attrs in part.iter("attributes"):
+        for tr in attrs.findall("transpose"):
+            attrs.remove(tr)
+    first = part.find("measure/attributes")
+    if first is None or not semitones:
+        return
+    sign = -1 if semitones < 0 else 1
+    octaves, rem = divmod(abs(semitones), 12)
+    tr = ET.Element("transpose")
+    ET.SubElement(tr, "diatonic").text = str(sign * _DIATONIC[rem])
+    ET.SubElement(tr, "chromatic").text = str(sign * rem)
+    if octaves:
+        ET.SubElement(tr, "octave-change").text = str(sign * octaves)
+    # schema order: ... key, time, staves, part-symbol, instruments, clef, staff-details, transpose
+    after = {"divisions", "key", "time", "staves", "part-symbol", "instruments", "clef", "staff-details"}
+    pos = max([i + 1 for i, c in enumerate(first) if c.tag in after], default=0)
+    first.insert(pos, tr)
+
+
+def _name_instrument(score_part: ET.Element, canon: str) -> None:
+    """Give the <score-part> the instrument's name, sound and MIDI program."""
+    name, abbr, sound, program = INFO[canon]
+    for tag, text in (("part-name", name), ("part-abbreviation", abbr)):
+        el = score_part.find(tag)
+        if el is None:
+            el = ET.Element(tag)
+            score_part.insert(0, el)
+        el.text = text
+    inst = score_part.find("score-instrument")
+    if inst is None:
+        inst = ET.Element("score-instrument", id=f"{score_part.get('id', 'P1')}-I1")
+        score_part.insert(list(score_part).index(score_part.find("part-abbreviation")) + 1, inst)
+    for tag, text in (("instrument-name", name), ("instrument-abbreviation", abbr),
+                      ("instrument-sound", sound)):
+        el = inst.find(tag)
+        if el is None:
+            el = ET.SubElement(inst, tag)
+        el.text = text
+    # schema order inside score-instrument: name, abbreviation, sound
+    order = {"instrument-name": 0, "instrument-abbreviation": 1, "instrument-sound": 2}
+    inst[:] = sorted(inst, key=lambda c: order.get(c.tag, 3))
+    midi = score_part.find("midi-instrument")
+    if midi is not None:
+        prog = midi.find("midi-program")
+        if prog is None:
+            prog = ET.SubElement(midi, "midi-program")
+        prog.text = str(program)
+
+
 def _part_names(root: ET.Element) -> dict:
     return {sp.get("id"): (sp.findtext("part-name") or sp.findtext("part-abbreviation") or "")
             for sp in root.iter("score-part")}
@@ -131,8 +186,14 @@ def transpose_score(
     semitones: Optional[int] = None,
     instrument: Optional[str] = None,
     clef: Optional[str] = None,
+    mode: str = "concert",
 ) -> TransposeResult:
     """Transpose every part of a parsed ``score-partwise`` in place.
+
+    ``mode="concert"`` rewrites pitches and keys at concert pitch. ``mode="written"``
+    leaves them as written and instead declares the instrument and its
+    ``<transpose>`` so notation software shows the score as printed and does the
+    concert-pitch conversion itself.
 
     Give ``semitones`` (applied to all parts), or ``instrument`` (looked up in
     ``musicocr.instruments``, using each part's own clef unless ``clef`` is
@@ -157,7 +218,15 @@ def transpose_score(
                     raise
                 result.skipped.append(f"{pid} ({name or 'unnamed'}): {exc}")
                 continue
-        res = transpose_part(part, n)
+        if mode == "written":
+            res = PartResult(pid, name, n, 0, sum(1 for _ in part.iter("pitch")))
+            _declare_transpose(part, n)
+            canon = canonical_name(instrument or name)
+            score_part = next((sp for sp in root.iter("score-part") if sp.get("id") == pid), None)
+            if canon in INFO and score_part is not None:
+                _name_instrument(score_part, canon)
+        else:
+            res = transpose_part(part, n)
         res.name = name
         result.parts.append(res)
         if semitones is None and not clef:
@@ -176,6 +245,7 @@ def transpose_file(
     semitones: Optional[int] = None,
     instrument: Optional[str] = None,
     clef: Optional[str] = None,
+    mode: str = "concert",
     log: Callable[[str], None] = print,
 ) -> TransposeResult:
     """Read ``src`` MusicXML, transpose, write to ``dst`` (may equal ``src``)."""
@@ -183,9 +253,10 @@ def transpose_file(
     root = tree.getroot()
     if root.tag != "score-partwise":
         raise ValueError(f"{src}: only score-partwise MusicXML is supported (got {root.tag})")
-    result = transpose_score(root, semitones, instrument, clef)
+    result = transpose_score(root, semitones, instrument, clef, mode)
     for p in result.parts:
-        log(f"{p.part_id} {p.name}: {p.semitones:+d} semitones "
+        what = "declared transposition" if mode == "written" else "transposed"
+        log(f"{p.part_id} {p.name}: {what} {p.semitones:+d} semitones "
             f"({p.fifths_shift:+d} fifths), {p.notes} notes")
     for s in result.skipped:
         log(f"skipped {s}")

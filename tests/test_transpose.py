@@ -141,6 +141,26 @@ def test_tuba_treble_clef_depends_on_pitch():
     assert _read(root) == [("E", -1, 3)] and _keys(root) == [-3]   # C5 -> Eb3 (down 21)
 
 
+def test_written_mode_keeps_pitches_and_declares_instrument():
+    root = _score("Voice", [("C", 0, 5)])
+    transpose_score(root, instrument="horn in f", mode="written")
+    assert _read(root) == [("C", 0, 5)] and _keys(root) == [0]
+    tr = root.find(".//attributes/transpose")
+    assert (tr.findtext("diatonic"), tr.findtext("chromatic")) == ("-4", "-7")
+    assert tr.find("octave-change") is None
+    assert root.findtext(".//score-part/part-name") == "Horn in F"
+    assert root.findtext(".//score-instrument/instrument-sound") == "brass.french-horn"
+    assert len(root.findall(".//transpose")) == 1
+
+
+def test_written_mode_octave_and_second():
+    root = _score("Euphonium", [("C", 0, 5)], clef=("G", "2"))
+    transpose_score(root, mode="written")
+    tr = root.find(".//attributes/transpose")
+    assert (tr.findtext("diatonic"), tr.findtext("chromatic"), tr.findtext("octave-change")) \
+        == ("-1", "-2", "-1")
+
+
 def test_stage_is_idempotent_and_restores_from_written_copy(tmp_path):
     from musicocr.config import TransposeConfig, load_config
     from musicocr.pipeline import PipelineContext
@@ -149,7 +169,7 @@ def test_stage_is_idempotent_and_restores_from_written_copy(tmp_path):
     xml = tmp_path / "book.musicxml"
     ET.ElementTree(_score("Voice", [("C", 0, 5)])).write(xml)
     cfg = load_config()
-    cfg.stages.transpose = TransposeConfig(enabled=True, instrument="horn in f")
+    cfg.stages.transpose = TransposeConfig(enabled=True, instrument="horn in f", mode="concert")
     ctx = PipelineContext(input_pdf=tmp_path / "x.pdf", workdir=tmp_path, config=cfg,
                           book_name="book", log=lambda s: None)
     ctx.artifacts.musicxml = xml

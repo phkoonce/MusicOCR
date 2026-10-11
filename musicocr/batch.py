@@ -44,6 +44,7 @@ class Part:
     label: str
     first_page: int
     last_page: int
+    instrument: str = ""  # transposition-table name; empty = leave pitches as written
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,7 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
             label=raw.get("label") or raw["id"],
             first_page=_require(raw, "first_page", int),
             last_page=_require(raw, "last_page", int),
+            instrument=raw.get("instrument", ""),
         )
         if part.first_page < 1 or part.last_page < part.first_page:
             raise BatchSpecError(f"batch spec: bad page range for part '{part.id}'")
@@ -215,10 +217,12 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
     key = spec.key(part)
     out_dir = spec.root / "output"
     started = time.time()
+    cmd = [str(spec.root / "run.sh"), "run", str(pdf), "--keep-going"]
+    if part.instrument:
+        cmd += ["--transpose-instrument", part.instrument]
     with open(out_dir / f"{key}.run.log", "w") as log:
         rc = subprocess.run(
-            [str(spec.root / "run.sh"), "run", str(pdf), "--keep-going"],
-            stdout=log, stderr=subprocess.STDOUT,
+            cmd, stdout=log, stderr=subprocess.STDOUT,
         ).returncode
     produced = out_dir / key / f"{key}.musicxml"
     if produced.exists() and produced.stat().st_size > 0:

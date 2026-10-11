@@ -1,5 +1,10 @@
-"""Stage 6 (between normalize and validate, optional): transpose written pitch
-to concert pitch (or any shift) via ``musicocr.transpose``.
+"""Stage 6 (between normalize and validate, optional): handle instrument
+transposition via ``musicocr.transpose``.
+
+``mode = "written"`` (default) keeps the notes as printed and declares the
+instrument and its ``<transpose>`` on the part, so MuseScore shows the written
+score and toggles concert pitch itself. ``mode = "concert"`` instead rewrites
+pitches and keys at concert pitch.
 
 Off by default (``[stages.transpose] enabled``). Shift comes from, in order:
 ``semitones`` (all parts), ``instrument`` (looked up in
@@ -12,8 +17,8 @@ run transposes from that copy, so ``--from transpose`` never stacks shifts. A
 fresh extract/normalize rewrite of the master is detected (mtime stamp) and
 becomes the new "written" copy.
 
-Note the qa stage's render will be at the new pitch, so it will not visually
-match the written-pitch scan.
+In ``concert`` mode the qa stage's render is at the new pitch, so it will not
+visually match the written-pitch scan.
 """
 from __future__ import annotations
 
@@ -53,6 +58,7 @@ def run(ctx: PipelineContext) -> StageResult:
             semitones=cfg.semitones,
             instrument=cfg.instrument or None,
             clef=cfg.clef or None,
+            mode=cfg.mode,
             log=lambda s, n=path.name: ctx.log(f"  {n}: {s}"),
         )
         stamps[str(path)] = path.stat().st_mtime_ns

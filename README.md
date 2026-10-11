@@ -70,6 +70,15 @@ enabling GUI correction re-adds Audiveris's `-save`, which is what makes one bad
 sheet able to abort a whole multi-page book. Automated runs leave it off. homr
 has no whole-book mode to abort — it always runs one page per process.)
 
+### Time-signature repair
+
+homr has no way to hint the time signature, and it gets the *numerator* wrong
+whenever the signature changes mid-page (6/8 comes out as "8/8": the model reads the
+denominator, but the numerator is derived from the page's median bar length).
+`musicocr/timesig.py` re-derives each numerator from the bars it governs, treating
+the per-page files as one part, and carries the signature onto pages that declare
+none. It runs in `extract` just before the page merge and logs every change.
+
 ### Transposition
 
 OMR output is *written* pitch. To get concert pitch (or any other shift):
@@ -81,11 +90,15 @@ python -m musicocr transpose part.musicxml --semitones -2 -o out.musicxml
 python -m musicocr instruments                                        # show the table
 ```
 
-To do it inside a run, enable the `transpose` stage (`[stages.transpose]` in
+(The `transpose` command rewrites pitches at concert pitch.) Inside a run the stage
+defaults to `mode = "written"`: notes stay exactly as printed, and the part gets the
+instrument name and a MusicXML `<transpose>` so MuseScore shows the written score
+and its "Concert pitch" toggle does the shift. Set `mode = "concert"` to rewrite
+the pitches instead. To do it inside a run, enable the `transpose` stage (`[stages.transpose]` in
 `config.toml`, or `--transpose-instrument "horn in f"` / `--transpose-semitones -7`
 on `run`). The untransposed file is kept in `output/<book>/written/`, and re-running
 `--from transpose` always starts from that copy, so shifts never stack. The `qa`
-render will be at the new pitch, so it won't visually match a written-pitch scan.
+render is at the new pitch in `concert` mode, so it won't visually match a written-pitch scan.
 
 Pitches and key signatures move together and are respelled (C major horn part →
 F major). The shared instrument table lives in `musicocr/instruments.py`; values

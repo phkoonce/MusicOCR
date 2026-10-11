@@ -93,9 +93,12 @@ class TransposeConfig:
     semitones: Optional[int] = None
     instrument: str = ""
     clef: str = ""
+    mode: str = "written"   # "written": keep pitches, declare instrument + <transpose>; "concert": rewrite pitches
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "TransposeConfig":
+        if d.get("mode", "written") not in ("written", "concert"):
+            raise ConfigError("[stages.transpose] mode must be written or concert")
         if d.get("semitones") is not None and d.get("instrument"):
             raise ConfigError("[stages.transpose]: set either semitones or instrument, not both")
         if d.get("clef") and d["clef"] not in VALID_CLEFS:
@@ -105,6 +108,7 @@ class TransposeConfig:
             semitones=d.get("semitones"),
             instrument=d.get("instrument") or "",
             clef=d.get("clef") or "",
+            mode=d.get("mode", "written"),
         )
 
 
