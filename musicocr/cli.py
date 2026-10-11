@@ -21,34 +21,37 @@ def _book_name(pdf: Path) -> str:
 
 def apply_run_overrides(config: Config, args) -> Config:
     """Return a copy of ``config`` with the ``run`` CLI flags applied."""
+    def g(name):  # `compare` has only a subset of the run flags
+        return getattr(args, name, None)
+
     omr = config.omr
-    if args.engine:
-        omr = replace(omr, engine=args.engine)
-    if args.profile:
-        omr = replace(omr, profile=args.profile)
-    if args.merge is not None:
-        omr = replace(omr, merge_pages=args.merge)
-    if args.constant:
-        omr = replace(omr, extra_constants=list(args.constant))
+    if g("engine"):
+        omr = replace(omr, engine=g("engine"))
+    if g("profile"):
+        omr = replace(omr, profile=g("profile"))
+    if g("merge") is not None:
+        omr = replace(omr, merge_pages=g("merge"))
+    if g("constant"):
+        omr = replace(omr, extra_constants=list(g("constant")))
 
     pp = config.preprocess
-    if args.preprocess is not None:
-        pp = replace(pp, enabled=args.preprocess)
-    if args.deskew is not None:
-        pp = replace(pp, deskew=args.deskew)
-    if args.crop is not None:
-        pp = replace(pp, crop_margins=args.crop)
-    if (args.deskew or args.crop) and args.preprocess is None and not pp.enabled:
+    if g("preprocess") is not None:
+        pp = replace(pp, enabled=g("preprocess"))
+    if g("deskew") is not None:
+        pp = replace(pp, deskew=g("deskew"))
+    if g("crop") is not None:
+        pp = replace(pp, crop_margins=g("crop"))
+    if (g("deskew") or g("crop")) and g("preprocess") is None and not pp.enabled:
         pp = replace(pp, enabled=True)
         print("note: --deskew/--crop turn on the [preprocess] pass")
 
     tr = config.stages.transpose
-    if args.transpose_instrument is not None:
-        tr = replace(tr, enabled=True, instrument=args.transpose_instrument, semitones=None)
-    if args.transpose_semitones is not None:
-        tr = replace(tr, enabled=True, semitones=args.transpose_semitones, instrument="")
-    if args.transpose is not None:
-        tr = replace(tr, enabled=args.transpose)
+    if g("transpose_instrument") is not None:
+        tr = replace(tr, enabled=True, instrument=g("transpose_instrument"), semitones=None)
+    if g("transpose_semitones") is not None:
+        tr = replace(tr, enabled=True, semitones=g("transpose_semitones"), instrument="")
+    if g("transpose") is not None:
+        tr = replace(tr, enabled=g("transpose"))
 
     return replace(config, omr=omr, preprocess=pp,
                    stages=replace(config.stages, transpose=tr))
@@ -101,6 +104,43 @@ def cmd_run(args) -> int:
         print(f"\nPAUSED at: {', '.join(r.name for r in paused)}")
         return 3
     print("\nOK")
+    return 0
+
+
+def cmd_compare(args) -> int:
+    from musicocr.compare import run_compare
+
+    engines = list(dict.fromkeys(e.strip() for e in args.engines.split(",") if e.strip()))
+    bad = [e for e in engines if e not in ENGINES]
+    if not engines or bad:
+        print(f"error: unknown engine(s) {bad or args.engines!r}; known: "
+              f"{', '.join(sorted(ENGINES))}", file=sys.stderr)
+        return 2
+    try:
+        config = load_config(args.config)
+    except ConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 2
+    config = apply_run_overrides(config, args)
+
+    input_pdf = Path(args.input).expanduser().resolve()
+    book = _book_name(input_pdf)
+    out_root = Path(args.output).expanduser().resolve() if args.output \
+        else Path(__file__).resolve().parent.parent / "output"
+    ctx = PipelineContext(
+        input_pdf=input_pdf, workdir=out_root / book, config=config, book_name=book,
+        pages=args.pages.replace(",", " ") if args.pages else None, force=args.force)
+
+    print(f"MusicOCR {__version__}  |  compare: {', '.join(engines)}  |  book: {book}  "
+          f"|  workdir: {ctx.workdir}")
+    out = run_compare(ctx, engines, to_stage="qa" if args.convert else "validate",
+                      keep_going=args.keep_going)
+    for n in out["notes"]:
+        print(n)
+    if not out["ok"]:
+        print("\nno engine produced a score", file=sys.stderr)
+        return 1
+    print(f"\ncompare report: {ctx.workdir / 'compare.md'}")
     return 0
 
 
@@ -239,6 +279,34 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--keep-going", action="store_true",
                    help="continue after a stage fails")
     r.set_defaults(func=cmd_run)
+
+    c = sub.add_parser(
+        "compare", help="run several OMR engines on one PDF and compare them",
+        description="Ingest (rasterise/deskew/crop) once, then run each engine through "
+                    "extract/normalize/transpose/validate in <output>/<book>/engines/<engine>/ "
+                    "and write compare.md/compare.json to <output>/<book>/.")
+    c.add_argument("input", help="input PDF")
+    c.add_argument("--engines", required=True, metavar="A,B",
+                   help="comma-separated engines, e.g. homr,copisteria (unavailable ones "
+                        "are skipped)")
+    c.add_argument("--output", help="output root dir (default: ./output)")
+    c.add_argument("--pages", help="page selection, e.g. '1,4-5'")
+    c.add_argument("--force", action="store_true", help="re-run OMR even if output exists")
+    c.add_argument("--keep-going", action="store_true", help="continue after a stage fails")
+    c.add_argument("--convert", action="store_true",
+                   help="also run convert and qa per engine (slow; default stops at validate)")
+    c.add_argument("--preprocess", dest="preprocess", action="store_true", default=None,
+                   help="force scan clean-up on")
+    c.add_argument("--no-preprocess", dest="preprocess", action="store_false",
+                   help="force scan clean-up off")
+    c.add_argument("--deskew", dest="deskew", action="store_true", default=None)
+    c.add_argument("--no-deskew", dest="deskew", action="store_false")
+    c.add_argument("--crop", dest="crop", action="store_true", default=None)
+    c.add_argument("--no-crop", dest="crop", action="store_false")
+    c.add_argument("--transpose-instrument", metavar="NAME",
+                   help="transpose each engine's score by this instrument's table entry")
+    c.add_argument("--transpose-semitones", type=int, metavar="N")
+    c.set_defaults(func=cmd_compare)
 
     t = sub.add_parser(
         "transpose",

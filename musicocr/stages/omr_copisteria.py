@@ -54,7 +54,7 @@ def run(ctx: PipelineContext) -> StageResult:
     detector = ctx.config.omr.copisteria.detector
 
     pdftotext = ctx.config.resolve_tool("pdftotext")
-    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
 
     def _boost_multirests(img: Path) -> None:
         # Detect first (cached beside the page, the pipeline then reuses it), so a

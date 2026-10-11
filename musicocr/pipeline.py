@@ -36,6 +36,14 @@ class PipelineContext:
     force: bool = False
     artifacts: Artifacts = field(default_factory=Artifacts)
     log: Callable[[str], None] = print
+    # Where ingest products (source.pdf, prepped/) live. None = ``workdir`` itself
+    # (the normal single-engine layout). ``musicocr compare`` points several
+    # engine workdirs at one shared book dir so ingest runs once.
+    shared_dir: Path | None = None
+
+    @property
+    def shared(self) -> Path:
+        return self.shared_dir or self.workdir
 
 
 def resolve_slice(from_stage: str | None, to_stage: str | None) -> list[str]:

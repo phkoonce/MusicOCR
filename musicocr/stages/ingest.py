@@ -27,8 +27,9 @@ def run(ctx: PipelineContext) -> StageResult:
     if ctx.input_pdf.suffix.lower() != ".pdf":
         raise StageError(f"expected a .pdf, got {ctx.input_pdf.suffix!r}")
 
+    ctx.shared.mkdir(parents=True, exist_ok=True)
     ctx.workdir.mkdir(parents=True, exist_ok=True)
-    local_pdf = ctx.workdir / "source.pdf"
+    local_pdf = ctx.shared / "source.pdf"
     if not local_pdf.exists() or local_pdf.stat().st_mtime < ctx.input_pdf.stat().st_mtime:
         shutil.copy2(ctx.input_pdf, local_pdf)
     ctx.artifacts.source_pdf = local_pdf
@@ -56,7 +57,7 @@ def _preprocess(ctx: PipelineContext, opts: PreprocessOpts, pages: int | None) -
 
     prepped: dict[int, str] = {}
     for p in range(1, pages + 1):
-        dst = ctx.workdir / "prepped" / f"p{p:03d}.png"
+        dst = ctx.shared / "prepped" / f"p{p:03d}.png"
         if dst.exists() and not ctx.force:
             prepped[p] = str(dst)
             continue

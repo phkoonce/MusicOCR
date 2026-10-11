@@ -36,7 +36,7 @@ def ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
     pdftoppm = ctx.config.resolve_tool("pdftoppm")
     if not pdftoppm:
         return None
-    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
     return prepare_page(source_pdf, page, dst, ctx.config.preprocess, pdftoppm, ctx.log)
 
 

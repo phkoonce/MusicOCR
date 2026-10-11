@@ -285,6 +285,46 @@ Short version:
 4. `python -m musicocr run <pdf> --from extract` to finish on the corrected
    export.
 
+## Comparing engines
+
+```bash
+python -m musicocr compare input/your.pdf --engines homr,copisteria \
+    --output /some/dir --transpose-instrument "horn in f"
+```
+
+Runs the same PDF through several OMR engines and writes a side-by-side report.
+Ingest (rasterise/deskew/crop) runs **once**; every engine then reuses the same
+`prepped/` pages and geometry sidecars, so all shared pre/post-processing
+(multi-rest form, time-signature fix, normalize, transpose, validate) is applied
+identically:
+
+```
+<output>/<book>/source.pdf, prepped/       shared ingest
+<output>/<book>/engines/<engine>/          that engine's pages/, extract..validate
+                                           artifacts, state file, report.md
+<output>/<book>/compare.md, compare.json   the comparison
+```
+
+Engines that are unavailable (missing tool, or the `legato2` placeholder) are
+skipped with a message. Each engine stops after `validate` unless `--convert`
+is given (then convert and qa run too). Other flags: `--pages`, `--force`,
+`--keep-going`, `--preprocess/--deskew/--crop` (and `--no-*`),
+`--transpose-instrument`, `--transpose-semitones`.
+
+`compare.md` has one column per engine: wall-clock per stage, failed pages,
+measures/bars/notes/rests/tuplets (per page and in total, multi-rests in the
+collapsed convention), validate findings by code, normalize fixes, time
+signatures / keys / multi-rest counts per page, and a **measure-level diff** per
+engine pair. The diff aligns the measure sequences (pitch + duration per
+measure; ties and articulations ignored) with `difflib` and lists each
+disagreeing range with both engines' content and a locator (page, measure on
+page, running printed-bar estimate - each engine's own count, so it drifts
+after an engine drops a multi-rest count) to look up in the scan. Re-running
+into the same directory reuses finished pages, so stage timings then show ~0
+for OMR; use `--force` for fresh timings.
+
+Not yet: batch-TOML `engines=[...]`, ground-truth scoring (`--truth`), LEGATO 2.
+
 ## No-scan smoke test
 
 ```bash
@@ -298,7 +338,8 @@ A clean synthetic score should come back with few or no findings.
 
 ```
 musicocr/
-  cli.py               # `run` / `doctor`
+  cli.py               # `run` / `compare` / `doctor` / ...
+  compare.py           # engine comparison: metrics, measure diff, runner
   config.py            # config.toml loader
   pipeline.py          # stage protocol + ordered runner
   report.py            # report.md / report.json

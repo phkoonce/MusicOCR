@@ -97,7 +97,7 @@ def suspicious_tuplet_measures(part) -> list[tuple[int, str]]:
 def _bar_count_findings(ctx: PipelineContext, findings: list[dict]) -> None:
     """Flag ghost/missing bars against the PDF's printed bar numbers (text layer only)."""
     pages = ctx.artifacts.musicxml_pages
-    pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
+    pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
     pdftotext = ctx.config.resolve_tool("pdftotext")
     if not pages or not pdftotext or not Path(pdf).exists():
         return

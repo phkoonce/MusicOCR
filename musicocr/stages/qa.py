@@ -27,7 +27,7 @@ def run(ctx: PipelineContext) -> StageResult:
 
     qa_dir = ctx.workdir / "qa"
     dpi = ctx.config.output.qa_dpi
-    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
     render_pdfs = ctx.artifacts.render_pdfs or [
         ctx.artifacts.render_pdf or (ctx.workdir / "render.pdf")
     ]
