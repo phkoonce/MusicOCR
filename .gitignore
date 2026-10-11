@@ -32,3 +32,6 @@ __pycache__/
 /omr-eval/pages/
 /omr-eval/*/*.musicxml
 /omr-eval/*/*.png
+
+# omr-eval: per-piece alignment specs (hand-written, piece-specific) -- local only
+/omr-eval/specs/
