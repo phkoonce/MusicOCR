@@ -56,6 +56,7 @@ class CopisteriaConfig:
     detector: str = "28m"   # "28m" (default) or "2m" (smaller, faster)
     fix_empty: bool = True   # give bare-<forward> bars a whole-measure rest
     texts: str = "pdf-layer"   # page-text source: "pdf-layer" (multi-rest counts) or "none"
+    multirest_form: str = "collapse"   # "collapse" (homr's form), "expand", or "keep"
     repo: str = str(REPO_ROOT / "omr-eval" / "copisteria" / "repo")
 
     @classmethod
@@ -67,7 +68,11 @@ class CopisteriaConfig:
         texts = str(d.get("texts", base.texts))
         if texts not in ("pdf-layer", "none"):
             raise ConfigError("[omr.copisteria] texts must be 'pdf-layer' or 'none'")
+        form = str(d.get("multirest_form", base.multirest_form))
+        if form not in ("collapse", "expand", "keep"):
+            raise ConfigError("[omr.copisteria] multirest_form must be 'collapse', 'expand' or 'keep'")
         return cls(detector=detector, texts=texts, fix_empty=bool(d.get("fix_empty", True)),
+                   multirest_form=form,
                    repo=str(d.get("repo", base.repo)))
 
 

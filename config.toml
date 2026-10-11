@@ -68,6 +68,12 @@ texts = "pdf-layer"
 # Copisteria writes a bar it found no content for as a bare <forward>; give it a
 # whole-measure rest (musicocr/copisteria_fixes.py), like homr's fix_multirest.
 fix_empty = true
+# Multi-measure-rest form of the output: "collapse" (default) folds a tagged rest
+# plus its N-1 following rest bars into one bar like homr writes (what the
+# align_* tools expect; bar numbers then drift from print), "expand" writes the
+# standard N-bar form from collapsed input, "keep" leaves Copisteria's output
+# untouched. See musicocr/multirest.py.
+multirest_form = "collapse"
 # Clone Copisteria runs from (it looks for models/ relative to its repo root).
 # repo = "/path/to/omr-eval/copisteria/repo"
 

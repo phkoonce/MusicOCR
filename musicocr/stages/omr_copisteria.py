@@ -23,6 +23,7 @@ from pathlib import Path
 
 from musicocr.copisteria_fixes import fill_empty_measures
 from musicocr.errors import StageError, StageResult
+from musicocr.multirest import apply_multirest_form
 from musicocr.page_text import write_texts_json
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._omr_common import ensure_page_png as _ensure_page_png, run_raster_pages
@@ -72,15 +73,25 @@ def run(ctx: PipelineContext) -> StageResult:
         return res
 
     def postprocess(page: int, xml: Path) -> None:
-        if not ctx.config.omr.copisteria.fix_empty:
-            return
+        # Order matters: give bare-<forward> bars their rest first, so the
+        # multi-rest fold sees real whole-measure rests.
+        if ctx.config.omr.copisteria.fix_empty:
+            try:
+                fixed = fill_empty_measures(xml, log=ctx.log)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  page {page}: empty-bar fix failed ({type(exc).__name__}: {exc})")
+            else:
+                if fixed:
+                    ctx.log(f"  page {page}: gave {fixed} empty bar(s) a whole-measure rest")
+        form = ctx.config.omr.copisteria.multirest_form
         try:
-            fixed = fill_empty_measures(xml, log=ctx.log)
+            n = apply_multirest_form(xml, form, log=ctx.log)
         except Exception as exc:  # noqa: BLE001
-            ctx.log(f"  page {page}: empty-bar fix failed ({type(exc).__name__}: {exc})")
+            ctx.log(f"  page {page}: multi-rest {form} failed ({type(exc).__name__}: {exc})")
             return
-        if fixed:
-            ctx.log(f"  page {page}: gave {fixed} empty bar(s) a whole-measure rest")
+        if n:
+            ctx.log(f"  page {page}: multi-rest {form}: {n} bar(s) "
+                    f"{'removed' if form == 'collapse' else 'added'}")
 
     return run_raster_pages(ctx, label="Copisteria", ensure_png=_ensure_page_png,
                             runner=runner, build_cmd=build_cmd, postprocess=postprocess)

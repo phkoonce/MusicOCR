@@ -164,10 +164,14 @@ the normal way to iterate without paying for another full OMR pass.
   the digit boxes onto the preprocessed page via the geometry `preprocess`
   records in `prepped/pNNN.geom.json` (DPI, deskew angle, crop offset).
   Scanned PDFs have no text layer, so there the counts are still lost.
-* **Expanded multi-rests.** With counts, Copisteria writes the standard form (a
-  tagged bar plus N−1 following bars), so its bar numbers match the printed
-  ones; homr writes one collapsed bar per multi-rest. The two are not yet
-  normalised -- don't feed Copisteria output to the `align_*` tools unchanged.
+* **Multi-rest form.** With counts, Copisteria writes the standard expanded form
+  (a tagged bar plus N−1 following rest bars, so bar numbers match print);
+  homr writes one collapsed bar per multi-rest. The pipeline's canonical form is
+  collapsed, so `[omr.copisteria] multirest_form = "collapse"` (default) folds
+  Copisteria's output after the empty-bar fix (`musicocr/multirest.py`;
+  followers that aren't pure whole-measure rests are kept with a logged
+  warning). `"expand"` does the inverse (for collapsed input only) and `"keep"`
+  leaves the output as written.
 * **Empty bars** (bare `<forward>`, e.g. a multi-rest whose count it could not
   place) get a whole-measure rest (`[omr.copisteria] fix_empty`,
   `musicocr/copisteria_fixes.py`).
