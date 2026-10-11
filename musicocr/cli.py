@@ -1,10 +1,11 @@
-"""Command-line entry point: ``python -m musicocr <run|doctor>``."""
+"""Command-line entry point: ``python -m musicocr <run|transpose|instruments|doctor>``."""
 from __future__ import annotations
 
 import argparse
 import subprocess
 import sys
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 from musicocr import __version__
 from musicocr.config import ConfigError, load_config
@@ -81,6 +82,33 @@ def cmd_run(args) -> int:
         print(f"\nPAUSED at: {', '.join(r.name for r in paused)}")
         return 3
     print("\nOK")
+    return 0
+
+
+def cmd_transpose(args) -> int:
+    from musicocr.transpose import transpose_file
+
+    src = Path(args.input).expanduser().resolve()
+    dst = Path(args.output).expanduser().resolve() if args.output \
+        else src.with_name(src.stem + ".transposed.musicxml")
+    try:
+        transpose_file(src, dst, semitones=args.semitones,
+                       instrument=args.instrument, clef=args.clef)
+    except (ValueError, ET.ParseError, OSError) as exc:
+        print(f"transpose error: {exc}", file=sys.stderr)
+        return 2
+    print(f"wrote {dst}")
+    return 0
+
+
+def cmd_instruments(args) -> int:
+    from musicocr.instruments import ALIASES, TRANSPOSITIONS
+
+    for name, spec in sorted(TRANSPOSITIONS.items()):
+        shown = f"{spec:+d}" if isinstance(spec, int) else \
+            ", ".join(f"{clef} {n:+d}" for clef, n in spec.items())
+        aliases = sorted(a for a, c in ALIASES.items() if c == name)
+        print(f"{name:16} {shown}" + (f"   (also: {', '.join(aliases)})" if aliases else ""))
     return 0
 
 
@@ -177,6 +205,24 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--keep-going", action="store_true",
                    help="continue after a stage fails")
     r.set_defaults(func=cmd_run)
+
+    t = sub.add_parser(
+        "transpose",
+        help="transpose a MusicXML file (written -> concert pitch), keys included",
+        description="Shift pitches and key signatures. Negative is down; OMR'd parts are "
+                    "written pitch, so e.g. a horn in F is -7. With neither --semitones nor "
+                    "--instrument, each part is identified from its <part-name>.")
+    t.add_argument("input", help="input MusicXML")
+    t.add_argument("-o", "--output", help="output path (default: <input>.transposed.musicxml)")
+    g = t.add_mutually_exclusive_group()
+    g.add_argument("--semitones", type=int, help="shift every part by this many semitones")
+    g.add_argument("--instrument", help="look up the shift in musicocr/instruments.py")
+    t.add_argument("--clef", choices=["treble", "bass", "c"],
+                   help="clef family for clef-dependent instruments (default: each part's first clef)")
+    t.set_defaults(func=cmd_transpose)
+
+    i = sub.add_parser("instruments", help="list the instrument transposition table")
+    i.set_defaults(func=cmd_instruments)
 
     d = sub.add_parser("doctor", help="check tools and dependencies")
     d.set_defaults(func=cmd_doctor)

@@ -68,6 +68,23 @@ enabling GUI correction re-adds Audiveris's `-save`, which is what makes one bad
 sheet able to abort a whole multi-page book. Automated runs leave it off. homr
 has no whole-book mode to abort — it always runs one page per process.)
 
+### Transposition
+
+OMR output is *written* pitch. To get concert pitch (or any other shift):
+
+```
+python -m musicocr transpose part.musicxml --instrument "horn in f"   # table lookup
+python -m musicocr transpose score.musicxml                           # each part by its <part-name>
+python -m musicocr transpose part.musicxml --semitones -2 -o out.musicxml
+python -m musicocr instruments                                        # show the table
+```
+
+Pitches and key signatures move together and are respelled (C major horn part →
+F major). The shared instrument table lives in `musicocr/instruments.py`; values
+are semitones to add to written pitch, and clef-dependent instruments (baritone /
+tenor horn: treble −14, bass 0) are resolved from each part's first clef.
+Unknown part names are skipped, never guessed.
+
 ### Options
 
 ```
