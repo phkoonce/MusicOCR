@@ -447,7 +447,7 @@ def test_combine_cover_page_and_total_lower_bound(tmp_path):
             f = tmp_path / f"{pid}.p{k:03d}.musicxml"
             f.write_text(page(n, first))
             files.append(f)
-        parts.append(PartInput(pid, f"Horn {pid}", "", tmp_path / f"{pid}.pdf", files))
+        parts.append(PartInput(pid, f"Horn {pid}", "horn in f", tmp_path / f"{pid}.pdf", files))
         (tmp_path / f"{pid}.pdf").write_bytes(b"x")
     score, report, summary = combine(
         parts, "T", starts_of=lambda pdf: [None, 1, 5], last_start_of=lambda pdf: 7,
@@ -457,6 +457,9 @@ def test_combine_cover_page_and_total_lower_bound(tmp_path):
     assert any("hold no printed bars" in r for r in report)
     assert any("ignored" in r for r in report)
     assert len(score.findall("part")[0].findall("measure")) == 7
+    # written pitch stays; the horn part declares its transposition (written -> concert)
+    tr = score.find("part/measure/attributes/transpose")
+    assert tr is not None and tr.findtext("chromatic") == "-7" and tr.findtext("diatonic") == "-4"
 
 
 def test_add_missing_multirest_dets_guards(tmp_path):

@@ -35,7 +35,8 @@ from musicocr.alignment.build import (add_attributes, build_score, check_length,
                                       is_rest_only, measure_total, rest_measure)
 from musicocr.alignment.spec import DIV, bar_len
 from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words
-from musicocr.instruments import INFO, canonical_name
+from musicocr.instruments import INFO, canonical_name, semitones_for
+from musicocr.transpose import _declare_transpose, clef_family
 
 Src = Tuple[ET.Element, int]            # (measure, its <divisions>)
 
@@ -433,4 +434,15 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             out.append(m)
         built[n] = out
     summary["repairs"] = sum(1 for r in report if "-- check" in r.lower())
-    return build_score(spec, built, infos), report, summary
+    score = build_score(spec, built, infos)
+    # The notes stay as printed (written pitch); declare each part's transposition so the
+    # score sounds right (the per-part files carry it, the page files this reads do not).
+    for n, pe in zip(infos, score.findall("part")):
+        d = data[list(bars)[n - 1]]["p"]
+        try:
+            semis = semitones_for(d.instrument or d.label, clef_family(pe))
+        except ValueError as e:
+            report.append(f"part {n} ({d.label}): no transposition declared ({e})")
+            continue
+        _declare_transpose(pe, semis)
+    return score, report, summary
