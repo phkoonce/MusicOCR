@@ -525,3 +525,13 @@ def test_copy_marks_keeps_directions_and_drops_orphan_hairpins():
     assert [c.tag for c in dst] == ["direction", "note", "direction", "barline"]
     assert balance_wedges([dst]) == 1                      # the crescendo never stops
     assert [c.tag for c in dst] == ["direction", "note", "barline"]
+
+
+def test_trailing_courtesy_clef_takes_effect_next_bar():
+    import xml.etree.ElementTree as ET
+    from musicocr.combine import _clefs
+    note = "<note><rest/><duration>4</duration></note>"
+    bar = ET.fromstring(f'<measure>{note}<attributes><clef><sign>G</sign><line>2</line></clef></attributes></measure>')
+    assert _clefs((bar, 4)) == (None, ("G", "2"))
+    bar = ET.fromstring(f'<measure><attributes><clef><sign>F</sign><line>4</line></clef></attributes>{note}</measure>')
+    assert _clefs((bar, 4)) == (("F", "4"), None)

@@ -216,11 +216,30 @@ def _declared(m: ET.Element) -> Tuple[Optional[int], Optional[Tuple[int, int]]]:
     return key, meter
 
 
+def _clefs(src: Optional[Src]) -> Tuple[Optional[Tuple[str, str]], Optional[Tuple[str, str]]]:
+    """(leading, trailing) clef of a source bar. Copisteria writes the courtesy clef printed at the end
+    of a system as an ``<attributes>`` *after* the bar's last note: it takes effect in the next bar."""
+    lead = trail = None
+    seen_note = False
+    for el in (src[0] if src is not None else []):
+        if el.tag == "note":
+            seen_note = True
+        elif el.tag == "attributes":
+            c = el.find("clef")
+            if c is not None and c.findtext("sign"):
+                val = (c.findtext("sign"), c.findtext("line") or "2")
+                if seen_note:
+                    trail = val
+                else:
+                    lead = val
+    return lead, trail
+
+
 def _first_clef(srcs: Sequence[Optional[Src]]) -> Tuple[str, str]:
     for s in srcs:
-        c = s[0].find("attributes/clef") if s is not None else None
-        if c is not None and c.findtext("sign"):
-            return c.findtext("sign"), c.findtext("line") or "2"
+        lead, _ = _clefs(s)
+        if lead:
+            return lead
     return ("G", "2")
 
 
@@ -462,11 +481,13 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         clef = _first_clef(seq)
         cur_clef: Optional[Tuple[str, str]] = None
         prev_key = prev_met = None
+        prev_trail = None
         out: List[ET.Element] = []
         for b, src in enumerate(seq, 1):
             m = ET.Element("measure", number=str(b))
-            c = src[0].find("attributes/clef") if src else None
-            here = (c.findtext("sign"), c.findtext("line") or "2") if c is not None and c.findtext("sign") else None
+            lead, trail = _clefs(src)
+            here = lead or prev_trail
+            prev_trail = trail
             want = clef if cur_clef is None else (here if here and here != cur_clef else None)
             key, meter = spec.key_fifths(b), spec.meter(b)
             add_attributes(m, divisions=DIV if not out else None,
