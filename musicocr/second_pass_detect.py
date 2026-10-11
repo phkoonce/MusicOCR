@@ -38,7 +38,55 @@ def union_dets(base: list, big: list) -> list:
     return base + extra
 
 
-def main(png: str, base: str, out: str, scale: str) -> None:
+CONTENT = ("note", "rest", "mRest", "multiRest")
+CONTENT_MIN_CONF = 0.4          # Copisteria's own bar-content filter (p >= 0.4)
+EMPTY_FAMILIES = ("note", "rest", "mRest", "multiRest")
+EMPTY_MIN_CONF = 0.5
+
+
+def empty_measures(dets: list) -> list:
+    """``measure`` detections with no note/rest/mRest/multiRest detection (conf >= 0.4) centred in them.
+
+    Copisteria drops an empty first/last stretch of a system as "no bar" (the cautionary key or
+    clef after the last bar line) and a bar with nothing in it reads as nothing, so a missed
+    symbol that is a bar's only content loses the *whole bar* from the output -- not a gap that
+    the gap-bar second pass would notice."""
+    fam = lambda c: c["cls"].split("_")[0]  # noqa: E731
+    content = [d for d in dets if fam(d) in CONTENT and d.get("conf", 1.0) >= CONTENT_MIN_CONF]
+    out = []
+    for m in dets:
+        if fam(m) != "measure" or m.get("conf", 1.0) < 0.5:
+            continue
+        x0, y0, x1, y1 = m["xyxy"]
+        h = y1 - y0
+        if not any(x0 <= (c["xyxy"][0] + c["xyxy"][2]) / 2 <= x1
+                   and y0 - 0.75 * h <= (c["xyxy"][1] + c["xyxy"][3]) / 2 <= y1 + 0.75 * h for c in content):
+            out.append(m)
+    return out
+
+
+def union_into_empty(base: list, big: list) -> list:
+    """``base`` plus the note/rest/mRest/multiRest detections (conf >= 0.5) of ``big`` that are centred in a
+    bar ``base`` found empty and do not overlap a base detection of the same family."""
+    fam = lambda c: c["cls"].split("_")[0]  # noqa: E731
+    empties = empty_measures(base)
+    if not empties:
+        return base
+    extra = []
+    for r in big:
+        if fam(r) not in EMPTY_FAMILIES or r.get("conf", 0.0) < EMPTY_MIN_CONF:
+            continue
+        cx, cy = (r["xyxy"][0] + r["xyxy"][2]) / 2, (r["xyxy"][1] + r["xyxy"][3]) / 2
+        if not any(m["xyxy"][0] <= cx <= m["xyxy"][2] and m["xyxy"][1] - 0.75 * (m["xyxy"][3] - m["xyxy"][1]) <= cy
+                   <= m["xyxy"][3] + 0.75 * (m["xyxy"][3] - m["xyxy"][1]) for m in empties):
+            continue
+        if any(fam(b) == fam(r) and _iou(b["xyxy"], r["xyxy"]) > IOU_SKIP for b in base + extra):
+            continue
+        extra.append(r)
+    return base + extra
+
+
+def main(png: str, base: str, out: str, scale: str, mode: str = "") -> None:
     from PIL import Image
 
     from copisteria.detect import Detector
@@ -49,10 +97,11 @@ def main(png: str, base: str, out: str, scale: str) -> None:
     dets = json.loads(base_path.read_text())
     det = Detector()
     arr, s = det.prepare(Image.open(png), big_sz)
-    merged = union_dets(dets, det.run_array(arr, s))
+    big = det.run_array(arr, s)
+    merged = union_into_empty(dets, big) if mode == "--empty-bars" else union_dets(dets, big)
     Path(out).write_text(json.dumps(merged))
     print(json.dumps({"added": len(merged) - len(dets), "imgsz": big_sz}))
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:5])
+    main(*sys.argv[1:6])

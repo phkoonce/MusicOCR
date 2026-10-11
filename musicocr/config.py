@@ -57,6 +57,8 @@ class CopisteriaConfig:
     fix_empty: bool = True   # give bare-<forward> bars a whole-measure rest
     second_pass: bool = True   # re-detect gap pages one size up and re-read (accepted only if confined to gap bars)
     second_pass_scale: float = 1.28
+    fill_empty_bars: bool = True   # bars the detector read nothing in: re-detect one size up, add what is found there
+    text_tuplets: bool = True   # small "2"/"3" digits from the text layer mark duplets/triplets (copisteria_run.py)
     fix_pickup: bool = True   # page 1: make a padded opening bar a real pickup, show its time signature
     reveal_gaps: bool = True   # gaps Copisteria left (missed symbols) -> visible coloured rests
     fix_ghost_bars: bool = True   # drop key/time-signature "bars" misread from cautionary signatures
@@ -85,6 +87,8 @@ class CopisteriaConfig:
                    fix_pickup=bool(d.get("fix_pickup", True)),
                    second_pass=bool(d.get("second_pass", True)),
                    second_pass_scale=float(d.get("second_pass_scale", 1.28)),
+                   fill_empty_bars=bool(d.get("fill_empty_bars", True)),
+                   text_tuplets=bool(d.get("text_tuplets", True)),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),
                    multirest_form=form, ocr_backend=ocr_backend,
                    repo=str(d.get("repo", base.repo)))
