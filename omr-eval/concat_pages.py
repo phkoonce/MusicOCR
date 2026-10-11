@@ -1,7 +1,7 @@
 """Concatenate homr's per-page MusicXML into one file per part.
 
 Reuses the same measure-append logic the main pipeline uses to stitch
-Audiveris's per-page output (musicocr.stages.extract._concat): the first
+Audiveris's per-page output (musicocr.musicxml_merge.merge_pages): the first
 page's score -- metadata, part-list, attributes -- is kept as-is, and each
 subsequent page's measures are appended onto the same part(s) and
 renumbered 1..N. Only the first page's non-measure data survives, which is
@@ -19,8 +19,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from musicocr.stages.extract import _concat  # noqa: E402
+from musicocr.musicxml_merge import merge_pages
 
 
 def main(argv: list[str]) -> int:
@@ -33,7 +32,7 @@ def main(argv: list[str]) -> int:
             continue
         page_files = [Path(p) for p in pages.split(",")]
         dest = page_files[0].parent / f"{name}.musicxml"
-        merged, skipped = _concat(page_files, dest, log=print)
+        merged, skipped = merge_pages(page_files, dest, log=print)
         if merged is None:
             print(f"{name}: merge failed")
             ok = False

@@ -24,9 +24,6 @@ import argparse
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT))
-
 
 def normalize_file(path: Path, suffix: bool, log) -> None:
     from music21 import converter

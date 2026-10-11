@@ -20,11 +20,9 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from musicocr.homr_fixes import fix_multirest_file  # noqa: E402
+from musicocr.homr_fixes import fix_multirest_file
 
 
 def fix_file(path: Path, suffix: bool) -> None:

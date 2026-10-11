@@ -29,10 +29,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO))
 
-from musicocr.config import load_config          # noqa: E402
-from musicocr.util import run_cmd_lenient          # noqa: E402
+from musicocr.config import load_config
+from musicocr.util import run_cmd_lenient
 
 SW = "org.audiveris.omr.sheet.ProcessingSwitches"
 FILT = "org.audiveris.omr.image.FilterDescriptor"

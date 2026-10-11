@@ -21,11 +21,13 @@ see below).
 ## Setup
 
 ```bash
-bash scripts/setup.sh          # brew install poppler + create .venv + pip install
+bash scripts/setup.sh          # brew install poppler + create .venv + pip install -e .
 bash omr-eval/setup.sh         # creates the homr venv (default OMR engine)
 source .venv/bin/activate
 python -m musicocr doctor       # verify all tools are found
 ```
+
+Manual install: `pip install -e .` (add `.[test]` for pytest). An editable install is required: `config.toml` and the homr venv default are located relative to the repo checkout.
 
 ## Usage
 

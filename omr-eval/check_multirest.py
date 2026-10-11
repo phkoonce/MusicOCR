@@ -42,8 +42,7 @@ from fractions import Fraction
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from musicocr.homr_fixes import suspicious_whole_rests  # noqa: E402
+from musicocr.homr_fixes import suspicious_whole_rests
 
 
 def scan_file(path: Path) -> tuple[Fraction, list[str]]:

@@ -10,10 +10,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO))
 
-from musicocr.config import load_config  # noqa: E402
-from musicocr.util import run_cmd_lenient  # noqa: E402
+from musicocr.config import load_config
+from musicocr.util import run_cmd_lenient
 
 
 def build_score(path: Path):
