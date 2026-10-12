@@ -32,7 +32,8 @@ pdftotext = "pdftotext"
 #                 hand-correction round-trip ([stages.correct]).
 # homr consistently outperformed Audiveris on monophonic wind/brass parts in
 # local testing; Audiveris remains available for full scores / hand-correction.
-engine = "homr"
+# homr stays available but is not used for now (2026-10-12); pass --engine homr to use it.
+engine = "copisteria"
 # Which profile under [omr.profiles.*] to use unless --profile overrides it
 # (Audiveris only).
 profile = "default"
