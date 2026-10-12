@@ -33,6 +33,8 @@ def apply_run_overrides(config: Config, args) -> Config:
         omr = replace(omr, merge_pages=g("merge"))
     if g("constant"):
         omr = replace(omr, extra_constants=list(g("constant")))
+    if g("small_graces") is not None:
+        omr = replace(omr, copisteria=replace(omr.copisteria, small_graces=g("small_graces")))
 
     pp = config.preprocess
     if g("preprocess") is not None:
@@ -293,6 +295,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="transpose by this instrument's table entry (implies --transpose)")
     r.add_argument("--transpose-semitones", type=int, metavar="N",
                    help="transpose by N semitones (implies --transpose)")
+    r.add_argument("--small-graces", dest="small_graces", action="store_true", default=None,
+                   help="copisteria: treat small noteheads as grace notes (timpani/drum ruffs and "
+                        "flams; overrides [omr.copisteria] small_graces)")
+    r.add_argument("--no-small-graces", dest="small_graces", action="store_false")
     r.add_argument("--from", dest="from_stage", choices=STAGE_ORDER, help="start stage")
     r.add_argument("--to", dest="to_stage", choices=STAGE_ORDER, help="end stage (inclusive)")
     r.add_argument("--keep-going", action="store_true",

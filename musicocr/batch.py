@@ -48,6 +48,7 @@ class Part:
     last_page: int
     instrument: str = ""  # transposition-table name; empty = leave pitches as written
     score: bool = True    # include in `musicocr combine` (False for e.g. percussion)
+    small_graces: bool = False  # copisteria: small noteheads are ruff/flam grace notes (timpani, drums)
 
 
 @dataclass(frozen=True)
@@ -98,6 +99,7 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
             last_page=_require(raw, "last_page", int),
             instrument=raw.get("instrument", ""),
             score=bool(raw.get("score", True)),
+            small_graces=bool(raw.get("small_graces", False)),
         )
         if part.first_page < 1 or part.last_page < part.first_page:
             raise BatchSpecError(f"batch spec: bad page range for part '{part.id}'")
@@ -250,6 +252,8 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
         cmd = [str(spec.root / "run.sh"), "run", str(pdf), "--output", str(out_dir), "--keep-going"]
     if part.instrument:
         cmd += ["--transpose-instrument", part.instrument]
+    if part.small_graces and not spec.engines:
+        cmd.append("--small-graces")
     with open(out_dir / f"{key}.run.log", "w") as log:
         rc = subprocess.run(
             cmd, stdout=log, stderr=subprocess.STDOUT,

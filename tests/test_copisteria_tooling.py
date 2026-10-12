@@ -483,6 +483,26 @@ def test_combine_shares_the_concert_key_across_transposing_parts(tmp_path):
     assert any("concert pitch" in r and "+1" in r for r in report)
 
 
+def test_combine_gives_unpitched_percussion_no_key_signature(tmp_path):
+    from musicocr.combine import PartInput, combine
+    rest = '<note><rest measure="yes"/><duration>12</duration></note>'
+    parts = []
+    for pid, label, inst, clef, fifths in (("h", "Horn", "horn in f", "G", 2), ("t", "Tuba", "tuba", "F", 2),
+                                           ("p", "Perkussion 1", "", "percussion", 0)):
+        attrs = (f"<attributes><divisions>4</divisions><key><fifths>{fifths}</fifths></key>"
+                 f"<time><beats>3</beats><beat-type>4</beat-type></time><clef><sign>{clef}</sign></clef></attributes>")
+        f = tmp_path / f"{pid}.p001.musicxml"
+        f.write_text('<score-partwise><part id="P1">' + "".join(
+            f'<measure number="{i + 1}">{attrs if i == 0 else ""}{rest}</measure>' for i in range(2))
+            + "</part></score-partwise>")
+        (tmp_path / f"{pid}.pdf").write_bytes(b"x")
+        parts.append(PartInput(pid, label, inst, tmp_path / f"{pid}.pdf", [f]))
+    score, _, _ = combine(parts, "T", starts_of=lambda pdf: [1], last_start_of=lambda pdf: 2,
+                          spans_of=lambda pdf: [])
+    perc = score.findall("part")[2]
+    assert [k.text for k in perc.findall("measure/attributes/key/fifths")] == ["0"]   # one C-major key, never changed
+
+
 def test_add_missing_multirest_dets_guards(tmp_path):
     import json
     from musicocr.page_text import add_missing_multirest_dets

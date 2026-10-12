@@ -260,6 +260,16 @@ def _first_clef(srcs: Sequence[Optional[Src]]) -> Tuple[str, str]:
     return ("G", "2")
 
 
+def _is_unpitched(seq: Sequence[Optional[Src]]) -> bool:
+    """True for an unpitched-percussion part (percussion clef or ``<unpitched>`` notes): it has no
+    key signature, so it neither votes on the score's key nor gets one written."""
+    for s in seq:
+        if s is not None and (s[0].find("attributes/clef[sign='percussion']") is not None
+                              or s[0].find("note/unpitched") is not None):
+            return True
+    return False
+
+
 def _plurality(values: Sequence[Any], default: Any) -> Any:
     vals = [v for v in values if v is not None]
     return Counter(vals).most_common(1)[0][0] if vals else default
@@ -503,7 +513,9 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         except ValueError:
             semis = 0
         shifts[pid] = fifths_shift(semis, [0])
-    keys = [_plurality([None if key_by[p][b] is None else key_by[p][b] + shifts[p] for p in bars], 0)
+    unpitched = {pid for pid, seq in bars.items() if _is_unpitched(seq)}
+    keys = [_plurality([None if key_by[p][b] is None else key_by[p][b] + shifts[p]
+                        for p in bars if p not in unpitched], 0)
             for b in range(total)]
     meters = [_plurality([met_by[p][b] for p in bars], (4, 4)) for b in range(total)]
     first_len = _plurality(
@@ -540,7 +552,8 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             here = lead or prev_trail
             prev_trail = trail
             want = clef if cur_clef is None else (here if here and here != cur_clef else None)
-            key, meter = spec.key_fifths(b) - shifts[pid], spec.meter(b)
+            key = 0 if pid in unpitched else spec.key_fifths(b) - shifts[pid]
+            meter = spec.meter(b)
             add_attributes(m, divisions=DIV if not out else None,
                            key=key if (not out or key != prev_key) else None,
                            meter=meter if (not out or meter != prev_met) else None,
