@@ -114,3 +114,14 @@ def test_check_bar_counts_end_to_end_with_fake_text_layer(tmp_path):
     assert issues[0].actual == 7
     # no text layer -> silently nothing
     assert check_bar_counts(pdf, page_files_of([xml]), words=lambda *_: []) == []
+
+
+def test_ghost_with_tied_note_dropped_when_signature_split(tmp_path):
+    tied = '<tie type="start"/><notations><tied type="start"/></notations>'
+    p = _write(tmp_path, [_pitch("A", 0) + DOUBLE, GHOST_KEY + _pitch(extra=tied),
+                          NEXT_TIME + _pitch("F", 1, 5, 6, "quarter"), _rest(12)])
+    assert drop_ghost_bars(p, log=lambda s: None) == 1
+    # but a tied note beside a key-only bar with no time-only follower is real content
+    p = _write(tmp_path, [_pitch("A", 0) + DOUBLE, GHOST_KEY + _pitch(extra=tied), _pitch("F", 1, 5, 6, "quarter")],
+               name="q001.musicxml")
+    assert drop_ghost_bars(p, log=lambda s: None) == 0

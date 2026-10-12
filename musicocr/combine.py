@@ -72,9 +72,26 @@ def read_page(path: Path) -> List[Src]:
             div = int(dv.text)
         out.append((m, div))
         n = _mr_count(m)
-        for _ in range(max(n - 1, 0)):
-            out.append((rest_measure(0, max(measure_total(m), 1), True), div))
+        if n > 1:
+            tail = _take_tail(m)
+            for k in range(n - 1):
+                rm = rest_measure(0, max(measure_total(m), 1), True)
+                if k == n - 2:
+                    rm.extend(tail)          # the closing barline / courtesy clef end the last bar
+                out.append((rm, div))
     return out
+
+
+def _take_tail(m: ET.Element) -> List[ET.Element]:
+    """Remove and return what closes a measure: its right barline and any attributes after the notes."""
+    tail, seen_note = [], False
+    for el in list(m):
+        if el.tag == "note":
+            seen_note = True
+        elif (el.tag == "attributes" and seen_note) or (el.tag == "barline" and el.get("location", "right") == "right"):
+            m.remove(el)
+            tail.append(el)
+    return tail
 
 
 def printed_page_starts(pdf: Path, pdftotext: str = "pdftotext") -> List[Optional[int]]:
@@ -312,6 +329,20 @@ def balance_wedges(measures: List[ET.Element]) -> int:
     return len(drop)
 
 
+CHECK_COLOR = "#D32F2F"
+
+
+def _flag_bar(m: ET.Element, text: str) -> None:
+    """Colour the bar's notes/rests and put a short note above it, so a bar that needs a human look
+    stands out in MuseScore (gap rests keep their own orange)."""
+    for n in m.findall("note"):
+        n.set("color", n.get("color") or CHECK_COLOR)
+    d = ET.Element("direction", placement="above")
+    ET.SubElement(ET.SubElement(d, "direction-type"), "words", color=CHECK_COLOR).text = text
+    idx = 1 if m.find("attributes") is not None else 0
+    m.insert(idx, d)
+
+
 # ---- combine ----------------------------------------------------------------------
 
 def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftotext",
@@ -406,6 +437,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
 
     # repair mismatched pages, then lay every part out on bars 1..total
     bars: Dict[str, List[Optional[Src]]] = {}
+    flags: Dict[str, Dict[int, str]] = {}
     for pid, d in data.items():
         seq: List[Optional[Src]] = []
         for pg, a, t, ok in zip(d["pages"], d["start"], d["target"], d["good"]):
@@ -430,6 +462,13 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                               + (f", {len(outside)} of them outside the printed multi-rests {outside}"
                                  if outside else "") + " -- check")
                 seq.extend(None if s is None else pg[s] for s in slots)
+                fl = flags.setdefault(pid, {})
+                for b in added:
+                    fl[b] = "check: bar inserted (the page read one bar short)"
+                for k in dropped:
+                    nxt_slot = next((j for j, s in enumerate(slots) if s is not None and s > k), None)
+                    if nxt_slot is not None:
+                        fl.setdefault(a + nxt_slot, "check: a source bar was dropped just before here")
             else:
                 seq.extend((pg + [None] * t)[:t])
                 report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
@@ -507,7 +546,11 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                 if bad:
                     report.append(f"  bar {b}: LENGTH {bad[0]:g} beats, expected {bad[1]:g}")
                     summary["bad_bars"] += 1
+                    note = f"check: {bad[0]:g} beats, expected {bad[1]:g}"
+                    flags.setdefault(pid, {})[b] = note + (" / " + flags[pid][b] if b in flags.get(pid, {}) else "")
             prev_key, prev_met = key, meter
+            if b in flags.get(pid, {}):
+                _flag_bar(m, flags[pid][b])
             out.append(m)
         built[n] = out
         dropped = balance_wedges(out)

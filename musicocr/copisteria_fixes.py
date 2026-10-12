@@ -86,12 +86,21 @@ def _is_ghost(prev: ET.Element, ghost: ET.Element, nxt: ET.Element) -> bool:
     notes = ghost.findall("note")
     if not 1 <= len(notes) <= 2:
         return False
-    for n in notes:
-        if n.find("pitch") is None or n.find("rest") is not None or n.find("notations") is not None \
-                or n.find("tie") is not None or n.find("lyric") is not None:
-            return False
     gk, gt = _sig(ghost)
     nk, nt = _sig(nxt)
+    # A signature block split over two bars (ghost: key only, next: time only, or the reverse) is
+    # unmistakable, so the ghost's note may then carry a tie (a key-signature sharp
+    # read as a tied note); otherwise it must be a plain pitched note.
+    split = (gk is not None and gt is None and nt is not None and nk is None) or \
+            (gt is not None and gk is None and nk is not None and nt is None)
+    for n in notes:
+        if n.find("pitch") is None or n.find("rest") is not None or n.find("lyric") is not None:
+            return False
+        tie_only = all(c.tag == "tied" for c in (n.find("notations") if n.find("notations") is not None else []))
+        if n.find("notations") is not None and not (split and tie_only):
+            return False
+        if n.find("tie") is not None and not split:
+            return False
     if gk is None and gt is None:
         return False
     # Complementary halves of one signature block: what the ghost declares, the next bar
