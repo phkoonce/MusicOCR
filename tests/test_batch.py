@@ -167,3 +167,24 @@ def test_run_batch_resumes_with_fakes(tmp_path):
 def test_main_reports_bad_spec(tmp_path, capsys):
     assert batch.main(["--batch", str(tmp_path / "missing.toml")]) == 2
     assert "error" in capsys.readouterr().err
+
+
+def test_run_batch_jobs_runs_every_part_once(tmp_path):
+    import threading
+    import time
+    spec = _spec(tmp_path)
+    seen, active, peak, lock = [], [0], [0], threading.Lock()
+
+    def runner(s, part, pdf):
+        with lock:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        time.sleep(0.1)
+        with lock:
+            active[0] -= 1
+            seen.append(part.id)
+        return {"status": batch.DONE, "note": "ok"}
+
+    state = batch.run_batch(spec, runner=runner, splitter=lambda s, p: tmp_path / f"{p.id}.pdf", jobs=3)
+    assert sorted(seen) == ["a", "b"] and peak[0] == 2
+    assert all(v["status"] == "done" for v in state.values())

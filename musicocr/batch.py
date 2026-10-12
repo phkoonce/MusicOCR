@@ -12,7 +12,9 @@ import argparse
 import json
 import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -266,19 +268,38 @@ def run_batch(
     redo: bool = False,
     runner: Callable[[BatchSpec, Part, Path], Dict[str, str]] = run_part,
     splitter: Callable[[BatchSpec, Part], Path] = split_pdf,
+    jobs: int = 1,
 ) -> State:
-    """Run every outstanding part, persisting state and the progress doc after each step."""
+    """Run every outstanding part, persisting state and the progress doc after each step.
+
+    ``jobs`` parts run at a time (each part is its own process tree with its own output folder,
+    so they do not share files); state and the progress doc are updated under a lock.
+    """
     state = load_state(spec.state_path)
-    for part in select_parts(spec, state, only, redo):
+    lock = threading.Lock()
+
+    def one(part: Part) -> None:
         key = spec.key(part)
         pdf = splitter(spec, part)
-        state[key] = {"status": RUNNING, "note": f"started {time.strftime('%H:%M')}"}
-        save_state(spec.state_path, state)
-        write_progress_doc(spec, state)
-        state[key] = runner(spec, part, pdf)
-        save_state(spec.state_path, state)
-        write_progress_doc(spec, state)
-        print(key, state[key], flush=True)
+        with lock:
+            state[key] = {"status": RUNNING, "note": f"started {time.strftime('%H:%M')}"}
+            save_state(spec.state_path, state)
+            write_progress_doc(spec, state)
+        result = runner(spec, part, pdf)
+        with lock:
+            state[key] = result
+            save_state(spec.state_path, state)
+            write_progress_doc(spec, state)
+            print(key, state[key], flush=True)
+
+    todo = list(select_parts(spec, state, only, redo))
+    if jobs <= 1:
+        for part in todo:
+            one(part)
+    else:
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            for fut in [pool.submit(one, part) for part in todo]:
+                fut.result()
     return state
 
 
@@ -291,6 +312,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="batch spec file (see scripts/batch.example.toml)")
     ap.add_argument("--only", help="comma-separated part ids or keys to run")
     ap.add_argument("--redo", action="store_true", help="re-run parts already marked done")
+    ap.add_argument("--jobs", type=int, default=1, metavar="N",
+                    help="parts to run at the same time (default 1; each detector process uses about "
+                         "one core, so 3-4 is a sensible start on a laptop -- watch the temperature)")
     return ap
 
 
@@ -302,5 +326,5 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     only = args.only.split(",") if args.only else None
-    run_batch(spec, only=only, redo=args.redo)
+    run_batch(spec, only=only, redo=args.redo, jobs=max(args.jobs, 1))
     return 0

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Thin entrypoint for the resumable batch runner (logic lives in musicocr.batch).
 
-  .venv/bin/python scripts/batch_run.py --batch batches/zerberus.toml [--only hn01,eu2] [--redo]
+  .venv/bin/python scripts/batch_run.py --batch batches/zerberus.toml [--only hn01,eu2] [--redo] [--jobs 3]
 """
 from __future__ import annotations
 
