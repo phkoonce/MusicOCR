@@ -463,6 +463,26 @@ def test_combine_cover_page_and_total_lower_bound(tmp_path):
     assert tr is not None and tr.findtext("chromatic") == "-7" and tr.findtext("diatonic") == "-4"
 
 
+def test_combine_shares_the_concert_key_across_transposing_parts(tmp_path):
+    from musicocr.combine import PartInput, combine
+    rest = '<note><rest measure="yes"/><duration>12</duration></note>'
+    parts = []
+    for pid, label, inst, fifths in (("h", "Horn", "horn in f", 2), ("t", "Tuba", "tuba", 1)):
+        attrs = (f"<attributes><divisions>4</divisions><key><fifths>{fifths}</fifths></key>"
+                 "<time><beats>3</beats><beat-type>4</beat-type></time></attributes>")
+        f = tmp_path / f"{pid}.p001.musicxml"
+        f.write_text('<score-partwise><part id="P1">' + "".join(
+            f'<measure number="{i + 1}">{attrs if i == 0 else ""}{rest}</measure>' for i in range(2))
+            + "</part></score-partwise>")
+        (tmp_path / f"{pid}.pdf").write_bytes(b"x")
+        parts.append(PartInput(pid, label, inst, tmp_path / f"{pid}.pdf", [f]))
+    score, report, _ = combine(parts, "T", starts_of=lambda pdf: [1], last_start_of=lambda pdf: 2,
+                               spans_of=lambda pdf: [])
+    keys = [p.findtext("measure/attributes/key/fifths") for p in score.findall("part")]
+    assert keys == ["2", "1"]                       # horn written D major, tuba (concert) G major
+    assert any("concert pitch" in r and "+1" in r for r in report)
+
+
 def test_add_missing_multirest_dets_guards(tmp_path):
     import json
     from musicocr.page_text import add_missing_multirest_dets

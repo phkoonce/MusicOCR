@@ -37,7 +37,7 @@ from musicocr.alignment.build import (add_attributes, build_score, check_length,
 from musicocr.alignment.spec import DIV, bar_len
 from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words
 from musicocr.instruments import INFO, canonical_name, semitones_for
-from musicocr.transpose import _declare_transpose, clef_family
+from musicocr.transpose import _CLEF_FAMILY, _declare_transpose, clef_family, fifths_shift
 
 Src = Tuple[ET.Element, int]            # (measure, its <divisions>)
 
@@ -492,7 +492,19 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             ks.append(ck)
             ms.append(cm)
         key_by[pid], met_by[pid] = ks, ms
-    keys = [_plurality([key_by[p][b] for p in bars], 0) for b in range(total)]
+    # The parts are printed in written pitch, so a transposing part's key signature differs from the
+    # score's: vote on the *concert* key (written fifths + the part's shift) and write each part's
+    # own key back as concert - shift.
+    shifts: Dict[str, int] = {}
+    for pid, seq in bars.items():
+        d = data[pid]["p"]
+        try:
+            semis = semitones_for(d.instrument or d.label, _CLEF_FAMILY.get(_first_clef(seq)[0]))
+        except ValueError:
+            semis = 0
+        shifts[pid] = fifths_shift(semis, [0])
+    keys = [_plurality([None if key_by[p][b] is None else key_by[p][b] + shifts[p] for p in bars], 0)
+            for b in range(total)]
     meters = [_plurality([met_by[p][b] for p in bars], (4, 4)) for b in range(total)]
     first_len = _plurality(
         [round(measure_total(s[0]) / s[1], 4) for s in (seq[0] for seq in bars.values())
@@ -506,7 +518,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         report.append(f"score: bar 1 is a {first_beats:g}-beat pickup (plurality of the parts)")
     changes = [(b + 1, keys[b], meters[b]) for b in range(total)
                if b == 0 or keys[b] != keys[b - 1] or meters[b] != meters[b - 1]]
-    report.append("score: key/meter changes (bar, fifths, meter): "
+    report.append("score: key/meter changes at concert pitch (bar, fifths, meter): "
                   + "; ".join(f"{b}: {k:+d} {m[0]}/{m[1]}" for b, k, m in changes))
 
     # build every part
@@ -528,7 +540,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             here = lead or prev_trail
             prev_trail = trail
             want = clef if cur_clef is None else (here if here and here != cur_clef else None)
-            key, meter = spec.key_fifths(b), spec.meter(b)
+            key, meter = spec.key_fifths(b) - shifts[pid], spec.meter(b)
             add_attributes(m, divisions=DIV if not out else None,
                            key=key if (not out or key != prev_key) else None,
                            meter=meter if (not out or meter != prev_met) else None,
