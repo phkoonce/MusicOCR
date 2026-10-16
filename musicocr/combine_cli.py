@@ -7,6 +7,7 @@ from pathlib import Path
 from musicocr.alignment.build import write_score
 from musicocr.batch import BatchSpec
 from musicocr.combine import PartInput, combine
+from musicocr.marks import MarksOptions
 
 
 def part_inputs(spec: BatchSpec, engine: str | None, only=None) -> list[PartInput]:
@@ -27,13 +28,13 @@ def part_inputs(spec: BatchSpec, engine: str | None, only=None) -> list[PartInpu
 
 
 def run(spec: BatchSpec, engine: str | None, out_dir: Path, *, only=None, pdftotext: str = "pdftotext",
-        musescore: str | None = None, log=print) -> Path:
+        musescore: str | None = None, marks: MarksOptions | None = None, log=print) -> Path:
     parts = [p for p in part_inputs(spec, engine, only)]
     missing = [p.pid for p in parts if not p.pages]
     if missing:
         raise SystemExit(f"no per-page MusicXML for part(s) {missing} under {spec.output_dir} "
                          f"(engine {engine!r}); run the batch first")
-    score, report, summary = combine(parts, spec.title, pdftotext=pdftotext)
+    score, report, summary = combine(parts, spec.title, pdftotext=pdftotext, marks=marks)
     xml = write_score(score, out_dir / f"{spec.name}_combined.musicxml")
     (out_dir / f"{spec.name}_combined.report.txt").write_text("\n".join(report) + "\n")
     log("\n".join(report))

@@ -122,6 +122,22 @@ python -m musicocr run INPUT.pdf \
   --to omr                # stop after a stage
 ```
 
+### Dynamics / hairpin consistency (optional)
+
+`musicocr combine --normalize-marks [RULES]` runs a post-pass (`musicocr/marks.py`) that uses the
+other parts as evidence to tidy dynamics and hairpins. `RULES` is a comma list; bare means
+`dedupe,hairpins`.
+
+- `dedupe` -- the same dynamic twice in one bar (e.g. above and below the staff): keep one.
+- `hairpins` -- a hairpin that stops on the note it starts on is extended: to where the other parts
+  end it, else to the next dynamic if that is within a bar of the bar's end, else to the end of the bar.
+- `fill` (opt-in, or `all`) -- a dynamic that at least half of a section's playing parts carry
+  (min. 4 parts) is added to the section's parts that play but carry none.
+
+Inserted dynamics and moved hairpin stops are coloured blue; every change is in the combine report.
+`musicocr marks IN.musicxml --rules all` runs the same pass on an existing file, and
+`scripts/compare_marks.py before.musicxml cleaned.musicxml` scores it against a hand-cleaned score.
+
 ## OMR engine
 
 `[omr] engine` in `config.toml` (or `--engine`) picks the transcription engine:

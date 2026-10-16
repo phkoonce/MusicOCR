@@ -148,6 +148,7 @@ def cmd_compare(args) -> int:
 
 def cmd_combine(args) -> int:
     from musicocr import batch, combine_cli
+    from musicocr.marks import MarksOptions
 
     try:
         config = load_config(args.config)
@@ -159,9 +160,32 @@ def cmd_combine(args) -> int:
     out_dir = Path(args.output).expanduser() if args.output else \
         spec.output_dir / "_combined" / (engine or "run")
     only = set(args.only.split(",")) if args.only else None
-    combine_cli.run(spec, engine, out_dir, only=only,
+    try:
+        marks = MarksOptions.parse(args.normalize_marks) if args.normalize_marks else None
+    except ValueError as exc:
+        print(f"combine error: {exc}", file=sys.stderr)
+        return 2
+    combine_cli.run(spec, engine, out_dir, only=only, marks=marks,
                     pdftotext=config.resolve_tool("pdftotext") or "pdftotext",
                     musescore=config.resolve_tool("musescore") if args.convert else None)
+    return 0
+
+
+def cmd_marks(args) -> int:
+    from musicocr.marks import MarksOptions, normalize_file
+
+    try:
+        opts = MarksOptions.parse(args.rules)
+    except ValueError as exc:
+        print(f"marks error: {exc}", file=sys.stderr)
+        return 2
+    if args.no_colour:
+        opts.mark = None
+    src = Path(args.input).expanduser()
+    dst = Path(args.output).expanduser() if args.output else src.with_suffix(".marks.musicxml")
+    _, report = normalize_file(src, dst, opts)
+    print("\n".join(report))
+    print(f"wrote {dst}")
     return 0
 
 
@@ -342,7 +366,20 @@ def build_parser() -> argparse.ArgumentParser:
     cb.add_argument("--output", help="directory for the combined score (default: <batch output>/_combined/<engine>)")
     cb.add_argument("--only", help="comma-separated part ids/keys to include")
     cb.add_argument("--convert", action="store_true", help="also write .mscz via MuseScore")
+    cb.add_argument("--normalize-marks", nargs="?", const="dedupe,hairpins", metavar="RULES",
+                    help="make dynamics/hairpins consistent across parts (musicocr/marks.py); RULES is a "
+                         "comma list of dedupe, hairpins, fill, or all (default when given bare: "
+                         "dedupe,hairpins; fill is opt-in)")
     cb.set_defaults(func=cmd_combine)
+
+    mk = sub.add_parser(
+        "marks", help="dedupe dynamics / extend truncated hairpins / fill section dynamics in a MusicXML file",
+        description="The optional marks pass of `combine`, run on an existing partwise MusicXML file.")
+    mk.add_argument("input", help="partwise MusicXML file")
+    mk.add_argument("-o", "--output", help="output file (default: <input>.marks.musicxml)")
+    mk.add_argument("--rules", default="dedupe,hairpins", help="comma list of dedupe, hairpins, fill, or all")
+    mk.add_argument("--no-colour", action="store_true", help="do not colour inserted marks")
+    mk.set_defaults(func=cmd_marks)
 
     t = sub.add_parser(
         "transpose",

@@ -36,6 +36,7 @@ from musicocr.alignment.build import (add_attributes, build_score, check_length,
                                       is_rest_only, measure_total, rest_measure)
 from musicocr.alignment.spec import DIV, bar_len
 from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words
+from musicocr.marks import MarksOptions, normalize_marks
 from musicocr.instruments import INFO, canonical_name, semitones_for
 from musicocr.transpose import _CLEF_FAMILY, _declare_transpose, clef_family, fifths_shift
 
@@ -360,6 +361,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             starts_of: Callable[[Path], List[Optional[int]]] = None,
             last_start_of: Callable[[Path], Optional[int]] = None,
             spans_of: Callable[[Path], List[Tuple[int, int]]] = None,
+            marks: Optional["MarksOptions"] = None,
             ) -> Tuple[ET.Element, List[str], Dict[str, Any]]:
     starts_of = starts_of or (lambda pdf: printed_page_starts(pdf, pdftotext))
     last_start_of = last_start_of or (lambda pdf: printed_last_system_start(pdf, pdftotext))
@@ -582,6 +584,10 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         if dropped:
             report.append(f"  dropped {dropped} unmatched hairpin(s)")
     summary["repairs"] = sum(1 for r in report if "-- check" in r.lower())
+    if marks is not None:                # optional: make dynamics / hairpins consistent across parts
+        stats, lines = normalize_marks([(infos[n]["name"], built[n]) for n in infos], marks)
+        report.extend(lines)
+        summary["marks"] = stats
     score = build_score(spec, built, infos)
     # The notes stay as printed (written pitch); declare each part's transposition so the
     # score sounds right (the per-part files carry it, the page files this reads do not).
