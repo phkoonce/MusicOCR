@@ -90,6 +90,17 @@ def run(ctx: PipelineContext) -> StageResult:
 
     fix_time_signatures_files(page_files, log=ctx.log)
 
+    from musicocr.barrests import fix_file as fix_bar_rests
+
+    for pf in page_files:
+        try:
+            n = fix_bar_rests(pf, log=ctx.log)
+        except Exception as exc:  # noqa: BLE001
+            ctx.log(f"  {pf.name}: whole-bar rest fix failed ({type(exc).__name__}: {exc})")
+        else:
+            if n:
+                ctx.log(f"  {pf.name}: {n} overlong whole-bar rest(s) cut to the bar length")
+
     if ctx.config.stages.tuplets_enabled:
         # needs the repaired meters: it only touches bars that do not add up to their time signature
         from musicocr.tuplets import fix_tuplets_file

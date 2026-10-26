@@ -542,9 +542,28 @@ def test_low_confidence_breve_under_count_digit_becomes_multirest(tmp_path):
     assert not [x for x in out if x["cls"] == "note_breve"]
     mr = [x for x in out if x["cls"] == "multiRest"]
     assert len(mr) == 1 and 213 < mr[0]["xyxy"][0] < 300 and 1100 < mr[0]["xyxy"][2] < 1185
-    # no digit over it: a real (if doubtful) breve stays
-    d.write_text(json.dumps(dets)), t.write_text("[]")
+    # no digit over it and a note sharing its bar: a real (if doubtful) breve stays
+    d.write_text(json.dumps(dets + [{"cls": "note_quarter", "conf": 0.99, "xyxy": [900, 120, 912, 140]}])), t.write_text("[]")
     assert add_missing_multirest_dets(d, t) == 0
+
+
+def test_lone_very_weak_breve_is_a_multirest_even_without_a_digit(tmp_path):
+    import json
+    from musicocr.page_text import add_missing_multirest_dets
+    dets = [{"cls": "measure", "conf": 0.99, "xyxy": [0, 100, 1000, 202]},
+            {"cls": "barLine_single", "conf": 1.0, "xyxy": [995, 100, 1005, 202]},
+            {"cls": "note_breve", "conf": 0.21, "xyxy": [450, 140, 510, 180]}]
+    d, t = tmp_path / "p.dets.json", tmp_path / "p.texts.json"
+    d.write_text(json.dumps(dets)), t.write_text("[]")
+    assert add_missing_multirest_dets(d, t) == 1
+    # a breve with another note in its bar, or a firmer one, stays
+    for extra, conf in (({"cls": "note_quarter", "conf": 0.99, "xyxy": [700, 120, 712, 140]}, 0.21), (None, 0.45)):
+        dd = [dict(x) for x in dets]
+        dd[2]["conf"] = conf
+        if extra:
+            dd.append(extra)
+        d.write_text(json.dumps(dd))
+        assert add_missing_multirest_dets(d, t) == 0
 
 
 def test_printed_multirest_span_regex():

@@ -169,6 +169,7 @@ def boost_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
 
 MIN_TALL_SP = 3.5     # a multi-rest count is set big (3.7-10 staff spaces tall, by scan and OCR box); tuplet digits, bar numbers
                       # and fingerings are 2-3 spaces
+BREVE_ALONE_CONF = 0.3  # without a digit over it, only a breve this weak that is alone in its bar is re-labelled
 BREVE_MAX_CONF = 0.5  # a breve detected below this under a count digit is really the multi-rest H-bar
 
 
@@ -188,8 +189,6 @@ def _breves_to_multirests(dets: list[dict], tall: list[list[float]], sp: float, 
         x0, y0, x1, y1 = d["xyxy"]
         cx = (x0 + x1) / 2
         t = next((b for b in tall if b[0] < cx < b[2] and 0 < y0 - (b[1] + b[3]) / 2 < 10 * sp), None)
-        if t is None:
-            continue
         left = [e["xyxy"][2] for e in dets
                 if e is not d and e.get("conf", 1.0) >= 0.5 and e["xyxy"][2] < x0
                 and (e.get("cls", "").split("_")[0] in ("clef", "keySig", "meterSig")
@@ -199,9 +198,16 @@ def _breves_to_multirests(dets: list[dict], tall: list[list[float]], sp: float, 
                  and (e["xyxy"][0] + e["xyxy"][2]) / 2 > x1 and abs(e["xyxy"][1] - y0) < 8 * sp]
         bx0 = max(left, default=x0 - 4 * sp) + 0.5 * sp
         bx1 = min(right, default=x1 + 4 * sp) - 0.5 * sp
+        if t is None:      # no count digit seen (OCR miss): a very weak breve alone in its bar is still the H-bar
+            alone = not any(e is not d and e.get("conf", 1.0) >= 0.5 and bx0 < (e["xyxy"][0] + e["xyxy"][2]) / 2 < bx1
+                            and abs((e["xyxy"][1] + e["xyxy"][3]) / 2 - (y0 + y1) / 2) < 6 * sp
+                            and e.get("cls", "").split("_")[0] in ("note", "rest", "mRest", "multiRest") for e in dets)
+            if d.get("conf", 1.0) >= BREVE_ALONE_CONF or not alone:
+                continue
         box = [bx0, y0 - 0.3 * sp, bx1, y1 + 0.3 * sp]
         if log:
-            log(f"  breve at ({x0:.0f},{y0:.0f}) conf {d.get('conf', 0):.2f} under a big digit: re-labelled multiRest")
+            log(f"  breve at ({x0:.0f},{y0:.0f}) conf {d.get('conf', 0):.2f} "
+                f"{'under a big digit' if t else 'alone in its bar'}: re-labelled multiRest")
         d.update({"cls": "multiRest", "conf": 0.99, "xyxy": box, "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]]})
         d.pop("attrs", None), d.pop("attr_p", None), d.pop("attr_dist", None)
         fixed += 1
