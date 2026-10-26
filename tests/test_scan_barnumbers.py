@@ -61,3 +61,11 @@ def test_pdf_words_or_ocr_scan_fallback_and_cache(monkeypatch, tmp_path):
     assert len(words) == 1                                # same value on both staves: only an increasing run is kept
     n = len(calls)
     assert pdf_words_or_ocr(str(pdf), 1) == words and len(calls) == n    # second call served from cache
+
+
+def test_pick_system_starts_skips_stray_digits():
+    import re
+    tok = lambda t, x: (x, 0, x + 5, 8, t, re.fullmatch(r"(\d+)\s*[-–](\d+)", t))
+    cands = [[tok("1", 10)], [tok("40", 10), tok("11", 40)], [tok("19-25", 90)], [], [tok("26", 10)]]
+    picked = systems._pick_system_starts(cands)
+    assert [None if p is None else p[4] for p in picked] == ["1", "11", "19-25", None, "26"]

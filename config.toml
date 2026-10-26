@@ -67,7 +67,7 @@ detector = "28m"
 # boxes from the PDF's text layer (born-digital PDFs only); "ocr" runs OCR on the
 # prepped page image (works on scans; see ocr_backend); "auto" = pdf-layer when the page has a text layer, else ocr;
 # "none" skips.
-texts = "pdf-layer"
+texts = "auto"
 # OCR engine for texts = "ocr"/"auto" (musicocr/ocr_backends.py): "rapidocr" (PP-OCR via
 # the homr venv, offline), "vision" (macOS Vision via a Swift helper compiled on first
 # use) or "auto" = union of both (they miss different isolated numerals).

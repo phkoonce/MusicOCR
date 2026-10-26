@@ -67,16 +67,27 @@ def read_page(path: Path) -> List[Src]:
     part = ET.parse(path).getroot().find("part")
     out: List[Src] = []
     div = 1
+    bar: Optional[int] = None                 # length of a bar in divisions, once a time signature has been seen
     for m in (part.findall("measure") if part is not None else []):
         dv = m.find("attributes/divisions")
         if dv is not None and (dv.text or "").strip().isdigit():
             div = int(dv.text)
+        _, mt = _declared(m)
+        if mt:
+            bar = None
+            if div * 4 * mt[0] % mt[1] == 0:
+                bar = div * 4 * mt[0] // mt[1]
         out.append((m, div))
         n = _mr_count(m)
         if n > 1:
             tail = _take_tail(m)
+            unit = max(measure_total(m), 1)
+            if bar and unit == n * bar and is_rest_only(m):
+                unit = bar                    # the whole run was written as one n-bar-long measure: back to one bar
+                for du in m.findall("note/duration"):
+                    du.text = str(bar)
             for k in range(n - 1):
-                rm = rest_measure(0, max(measure_total(m), 1), True)
+                rm = rest_measure(0, unit, True)
                 if k == n - 2:
                     rm.extend(tail)          # the closing barline / courtesy clef end the last bar
                 out.append((rm, div))
@@ -145,6 +156,18 @@ def printed_last_system_start(pdf: Path, pdftotext: str = "pdftotext") -> Option
         starts, _ = page_text_layout(pdf_words_or_ocr(str(pdf), pg, pdftotext))
         if starts:
             return starts[-1][1]
+    return None
+
+
+def printed_max_bar(pdf: Path, pdftotext: str = "pdftotext") -> Optional[int]:
+    """Highest bar number printed on the part's last numbered page (scans: every bar's number is OCR'd,
+    so the last bar's own number lower-bounds the piece better than the last system's first number)."""
+    for pg in range(pdf_page_count(str(pdf)), 0, -1):
+        words = pdf_words_or_ocr(str(pdf), pg, pdftotext)
+        starts, _ = page_text_layout(words)
+        if starts:
+            nums = [int(w[1:]) for *_, w in words if w.startswith("#") and w[1:].isdigit()]
+            return max([starts[-1][1]] + [n for n in nums if n >= starts[-1][1]])
     return None
 
 
@@ -361,11 +384,14 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             starts_of: Callable[[Path], List[Optional[int]]] = None,
             last_start_of: Callable[[Path], Optional[int]] = None,
             spans_of: Callable[[Path], List[Tuple[int, int]]] = None,
+            max_bar_of: Callable[[Path], Optional[int]] = None,
             marks: Optional["MarksOptions"] = None,
             ) -> Tuple[ET.Element, List[str], Dict[str, Any]]:
+    reads_pdfs = last_start_of is None       # callers that inject the print structure (tests) bring their own
     starts_of = starts_of or (lambda pdf: printed_page_starts(pdf, pdftotext))
     last_start_of = last_start_of or (lambda pdf: printed_last_system_start(pdf, pdftotext))
     spans_of = spans_of or (lambda pdf: printed_multirest_spans(pdf, pdftotext))
+    max_bar_of = max_bar_of or ((lambda pdf: printed_max_bar(pdf, pdftotext)) if reads_pdfs else (lambda pdf: None))
     report: List[str] = []
     data: Dict[str, Dict[str, Any]] = {}
     for p in parts:
@@ -410,6 +436,8 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         raise ValueError("no part has a readable printed bar number; cannot derive the structure")
     # the last printed system starts at bar L, so the piece has at least L bars
     lasts = [last_start_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
+    lasts += [max_bar_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
+    lasts = [x for x in lasts if x]
     ends = [e for d in data.values() for _, e in d["spans"]]
     lower = max([x for x in lasts if x] + ends + [0])
     cand = [t for t in totals if t >= lower]
@@ -461,7 +489,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                               f"-> {len(pg)} measure(s) ignored")
                 continue
             r = [1.0 if (a + j) in d["rests"] else ref.get(a + j) for j in range(t)]
-            if sum(x is not None for x in r) >= max(t // 4, 1):
+            if sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
                 ins = [0.01 if (a + j) in d["rests"] else 2.0 for j in range(t)] if d["rests"] else None
                 slots = align_to_target([_rest_flag(s) for s in pg],
                                         [0.5 if x is None else x for x in r], ins)
@@ -476,7 +504,8 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                 seq.extend(None if s is None else pg[s] for s in slots)
                 fl = flags.setdefault(pid, {})
                 for b in added:
-                    fl[b] = "check: bar inserted (the page read one bar short)"
+                    if not d["rests"] or b not in d["rests"]:      # inside a printed multi-rest: a lost count, not a doubt
+                        fl[b] = "check: bar inserted (the page read one bar short)"
                 for k in dropped:
                     nxt_slot = next((j for j, s in enumerate(slots) if s is not None and s > k), None)
                     if nxt_slot is not None:
@@ -494,7 +523,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
     key_by: Dict[str, List[Optional[int]]] = {}
     met_by: Dict[str, List[Optional[Tuple[int, int]]]] = {}
     for pid, seq in bars.items():
-        ck: Optional[int] = None
+        ck: Optional[int] = 0                 # no key signature printed = written C major (also for a first bar that declares none)
         cm: Optional[Tuple[int, int]] = None
         ks, ms = [], []
         for s in seq:

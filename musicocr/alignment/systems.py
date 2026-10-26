@@ -100,13 +100,71 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
     return out
 
 
+_RANGE_TOKEN = re.compile(r"(\d+)\s*[-\u2013\u2014_]\s*(\d+)")
+
+
+def _strip_tokens(img, path, box, ranges: bool = False):
+    """OCR one strip of the page image: [(x0, y0, x1, y1, text, range_match)] in image pixels, left to right.
+
+    Digit words only, plus (with ``ranges``) printed multi-rest ranges such as "1-6".
+    """
+    from PIL import Image
+    from musicocr.ocr_backends import ocr_words
+    x0, y0, x1, y1 = box
+    crop = img.crop((x0, y0, x1, y1))
+    if crop.width < 4 or crop.height < 4:
+        return []
+    crop = crop.resize((crop.width * 3, crop.height * 3), Image.LANCZOS)
+    crop.save(path)
+    toks = []
+    for w in ocr_words(path, "vision"):
+        t = w["text"].strip()
+        bx0, by0, bx1, by1 = (v / 3 for v in w["xyxy"])
+        rng = _RANGE_TOKEN.fullmatch(t)
+        if rng and int(rng.group(2)) <= int(rng.group(1)):
+            rng = None
+        if (t.isdigit() and len(t) <= 3) or (ranges and rng):
+            toks.append((bx0 + x0, by0 + y0, bx1 + x0, by1 + y0, t, rng))
+    return sorted(toks)
+
+
+def _strip_numbers(img, path, box, left: int, k: float) -> List[Word]:
+    """Digit words from a strip above a staff, in PDF points, x shifted so the staff's left end is at ``_LEFT_REF_PT``."""
+    return [((x0 - left) * k + _LEFT_REF_PT, y0 * k, (x1 - left) * k + _LEFT_REF_PT, y1 * k, t)
+            for x0, y0, x1, y1, t, _ in _strip_tokens(img, path, box) if t.isdigit()]
+
+
+def _pick_system_starts(cands: List[List[tuple]]) -> List[Optional[tuple]]:
+    """One token per staff (or None) so the first-bar numbers strictly increase down the page.
+
+    Under-the-staff strips also hold tuplet digits and misreads, so the leftmost token is not always
+    the system's first bar. Maximises the number of staves given a number, then prefers leftmost.
+    """
+    val = lambda t: int((t[5].group(1) if t[5] else t[4]))
+    state: dict = {0: ((0, 0), [])}          # last bar number taken -> ((staves covered, -leftness), choice per staff)
+    for toks in cands:
+        nxt = dict(state)                    # skip this staff
+        nxt = {v: (sc, ch + [None]) for v, (sc, ch) in nxt.items()}
+        for v, (sc, ch) in state.items():
+            for rank, t in enumerate(toks[:4]):
+                if val(t) > v:
+                    cand = ((sc[0] + 1, sc[1] - rank), ch + [t])
+                    if val(t) not in nxt or cand[0] > nxt[val(t)][0]:
+                        nxt[val(t)] = cand
+        state = nxt
+    return max(state.values(), key=lambda x: x[0])[1]
+
+
 def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[Word]:
     """``pdf_words``, falling back to OCR of the printed bar numbers when the page has no text layer.
 
-    For a scan, each staff's left end is found by line projection and the strip just above it is OCR'd
-    on its own, upscaled (whole-page OCR misses most of these small italic numerals). Only digit words
-    are returned, with y in PDF points and x shifted so the staff's left end sits at ``_LEFT_REF_PT``
-    (page_text_layout wants bar numbers in the left margin; scans' margins vary). Cached per PDF/page.
+    For a scan, each staff's left end is found by line projection and a strip beside it is OCR'd on its
+    own, upscaled (whole-page OCR misses most of these small italic numerals). Engravers print the
+    system's first bar number either above the staff's left end or, with every bar numbered, below the
+    staff; both zones are read and the one that yields more system starts is used. Digit words are
+    returned with y in PDF points and x shifted so the system start sits at ``_LEFT_REF_PT``
+    (page_text_layout wants bar numbers in the left margin; scans' margins vary), plus the printed
+    multi-rest ranges ("1-6", as en-dash words) from the below-staff strips. Cached per PDF/page.
     """
     words = pdf_words(pdf, page, pdftotext)
     if words:
@@ -114,14 +172,15 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
     import hashlib, json, tempfile
     from pathlib import Path
     from PIL import Image
-    from musicocr.ocr_backends import _CACHE, ocr_words
+    from musicocr.ocr_backends import _CACHE
     st = Path(pdf).stat()
-    key = hashlib.sha1(f"v2|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
+    key = hashlib.sha1(f"v6|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
     cache = _CACHE / "pdf-ocr" / f"{key}.json"
     if cache.exists():
         return [tuple(w) for w in json.loads(cache.read_text())]
     k = 72.0 / _OCR_DPI
-    out: List[Word] = []
+    above: List[Word] = []
+    below: List[Word] = []
     with tempfile.TemporaryDirectory() as tmp:
         stem = Path(tmp) / "pg"
         subprocess.run(["pdftoppm", "-r", str(_OCR_DPI), "-f", str(page), "-l", str(page), "-gray", "-png",
@@ -129,21 +188,29 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
         png = stem.with_suffix(".png")
         if png.exists():
             img = Image.open(png).convert("L")
-            for n, (top, bot, left) in enumerate(_staff_systems(img)):
+            staves = _staff_systems(img)
+            lower: List[List[tuple]] = []
+            for n, (top, bot, left) in enumerate(staves):
                 space = max((bot - top) / 4, 4)
                 x0, x1 = max(left - 10, 0), left + int(_NUM_ZONE_PT / k)
                 y0, y1 = max(int(top - 7 * space), 0), max(int(top - 0.3 * space), 1)
-                crop = img.crop((x0, y0, x1, y1))
-                crop = crop.resize((crop.width * 3, crop.height * 3), Image.LANCZOS)
-                cp = Path(tmp) / f"c{n}.png"
-                crop.save(cp)
-                for w in ocr_words(cp, "vision"):
-                    t = w["text"].strip()
-                    if t.isdigit() and len(t) <= 3:
-                        bx0, by0, bx1, by1 = (v / 3 for v in w["xyxy"])
-                        out.append(((bx0 + x0 - left) * k + _LEFT_REF_PT, (by0 + y0) * k,
-                                    (bx1 + x0 - left) * k + _LEFT_REF_PT, (by1 + y0) * k, t))
-    out = _increasing_by_y(out)
+                above += _strip_numbers(img, Path(tmp) / f"a{n}.png", (x0, y0, x1, y1), left, k)
+                nxt = staves[n + 1][0] - space if n + 1 < len(staves) else img.height
+                y0, y1 = int(bot + 0.8 * space), int(min(bot + 6 * space, nxt))
+                lower.append(_strip_tokens(img, Path(tmp) / f"b{n}.png", (x0, y0, int(img.width * .97), y1), ranges=True))
+            for (top, bot, left), toks, pick in zip(staves, lower, _pick_system_starts(lower)):
+                for t in toks:
+                    if t[5]:                                 # a printed multi-rest range, at its own place
+                        below.append((t[0] * k, t[1] * k, t[2] * k, t[3] * k, f"{t[5].group(1)}\u2013{t[5].group(2)}"))
+                for t in toks:                               # every other bar number, "#12": ignored by the layout, read by printed_max_bar
+                    if t is not pick and t[4].isdigit():
+                        below.append((t[0] * k, t[1] * k, t[2] * k, t[3] * k, f"#{t[4]}"))
+                if pick is not None:                         # the system's first bar number, in the left margin
+                    first = pick[5].group(1) if pick[5] else pick[4]
+                    below.append((_LEFT_REF_PT, pick[1] * k, _LEFT_REF_PT + (pick[2] - pick[0]) * k, pick[3] * k, first))
+    ab = _increasing_by_y(above)
+    n_starts = lambda ws: sum(1 for w in ws if w[4].isdigit())
+    out = below if n_starts(below) > n_starts(ab) else ab
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(out))
     return out
