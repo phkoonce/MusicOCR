@@ -7,7 +7,10 @@ import subprocess
 import tempfile
 import time
 from collections import namedtuple
+from fractions import Fraction
 from pathlib import Path
+from typing import Iterator, Optional, Tuple
+from xml.etree import ElementTree as ET
 
 from musicocr.errors import StageError
 
@@ -129,3 +132,20 @@ def newest(paths: list[Path]) -> Path | None:
     if not paths:
         return None
     return max(paths, key=lambda p: p.stat().st_mtime)
+
+
+def measures_with_capacity(part: ET.Element) -> Iterator[Tuple[ET.Element, int, Optional[int]]]:
+    """Walk a MusicXML ``<part>`` tracking ``<divisions>`` and the time signature in force.
+
+    Yields ``(measure, divisions, capacity)`` per measure, ``capacity`` being the bar length in
+    divisions, or None before any time signature or when it is not a whole number of divisions.
+    """
+    div, beats, beat_type = 1, None, None
+    for m in part.findall("measure"):
+        for a in m.findall("attributes"):
+            if (a.findtext("divisions") or "").strip().isdigit():
+                div = int(a.findtext("divisions"))
+            if (a.findtext("time/beats") or "").strip().isdigit() and (a.findtext("time/beat-type") or "").strip().isdigit():
+                beats, beat_type = int(a.findtext("time/beats")), int(a.findtext("time/beat-type"))
+        cap = Fraction(div * 4 * beats, beat_type) if beats else None
+        yield m, div, (int(cap) if cap is not None and cap.denominator == 1 else None)
