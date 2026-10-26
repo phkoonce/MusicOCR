@@ -241,14 +241,14 @@ def test_registry_matches_config_validation():
     from musicocr.config import ConfigError, OmrConfig
     from musicocr.engines import ENGINES, VALID_ENGINES
     assert VALID_ENGINES == set(ENGINES) >= {"homr", "audiveris", "copisteria", "legato2"}
-    OmrConfig.from_dict({"engine": "legato2"})          # name is reserved
+    OmrConfig.from_dict({"engine": "legato2"})
     with pytest.raises(ConfigError):
         OmrConfig.from_dict({"engine": "nope"})
 
 
-def test_legato2_placeholder_fails_clearly(tmp_path):
-    ctx = _ctx(tmp_path, omr={"engine": "legato2"})
-    with pytest.raises(StageError, match="legato2.*not usable yet"):
+def test_legato2_missing_tool_raises(tmp_path):
+    ctx = _ctx(tmp_path, omr={"engine": "legato2"}, tools={"legato2_python": str(tmp_path / "nope")})
+    with pytest.raises(StageError, match="LEGATO 2 python not found"):
         omr.run(ctx)
 
 

@@ -38,6 +38,7 @@ __pycache__/
 
 # omr-eval: Copisteria clone + downloaded model weights (setup.sh recreates)
 /omr-eval/copisteria/
+/omr-eval/legato2/
 
 # Local batch specs (personal paths, piece-specific); the generic example is
 # scripts/batch.example.toml
