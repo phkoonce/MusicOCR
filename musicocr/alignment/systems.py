@@ -62,6 +62,106 @@ def pdf_words(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[Word]:
             re.findall(r'xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)<', t)]
 
 
+_OCR_DPI = 150
+_NUM_ZONE_PT = 60        # width of the strip above a staff's left end that is searched for the bar number
+_LEFT_REF_PT = 50        # scans: staff-left is reported at this x so page_text_layout's left-margin test holds
+
+
+def _staff_systems(img) -> List[Tuple[int, int, int]]:
+    """(top_row, bottom_row, left_col) of each 5-line staff on a greyscale page image (PIL 'L').
+
+    Staff lines are the rows that are dark across a band just right of where staves start (clef and
+    key signature there, so no stems or notes break the lines).
+    """
+    import numpy as np
+    a = np.asarray(img) < 200
+    h, w = a.shape
+    band = a[:, int(w * .21):int(w * .45)].mean(axis=1)
+    lines: List[List[int]] = []
+    for y in np.flatnonzero(band > 0.4):
+        if lines and y - lines[-1][-1] <= 2:
+            lines[-1].append(int(y))
+        else:
+            lines.append([int(y)])
+    ys = [sum(g) // len(g) for g in lines]
+    out: List[Tuple[int, int, int]] = []
+    i = 0
+    while i + 4 < len(ys):
+        gaps = [ys[i + j + 1] - ys[i + j] for j in range(4)]
+        if max(gaps) <= 1.5 * min(gaps) + 1:                             # evenly spaced: one staff
+            top, bot = ys[i], ys[i + 4]
+            hit = np.mean([a[max(y - 1, 0):y + 2, :int(w * .5)].any(axis=0) for y in ys[i:i + 5]], axis=0) >= 0.6
+            run = np.convolve(hit, np.ones(12), mode="valid") >= 10        # first dense run of staff lines (a clef may hide some)
+            xs = np.flatnonzero(run)
+            out.append((top, bot, int(xs[0]) if len(xs) else int(w * .15)))
+            i += 5
+        else:
+            i += 1
+    return out
+
+
+def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[Word]:
+    """``pdf_words``, falling back to OCR of the printed bar numbers when the page has no text layer.
+
+    For a scan, each staff's left end is found by line projection and the strip just above it is OCR'd
+    on its own, upscaled (whole-page OCR misses most of these small italic numerals). Only digit words
+    are returned, with y in PDF points and x shifted so the staff's left end sits at ``_LEFT_REF_PT``
+    (page_text_layout wants bar numbers in the left margin; scans' margins vary). Cached per PDF/page.
+    """
+    words = pdf_words(pdf, page, pdftotext)
+    if words:
+        return words
+    import hashlib, json, tempfile
+    from pathlib import Path
+    from PIL import Image
+    from musicocr.ocr_backends import _CACHE, ocr_words
+    st = Path(pdf).stat()
+    key = hashlib.sha1(f"v2|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
+    cache = _CACHE / "pdf-ocr" / f"{key}.json"
+    if cache.exists():
+        return [tuple(w) for w in json.loads(cache.read_text())]
+    k = 72.0 / _OCR_DPI
+    out: List[Word] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = Path(tmp) / "pg"
+        subprocess.run(["pdftoppm", "-r", str(_OCR_DPI), "-f", str(page), "-l", str(page), "-gray", "-png",
+                        "-singlefile", pdf, str(stem)], capture_output=True)
+        png = stem.with_suffix(".png")
+        if png.exists():
+            img = Image.open(png).convert("L")
+            for n, (top, bot, left) in enumerate(_staff_systems(img)):
+                space = max((bot - top) / 4, 4)
+                x0, x1 = max(left - 10, 0), left + int(_NUM_ZONE_PT / k)
+                y0, y1 = max(int(top - 7 * space), 0), max(int(top - 0.3 * space), 1)
+                crop = img.crop((x0, y0, x1, y1))
+                crop = crop.resize((crop.width * 3, crop.height * 3), Image.LANCZOS)
+                cp = Path(tmp) / f"c{n}.png"
+                crop.save(cp)
+                for w in ocr_words(cp, "vision"):
+                    t = w["text"].strip()
+                    if t.isdigit() and len(t) <= 3:
+                        bx0, by0, bx1, by1 = (v / 3 for v in w["xyxy"])
+                        out.append(((bx0 + x0 - left) * k + _LEFT_REF_PT, (by0 + y0) * k,
+                                    (bx1 + x0 - left) * k + _LEFT_REF_PT, (by1 + y0) * k, t))
+    out = _increasing_by_y(out)
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps(out))
+    return out
+
+
+def _increasing_by_y(words: List[Word]) -> List[Word]:
+    """Keep the longest top-to-bottom run of bar numbers that strictly increases (drops OCR misreads)."""
+    ws = sorted(words, key=lambda w: w[1])
+    best: List[List[Word]] = []
+    for i, w in enumerate(ws):
+        chain = [w]
+        for j in range(i):
+            if int(ws[j][4]) < int(w[4]) and len(best[j]) + 1 > len(chain):
+                chain = best[j] + [w]
+        best.append(chain)
+    return max(best, key=len, default=[])
+
+
 def pdf_page_count(pdf: str) -> int:
     out = subprocess.run(["pdfinfo", pdf], capture_output=True, text=True).stdout
     m = re.search(r"Pages:\s+(\d+)", out)

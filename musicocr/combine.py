@@ -35,7 +35,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from musicocr.alignment.build import (add_attributes, build_score, check_length, copy_notes,
                                       is_rest_only, measure_total, rest_measure)
 from musicocr.alignment.spec import DIV, bar_len
-from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words
+from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words_or_ocr
 from musicocr.marks import MarksOptions, normalize_marks
 from musicocr.instruments import INFO, canonical_name, semitones_for
 from musicocr.transpose import _CLEF_FAMILY, _declare_transpose, clef_family, fifths_shift
@@ -99,7 +99,7 @@ def printed_page_starts(pdf: Path, pdftotext: str = "pdftotext") -> List[Optiona
     """Bar number at the start of the first system of each page (None = unreadable)."""
     out: List[Optional[int]] = []
     for pg in range(1, pdf_page_count(str(pdf)) + 1):
-        starts, _ = page_text_layout(pdf_words(str(pdf), pg, pdftotext))
+        starts, _ = page_text_layout(pdf_words_or_ocr(str(pdf), pg, pdftotext))
         n = starts[0][1] if starts else None
         out.append(1 if pg == 1 and (n is None or n > 3) else n)
     return out
@@ -142,7 +142,7 @@ def printed_last_system_start(pdf: Path, pdftotext: str = "pdftotext") -> Option
     """Bar number at the start of the last numbered system on the part's last page."""
     n = pdf_page_count(str(pdf))
     for pg in range(n, 0, -1):
-        starts, _ = page_text_layout(pdf_words(str(pdf), pg, pdftotext))
+        starts, _ = page_text_layout(pdf_words_or_ocr(str(pdf), pg, pdftotext))
         if starts:
             return starts[-1][1]
     return None
@@ -156,7 +156,7 @@ def printed_multirest_spans(pdf: Path, pdftotext: str = "pdftotext") -> List[Tup
     prints them. En/em dash only: a hyphen is too often something else ("1-4")."""
     out: List[Tuple[int, int]] = []
     for pg in range(1, pdf_page_count(str(pdf)) + 1):
-        for *_, w in pdf_words(str(pdf), pg, pdftotext):
+        for *_, w in pdf_words_or_ocr(str(pdf), pg, pdftotext):
             m = _RANGE.fullmatch(w.strip())
             if m and int(m.group(2)) > int(m.group(1)):
                 out.append((int(m.group(1)), int(m.group(2))))

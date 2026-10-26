@@ -23,7 +23,7 @@ def _args(**kw):
 
 def test_repo_config_loads():
     cfg = load_config()
-    assert cfg.omr.engine == "homr"
+    assert cfg.omr.engine == "copisteria"
     assert cfg.omr.timeout == 1800 and cfg.omr.page_timeout == 900
     assert cfg.omr.per_page and cfg.omr.merge_pages and cfg.omr.homr.fix_multirest
     assert {"default", "dense-orchestral", "clean-typeset"} <= set(cfg.omr.profiles)
@@ -77,7 +77,7 @@ def test_overrides_do_not_mutate_and_apply():
     assert (out.omr.engine, out.omr.profile, out.omr.merge_pages) == \
         ("audiveris", "clean-typeset", False)
     assert out.preprocess.crop_margins and not out.preprocess.enabled
-    assert cfg.omr.engine == "homr" and cfg.preprocess.enabled     # original untouched
+    assert cfg.omr.engine == "copisteria" and cfg.preprocess.enabled     # original untouched
 
 
 def test_deskew_crop_enable_preprocess(tmp_path, capsys):
