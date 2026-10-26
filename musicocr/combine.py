@@ -437,7 +437,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
     # the last printed system starts at bar L, so the piece has at least L bars
     lasts = [last_start_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
     lasts += [max_bar_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
-    lasts = [x for x in lasts if x]
+    lasts = [x for x in lasts if x and (not totals or x <= 1.5 * max(totals) + 5)]     # a misread number (811) must not set the length
     ends = [e for d in data.values() for _, e in d["spans"]]
     lower = max([x for x in lasts if x] + ends + [0])
     cand = [t for t in totals if t >= lower]
