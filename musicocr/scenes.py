@@ -9,6 +9,7 @@ closes it.
 """
 from __future__ import annotations
 
+import copy
 import json
 import re
 import subprocess
@@ -18,10 +19,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence
 
+from musicocr.alignment.build import measure_total, rest_measure
+from musicocr.alignment.spec import DIV
+from musicocr.alignment.systems import pdf_page_count
+from musicocr.combine import _declared, copy_marks
+
 _CYRILLIC = str.maketrans("ЗМВАСНЕОР", "3MBACHEOP")
 _LABEL = re.compile(r"^\s*(\d\s*M\s*\d+[A-Z]?(?:-\d+[A-Z]?|-Credits)*)|^\s*(Entr.?acte)", re.I)
 _UNTIL = re.compile(r"(\d{1,2}\s*:\s*\d\d)\s*until\s+([0-9A-Za-z][\w'\-]*)", re.I)
 _DPI = 150
+# OCR regions as fractions of the page (x0, y0, x1, y1)
+_TITLE_BOX = (.3, .045, .75, .125)      # the title block of a scene's first page: "1M2  Dragon Racing"
+_UNTIL_BOX = (.4, .12, 1, 1)            # everything below it; the "0:16 until 1M4" box is on the last page
 
 
 @dataclass
@@ -51,11 +60,6 @@ def _ocr_page(pdf: Path, page: int, box: Sequence[float], tmp: Path, scale: int 
     return " ".join(x["text"] for x in ocr_words(tmp / "crop.png", "vision"))
 
 
-def page_count(pdf: Path) -> int:
-    out = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True).stdout
-    return int(re.search(r"Pages:\s+(\d+)", out).group(1))
-
-
 def read_until_box(text: str) -> str:
     """"0:16 until 1M4" from OCR text, with the label's look-alike letters repaired; "" if absent."""
     m = _UNTIL.search(text.translate(_CYRILLIC))
@@ -72,9 +76,9 @@ def detect_scenes(pdf: Path, cues: Optional[List[List[str]]] = None, log: Callab
     starts: List[tuple] = []
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
-        n = page_count(pdf)
+        n = pdf_page_count(str(pdf))
         for pg in range(1, n + 1):
-            text = _ocr_page(pdf, pg, (.3, .045, .75, .125), tmp).translate(_CYRILLIC)
+            text = _ocr_page(pdf, pg, _TITLE_BOX, tmp).translate(_CYRILLIC)
             m = _LABEL.match(text)
             if m:
                 starts.append((pg, re.sub(r"\s+", "", m.group(1) or "Entr'acte"), text))
@@ -88,9 +92,7 @@ def detect_scenes(pdf: Path, cues: Optional[List[List[str]]] = None, log: Callab
                 label, title = cues[i]
             scenes.append(Scene(label, title, pg, last))
         for s in scenes:
-            for pg in range(s.last_page, s.first_page - 1, -1):      # the box is on the scene's last page
-                s.until = read_until_box(_ocr_page(pdf, pg, (.4, .12, 1, 1), tmp))
-                break
+            s.until = read_until_box(_ocr_page(pdf, s.last_page, _UNTIL_BOX, tmp))
     if cues and len(scenes) != len(cues):
         log(f"  found {len(scenes)} scene(s) but the cue list has {len(cues)}")
     return scenes
@@ -135,8 +137,8 @@ def _rehearsal(text: str) -> ET.Element:
 def concat_scenes(scores: Sequence[ET.Element], scenes: Sequence[Scene], title: str) -> ET.Element:
     """One score from per-scene scores (same parts, in the same order).
 
-    Bar numbers restart at 1 in each scene (an upbeat is bar 0); each scene opens with a rehearsal mark ("1M1  Dragon
-    Racing") on a new system, and its ``until`` box text sits above the scene's last bar.
+    Bar numbers restart at 1 in each scene (an upbeat is bar 0); each scene opens with a rehearsal
+    mark ("1M1  Dragon Racing") on a new system, and its ``until`` box text sits above the scene's last bar.
     """
     out = ET.Element("score-partwise", version="3.1")
     ET.SubElement(ET.SubElement(out, "work"), "work-title").text = title
@@ -177,8 +179,6 @@ def pickup_of(first_bars, tol: float = 1e-6):
     list of upbeat bars (None where a part's first bar is full) or [] when fewer than half the parts
     have one.
     """
-    from musicocr.alignment.build import measure_total
-    from musicocr.combine import _declared
     found = []
     for fb in first_bars:
         if fb is None:
@@ -199,9 +199,6 @@ def prepend_pickup(score: ET.Element, pickups) -> None:
     The new bar takes over the first bar's attributes (key, meter, clef, transposition) and is marked
     implicit so MuseScore does not count it as a bar.
     """
-    from musicocr.alignment.build import rest_measure
-    from musicocr.alignment.spec import DIV
-    from musicocr.combine import copy_marks
     for pe, pk in zip(score.findall("part"), pickups):
         first = pe.find("measure")
         m = ET.Element("measure", number="0", implicit="yes")
@@ -217,7 +214,6 @@ def prepend_pickup(score: ET.Element, pickups) -> None:
 
 def drop_pickup(srcs):
     """A page's measures without the upbeat bar; its key / meter / clef declarations move to the next bar."""
-    import copy
     if len(srcs) < 2:
         return srcs[1:]
     (pm, _), (nm, nd) = srcs[0], srcs[1]
