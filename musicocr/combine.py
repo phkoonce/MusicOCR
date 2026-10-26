@@ -27,12 +27,12 @@ import copy
 import re
 import xml.etree.ElementTree as ET
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from musicocr.alignment.build import (add_attributes, build_score, check_length, copy_notes,
+from musicocr.alignment.build import (add_attributes, build_score, check_length,
                                       is_rest_only, measure_total, rest_measure)
 from musicocr.alignment.spec import DIV, bar_len
 from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words_or_ocr

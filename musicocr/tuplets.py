@@ -29,6 +29,8 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 from xml.etree import ElementTree as ET
 
+from musicocr.util import measures_with_capacity
+
 FLAG_COLOR = "#7B1FA2"
 _BASE = {"breve": F(8), "whole": F(4), "half": F(2), "quarter": F(1), "eighth": F(1, 2),
          "16th": F(1, 4), "32nd": F(1, 8), "64th": F(1, 16), "128th": F(1, 32)}
@@ -58,14 +60,19 @@ def _tuplet_tags(n: ET.Element) -> List[ET.Element]:
     return [t for nt in n.findall("notations") for t in nt.findall("tuplet")]
 
 
-def _voice_runs(measure: ET.Element) -> List[List[ET.Element]]:
-    """Runs of consecutive time-modified notes (chord tones follow their lead note), per voice."""
+def _voice_notes(measure: ET.Element) -> List[List[ET.Element]]:
+    """The bar's lead notes (no grace notes, no chord tones) grouped by voice, in document order."""
     by_voice: Dict[str, List[ET.Element]] = {}
     for n in measure.findall("note"):
         if n.find("grace") is None and n.find("chord") is None:
             by_voice.setdefault(n.findtext("voice") or "1", []).append(n)
+    return list(by_voice.values())
+
+
+def _voice_runs(measure: ET.Element) -> List[List[ET.Element]]:
+    """Runs of consecutive time-modified notes (chord tones follow their lead note), per voice."""
     runs: List[List[ET.Element]] = []
-    for notes in by_voice.values():
+    for notes in _voice_notes(measure):
         cur: List[ET.Element] = []
         for n in notes:
             if _ratio(n) is not None:
@@ -90,21 +97,6 @@ def _tags_ok(run: List[ET.Element]) -> bool:
         if open_ < 0:
             return False
     return open_ == 0
-
-
-def _groups_ok(run: List[ET.Element], ratio: Tuple[int, int]) -> bool:
-    """Each tagged group holds exactly ``actual-notes`` notes."""
-    size, depth = 0, 0
-    for n in run:
-        tags = _tuplet_tags(n)
-        if any(t.get("type") == "start" for t in tags):
-            size, depth = 0, depth + 1
-        size += 1
-        if any(t.get("type") == "stop" for t in tags):
-            if size != ratio[0]:
-                return False
-            depth -= 1
-    return True
 
 
 def _dur(n: ET.Element) -> int:
@@ -187,11 +179,7 @@ def _beam1(n: ET.Element) -> str:
 def _orphans(measure: ET.Element) -> List[Tuple[ET.Element, ET.Element, bool]]:
     """Notes without a ratio that are beamed to a time-modified neighbour: (note, neighbour, after_it)."""
     found = []
-    by_voice: Dict[str, List[ET.Element]] = {}
-    for n in measure.findall("note"):
-        if n.find("grace") is None and n.find("chord") is None:
-            by_voice.setdefault(n.findtext("voice") or "1", []).append(n)
-    for notes in by_voice.values():
+    for notes in _voice_notes(measure):
         for i, n in enumerate(notes):
             if _ratio(n) is not None or _printed_beats(n) is None:
                 continue
@@ -291,15 +279,7 @@ def fix_tree(root: ET.Element, flag: bool = True, log: Callable[[str], None] = p
     """Clean up every part of a ``score-partwise``; returns the number of bars rebuilt."""
     fixed = 0
     for part in root.findall("part"):
-        div, beats, beat_type = 1, None, None
-        for m in part.findall("measure"):
-            for a in m.findall("attributes"):
-                if (a.findtext("divisions") or "").strip().isdigit():
-                    div = int(a.findtext("divisions"))
-                if (a.findtext("time/beats") or "").strip().isdigit() and (a.findtext("time/beat-type") or "").strip().isdigit():
-                    beats, beat_type = int(a.findtext("time/beats")), int(a.findtext("time/beat-type"))
-            cap = F(div * 4 * beats, beat_type) if beats else None
-            cap = int(cap) if cap is not None and cap.denominator == 1 else None
+        for m, div, cap in measures_with_capacity(part):
             for msg in fix_measure(m, div, cap, flag):
                 log(f"  measure {m.get('number')}: {msg}")
                 fixed += msg.startswith("rebuilt")

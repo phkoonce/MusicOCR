@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Callable, Optional
 from xml.etree import ElementTree as ET
 
+from musicocr.util import measures_with_capacity
+
 
 def fix_measure(measure: ET.Element, capacity: Optional[int]) -> bool:
     """Shorten the lone rest of ``measure`` to ``capacity`` if it is longer; True if it changed."""
@@ -33,15 +35,7 @@ def fix_tree(root: ET.Element, log: Callable[[str], None] = print) -> int:
     """Fix every part of a ``score-partwise``; returns the number of bars changed."""
     fixed = 0
     for part in root.findall("part"):
-        div, beats, beat_type = 1, None, None
-        for m in part.findall("measure"):
-            for a in m.findall("attributes"):
-                if (a.findtext("divisions") or "").strip().isdigit():
-                    div = int(a.findtext("divisions"))
-                if (a.findtext("time/beats") or "").strip().isdigit() and (a.findtext("time/beat-type") or "").strip().isdigit():
-                    beats, beat_type = int(a.findtext("time/beats")), int(a.findtext("time/beat-type"))
-            cap = F(div * 4 * beats, beat_type) if beats else None
-            cap = int(cap) if cap is not None and cap.denominator == 1 else None
+        for m, div, cap in measures_with_capacity(part):
             if fix_measure(m, cap):
                 log(f"  measure {m.get('number')}: overlong whole-bar rest cut to the bar's {F(cap, div)} beats")
                 fixed += 1
