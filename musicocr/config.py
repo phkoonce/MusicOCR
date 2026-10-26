@@ -69,7 +69,7 @@ class CopisteriaConfig:
     fix_key_cancel: bool = True   # staff opens with no printed key sig -> C major
     fix_time_inherit: bool = True # unprinted page-start meter continues the previous page's
     fix_ghost_bars: bool = True   # drop key/time-signature "bars" misread from cautionary signatures
-    texts: str = "pdf-layer"   # "pdf-layer", "ocr", "auto" (layer if the PDF has one, else OCR) or "none"
+    texts: str = "auto"   # "pdf-layer", "ocr", "auto" (layer if the PDF has one, else OCR) or "none"
     ocr_backend: str = "auto"   # texts = "ocr": "auto" (union of all that work), "rapidocr" or "vision"
     multirest_form: str = "collapse"   # "collapse" (homr's form), "expand", or "keep"
     repo: str = str(REPO_ROOT / "omr-eval" / "copisteria" / "repo")
