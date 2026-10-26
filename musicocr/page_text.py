@@ -167,8 +167,45 @@ def boost_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
     return raised
 
 
-MIN_TALL_SP = 5.0     # a multi-rest count is set big (~10 staff spaces tall); tuplet digits, bar numbers
+MIN_TALL_SP = 4.0     # a multi-rest count is set big (4.5-10 staff spaces tall); tuplet digits, bar numbers
                       # and fingerings are 2-3 spaces
+BREVE_MAX_CONF = 0.5  # a breve detected below this under a count digit is really the multi-rest H-bar
+
+
+def _breves_to_multirests(dets: list[dict], tall: list[list[float]], sp: float, log=None) -> int:
+    """Re-label low-confidence ``note_breve`` detections that sit under a big count digit.
+
+    The thick H-bar of a multi-rest looks like a breve head on the middle line; on 150-ppi scans the
+    detector then finds a weak breve instead of the multiRest, the bar is read as an 8-beat breve and
+    swallows its neighbour (HTTYD2 Trumpet 2, "6" over bars 1-6: a 12-beat first bar). A real breve is
+    rare and has no giant numeral over it, so the detection becomes a confident multiRest spanning from
+    the clef/key/time signature (or the previous barline) to the next barline.
+    """
+    fixed = 0
+    for d in list(dets):
+        if d.get("cls") != "note_breve" or d.get("conf", 1.0) >= BREVE_MAX_CONF:
+            continue
+        x0, y0, x1, y1 = d["xyxy"]
+        cx = (x0 + x1) / 2
+        t = next((b for b in tall if b[0] < cx < b[2] and 0 < y0 - (b[1] + b[3]) / 2 < 10 * sp), None)
+        if t is None:
+            continue
+        left = [e["xyxy"][2] for e in dets
+                if e is not d and e.get("conf", 1.0) >= 0.5 and e["xyxy"][2] < x0
+                and (e.get("cls", "").split("_")[0] in ("clef", "keySig", "meterSig")
+                     or e.get("cls", "").startswith("barLine")) and abs(e["xyxy"][1] - y0) < 8 * sp]
+        right = [(e["xyxy"][0] + e["xyxy"][2]) / 2 for e in dets
+                 if e.get("conf", 1.0) >= 0.5 and e.get("cls", "").startswith("barLine")
+                 and (e["xyxy"][0] + e["xyxy"][2]) / 2 > x1 and abs(e["xyxy"][1] - y0) < 8 * sp]
+        bx0 = max(left, default=x0 - 4 * sp) + 0.5 * sp
+        bx1 = min(right, default=x1 + 4 * sp) - 0.5 * sp
+        box = [bx0, y0 - 0.3 * sp, bx1, y1 + 0.3 * sp]
+        if log:
+            log(f"  breve at ({x0:.0f},{y0:.0f}) conf {d.get('conf', 0):.2f} under a big digit: re-labelled multiRest")
+        d.update({"cls": "multiRest", "conf": 0.99, "xyxy": box, "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]]})
+        d.pop("attrs", None), d.pop("attr_p", None), d.pop("attr_dist", None)
+        fixed += 1
+    return fixed
 
 
 def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
@@ -192,11 +229,11 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> i
     if not sp:
         return 0
     measures = [d for d in dets if d.get("cls") == "measure"]
-    content = [d for d in dets if d.get("cls", "").split("_")[0] in ("note", "rest", "mRest", "multiRest")
-               and d.get("conf", 1.0) >= 0.5]
-    added = 0
     tall = [t["xyxy"] for t in texts if _DIGITS.fullmatch(str(t.get("text", "")).strip())
             and t["xyxy"][3] - t["xyxy"][1] >= MIN_TALL_SP * sp]
+    added = _breves_to_multirests(dets, tall, sp, log)
+    content = [d for d in dets if d.get("cls", "").split("_")[0] in ("note", "rest", "mRest", "multiRest")
+               and d.get("conf", 1.0) >= 0.5]
 
     def stacked(b) -> bool:
         """Another tall digit right above/below it: the two numerals of a time signature."""

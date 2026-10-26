@@ -526,6 +526,27 @@ def test_add_missing_multirest_dets_guards(tmp_path):
     assert add_missing_multirest_dets(d, t) == 0
 
 
+def test_low_confidence_breve_under_count_digit_becomes_multirest(tmp_path):
+    import json
+    from musicocr.page_text import add_missing_multirest_dets
+    dets = [{"cls": "measure", "conf": 0.99, "xyxy": [1190, 100, 1700, 202]},          # sp ~25
+            {"cls": "clef_G2", "conf": 1.0, "xyxy": [50, 90, 120, 280]},
+            {"cls": "meterSig_4_4", "conf": 0.99, "xyxy": [158, 100, 213, 200]},
+            {"cls": "note_breve", "conf": 0.14, "xyxy": [675, 140, 734, 180]},
+            {"cls": "barLine_single", "conf": 1.0, "xyxy": [1185, 100, 1198, 202]}]
+    texts = [{"text": "6", "xyxy": [651, 0, 744, 118]}]                                 # 4.7 spaces tall
+    d, t = tmp_path / "p.dets.json", tmp_path / "p.texts.json"
+    d.write_text(json.dumps(dets)), t.write_text(json.dumps(texts))
+    assert add_missing_multirest_dets(d, t) == 1
+    out = json.loads(d.read_text())
+    assert not [x for x in out if x["cls"] == "note_breve"]
+    mr = [x for x in out if x["cls"] == "multiRest"]
+    assert len(mr) == 1 and 213 < mr[0]["xyxy"][0] < 300 and 1100 < mr[0]["xyxy"][2] < 1185
+    # no digit over it: a real (if doubtful) breve stays
+    d.write_text(json.dumps(dets)), t.write_text("[]")
+    assert add_missing_multirest_dets(d, t) == 0
+
+
 def test_printed_multirest_span_regex():
     from musicocr.combine import _RANGE
     assert _RANGE.fullmatch("58–60") and _RANGE.fullmatch("98 — 101")

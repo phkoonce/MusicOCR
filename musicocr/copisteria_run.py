@@ -24,7 +24,7 @@ from __future__ import annotations
 import sys
 
 RATIO = {2: "2/3", 3: "3/2"}
-MIN_TALL_SP = 5.0
+MIN_TALL_SP = 4.0
 
 
 def _install() -> None:
