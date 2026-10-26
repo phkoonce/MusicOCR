@@ -192,8 +192,12 @@ def _rest_flag(src: Src) -> float:
     return 1.0 if is_rest_only(src[0]) else 0.0
 
 
+MUST_REST_COST = 3.0     # a played bar on a slot the print shows as a multi-rest contradicts the print itself
+
+
 def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
-                    ins_cost: Optional[Sequence[float]] = None) -> List[Optional[int]]:
+                    ins_cost: Optional[Sequence[float]] = None,
+                    must_rest: Optional[Sequence[bool]] = None) -> List[Optional[int]]:
     """Map each of ``len(ref)`` target slots to a source bar index (None = synthesise a rest).
 
     Needleman-Wunsch over the rest-only pattern: matching costs the disagreement with the
@@ -204,7 +208,9 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
     """
     n, m = len(rest_src), len(ref)
     # ``ins_cost`` (per slot) overrides the default insertion cost: a part that prints its
-    # multi-rest spans can only have lost bars inside them
+    # multi-rest spans can only have lost bars inside them; ``must_rest`` marks the slots the
+    # print shows inside a multi-rest, where a bar with notes never belongs (the other parts' rest
+    # pattern is unreliable there: parts that play different things rest at different bars)
     allow_del, allow_ins = n >= m, n <= m
     INF = 1e18
     D = [[INF] * (m + 1) for _ in range(n + 1)]
@@ -215,8 +221,11 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
             d = D[i][j]
             if d >= INF:
                 continue
-            if i < n and j < m and d + abs(rest_src[i] - ref[j]) < D[i + 1][j + 1]:
-                D[i + 1][j + 1], B[i + 1][j + 1] = d + abs(rest_src[i] - ref[j]), "m"
+            if i < n and j < m:
+                mc = d + abs(rest_src[i] - ref[j]) + (MUST_REST_COST * (1 - rest_src[i])
+                                                       if must_rest is not None and must_rest[j] else 0.0)
+                if mc < D[i + 1][j + 1]:
+                    D[i + 1][j + 1], B[i + 1][j + 1] = mc, "m"
             if i < n and allow_del:
                 c = d + 0.2 + 0.8 * (1 - rest_src[i])
                 if c < D[i + 1][j]:
@@ -492,7 +501,8 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             if sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
                 ins = [0.01 if (a + j) in d["rests"] else 2.0 for j in range(t)] if d["rests"] else None
                 slots = align_to_target([_rest_flag(s) for s in pg],
-                                        [0.5 if x is None else x for x in r], ins)
+                                        [0.5 if x is None else x for x in r], ins,
+                                        [(a + j) in d["rests"] for j in range(t)] if d["rests"] else None)
                 dropped = sorted(set(range(len(pg))) - {s for s in slots if s is not None})
                 added = [a + j for j, s in enumerate(slots) if s is None]
                 outside = [b for b in added if d["rests"] and b not in d["rests"]]

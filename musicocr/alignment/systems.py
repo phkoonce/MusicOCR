@@ -100,7 +100,10 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
     return out
 
 
-_RANGE_TOKEN = re.compile(r"(\d+)\s*[-\u2013\u2014_]\s*(\d+)")
+_RANGE_TOKEN = re.compile(r"\D{0,2}(\d{1,3})\s*[-\u2013\u2014_]\s*(\d{1,3})\D{0,2}")   # OCR adds stray marks ("130-133\u0142")
+
+
+_MAX_RANGE = 60       # longest multi-rest read as a range; "1-123" is two numbers glued together
 
 
 def _strip_tokens(img, path, box, ranges: bool = False):
@@ -109,23 +112,34 @@ def _strip_tokens(img, path, box, ranges: bool = False):
     Digit words only, plus (with ``ranges``) printed multi-rest ranges such as "1-6".
     """
     from PIL import Image
-    from musicocr.ocr_backends import ocr_words
     x0, y0, x1, y1 = box
     crop = img.crop((x0, y0, x1, y1))
     if crop.width < 4 or crop.height < 4:
         return []
-    crop = crop.resize((crop.width * 3, crop.height * 3), Image.LANCZOS)
+    toks = _ocr_tokens(crop, path, x0, y0, Image.LANCZOS, ranges)
+    if ranges:
+        # the same strip under another resampling filter: Vision drops a range label ("130-133")
+        # under one and finds it under the other, so keep the ranges the first pass lacks
+        for t in _ocr_tokens(crop, path, x0, y0, Image.BICUBIC, ranges):
+            if t[5] and not any(o[0] < t[2] and t[0] < o[2] and o[1] < t[3] and t[1] < o[3] for o in toks):
+                toks.append(t)
+    return sorted(toks)
+
+
+def _ocr_tokens(crop, path, x0, y0, resample, ranges):
+    from musicocr.ocr_backends import ocr_words
+    crop = crop.resize((crop.width * 3, crop.height * 3), resample)
     crop.save(path)
     toks = []
     for w in ocr_words(path, "vision"):
         t = w["text"].strip()
         bx0, by0, bx1, by1 = (v / 3 for v in w["xyxy"])
         rng = _RANGE_TOKEN.fullmatch(t)
-        if rng and int(rng.group(2)) <= int(rng.group(1)):
+        if rng and not 0 < int(rng.group(2)) - int(rng.group(1)) <= _MAX_RANGE:
             rng = None
         if (t.isdigit() and len(t) <= 3) or (ranges and rng):
             toks.append((bx0 + x0, by0 + y0, bx1 + x0, by1 + y0, t, rng))
-    return sorted(toks)
+    return toks
 
 
 def _strip_numbers(img, path, box, left: int, k: float) -> List[Word]:
@@ -174,7 +188,7 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
     from PIL import Image
     from musicocr.ocr_backends import _CACHE
     st = Path(pdf).stat()
-    key = hashlib.sha1(f"v6|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
+    key = hashlib.sha1(f"v9|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
     cache = _CACHE / "pdf-ocr" / f"{key}.json"
     if cache.exists():
         return [tuple(w) for w in json.loads(cache.read_text())]

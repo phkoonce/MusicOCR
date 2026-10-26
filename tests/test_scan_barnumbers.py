@@ -69,3 +69,20 @@ def test_pick_system_starts_skips_stray_digits():
     cands = [[tok("1", 10)], [tok("40", 10), tok("11", 40)], [tok("19-25", 90)], [], [tok("26", 10)]]
     picked = systems._pick_system_starts(cands)
     assert [None if p is None else p[4] for p in picked] == ["1", "11", "19-25", None, "26"]
+
+
+def test_range_token_tolerates_stray_marks_but_not_glued_numbers():
+    from musicocr.alignment.systems import _RANGE_TOKEN
+    assert _RANGE_TOKEN.fullmatch("130-133ł").groups() == ("130", "133")
+    assert _RANGE_TOKEN.fullmatch("-3-") is None
+
+
+def test_align_never_puts_a_played_bar_on_a_printed_multirest_slot():
+    from musicocr.combine import align_to_target
+    # source: R R N N R N (rest/note); print: rests at slots 0,1 and 4..7 (multi-rest spans), 8 slots
+    src = [1.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+    ref = [1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]          # a noisy reference that rests where this part plays
+    must = [True, True, False, False, True, True, True, True]
+    ins = [0.01 if m else 2.0 for m in must]
+    slots = align_to_target(src, ref, ins, must)
+    assert slots[2] == 2 and slots[3] == 3 and slots[4] == 4        # the notes stay on bars 3 and 4

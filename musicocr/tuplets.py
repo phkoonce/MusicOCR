@@ -177,6 +177,82 @@ def _flag(measure: ET.Element, run: List[ET.Element], text: str) -> None:
     measure.insert(list(measure).index(run[0]), d)
 
 
+def _beam1(n: ET.Element) -> str:
+    """The note's primary-beam state ("begin", "continue", "end", "" for none)."""
+    beams = n.findall("beam")
+    b = next((b for b in beams if b.get("number", "1") == "1"), None)
+    return (b.text or "").strip() if b is not None else ""
+
+
+def _orphans(measure: ET.Element) -> List[Tuple[ET.Element, ET.Element, bool]]:
+    """Notes without a ratio that are beamed to a time-modified neighbour: (note, neighbour, after_it)."""
+    found = []
+    by_voice: Dict[str, List[ET.Element]] = {}
+    for n in measure.findall("note"):
+        if n.find("grace") is None and n.find("chord") is None:
+            by_voice.setdefault(n.findtext("voice") or "1", []).append(n)
+    for notes in by_voice.values():
+        for i, n in enumerate(notes):
+            if _ratio(n) is not None or _printed_beats(n) is None:
+                continue
+            prev = notes[i - 1] if i else None
+            nxt = notes[i + 1] if i + 1 < len(notes) else None
+            if prev is not None and _ratio(prev) and _beam1(prev) in ("begin", "continue") and _beam1(n) in ("continue", "end"):
+                found.append((n, prev, True))
+            elif nxt is not None and _ratio(nxt) and _beam1(nxt) in ("continue", "end") and _beam1(n) in ("begin", "continue"):
+                found.append((n, nxt, False))
+    return found
+
+
+def _adopt(measure: ET.Element, note: ET.Element, nb: ET.Element, after: bool, div: int) -> bool:
+    """Give ``note`` its beamed neighbour's ratio and let the neighbour's bracket reach it."""
+    a, b = _ratio(nb)
+    d = _printed_beats(note) * div * b / a
+    if d.denominator != 1:
+        return False
+    note.find("duration").text = str(int(d))
+    tm = copy.deepcopy(nb.find("time-modification"))
+    for tag in ("normal-type", "normal-dot"):
+        for e in tm.findall(tag):
+            tm.remove(e)
+    pos = max((list(note).index(e) for e in note if e.tag in ("type", "dot", "accidental")), default=len(note) - 1)
+    note.insert(pos + 1, tm)
+    kind = "stop" if after else "start"
+    for nt in nb.findall("notations"):
+        for t in nt.findall("tuplet"):
+            if t.get("type") == kind:
+                nt.remove(t)
+                dest = note.find("notations")
+                if dest is None:
+                    dest = ET.SubElement(note, "notations")
+                dest.append(t)
+    return True
+
+
+def fix_orphans(measure: ET.Element, div: int, capacity: int, flag: bool = True) -> List[str]:
+    """Adopt a note that is beamed to a tuplet but lacks its ratio, when that makes the bar add up.
+
+    The usual Copisteria slip: the last (or first) note of a beamed tuplet group is read as an
+    ordinary note, so the bar runs a fraction of a beat long. The note takes the neighbour's ratio
+    (value unchanged, duration recomputed) and the neighbour's bracket end moves onto it. All
+    candidates are tried together, then one at a time; the bar is left as read unless it then adds up.
+    """
+    cands = _orphans(measure)
+    if not cands:
+        return []
+    orig = copy.deepcopy(measure)
+    before = _total(measure)
+    for subset in [cands] + ([[c] for c in cands] if len(cands) > 1 else []):
+        if all(_adopt(measure, n, nb, after, div) for n, nb, after in subset) and _total(measure) == capacity:
+            if flag:
+                for n, nb, _ in subset:
+                    _flag(measure, [n], "check: tuplet note fixed")
+            return [f"rebuilt: {len(subset)} note(s) beamed to a tuplet had no ratio "
+                    f"(bar was {F(before, div)} beats, now {F(capacity, div)})"]
+        measure[:] = list(copy.deepcopy(orig))
+    return []
+
+
 def fix_measure(measure: ET.Element, div: int, capacity: Optional[int], flag: bool = True) -> List[str]:
     """Rebuild the inconsistent tuplet runs of a bar that does not add up to ``capacity`` divisions.
 
@@ -185,6 +261,9 @@ def fix_measure(measure: ET.Element, div: int, capacity: Optional[int], flag: bo
     """
     if capacity is None or measure.find("backup") is not None or _total(measure) == capacity:
         return []
+    msgs = fix_orphans(measure, div, capacity, flag)
+    if msgs:
+        return msgs
     faults = []
     for run in _voice_runs(measure):
         what = _inconsistent(run, div)

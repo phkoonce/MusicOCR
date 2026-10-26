@@ -80,3 +80,20 @@ def test_stage_config_defaults_on():
     c = StagesConfig.from_dict({})
     assert c.tuplets_enabled and c.tuplets_flag
     assert not StagesConfig.from_dict({"tuplets": {"enabled": False}}).tuplets_enabled
+
+
+def test_beamed_note_missing_its_tuplet_ratio_is_adopted():
+    def n(dur, typ, beam, tm=None, tup=None):
+        t = f"<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>" if tm else ""
+        nt = f"<notations><tuplet type='{tup}'/></notations>" if tup else ""
+        return (f"<note><pitch><step>E</step><octave>5</octave></pitch><duration>{dur}</duration><voice>1</voice>"
+                f"<type>{typ}</type>{t}<beam number='1'>{beam}</beam>{nt}</note>")
+    root = _bar(_n(dur=30, typ="quarter"), _n(dur=30, typ="quarter"),
+                n(10, "eighth", "begin", tm=1, tup="start"), n(5, "16th", "continue", tm=1),
+                n(5, "16th", "continue", tm=1, tup="stop"), n(15, "eighth", "end"), beats=3)
+    logs = []
+    assert fix_tree(root, log=logs.append) == 1 and "had no ratio" in logs[0]
+    last = _m(root).findall("note")[-1]
+    assert last.findtext("duration") == "10" and last.findtext("time-modification/actual-notes") == "3"
+    assert [t.get("type") for t in last.iter("tuplet")] == ["stop"]
+    assert sum(int(d.findtext("duration")) for d in _m(root).findall("note")) == 90
