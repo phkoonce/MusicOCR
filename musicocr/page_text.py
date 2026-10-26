@@ -169,8 +169,34 @@ def boost_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
 
 MIN_TALL_SP = 3.5     # a multi-rest count is set big (3.7-10 staff spaces tall, by scan and OCR box); tuplet digits, bar numbers
                       # and fingerings are 2-3 spaces
+MIN_DIGIT_MARK_SP = 3.0  # a digit box this tall (staff spaces) can swallow a segno/coda detection (drop_digit_repeat_marks)
+REAL_CONF = 0.5       # detections below this are not counted as evidence of what a bar holds
 BREVE_ALONE_CONF = 0.3  # without a digit over it, only a breve this weak that is alone in its bar is re-labelled
 BREVE_MAX_CONF = 0.5  # a breve detected below this under a count digit is really the multi-rest H-bar
+MAX_STAFF_REACH_SP = 8.0  # a clef/barline/note this close (staff spaces) vertically belongs to the same staff
+
+
+def _centre(box) -> tuple[float, float]:
+    return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+
+
+def _multirest_det(box: list[float]) -> dict:
+    return {"cls": "multiRest", "conf": BOOSTED_CONF, "xyxy": box,
+            "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]]}
+
+
+def _bar_span_around(dets: list[dict], d: dict, sp: float) -> tuple[float, float]:
+    """Horizontal extent a multi-rest H-bar detected as ``d`` occupies: from the clef/key/time signature
+    (or previous barline) before it to the next barline, inset by half a staff space."""
+    x0, y0, x1, _ = d["xyxy"]
+    real = [e for e in dets if e is not d and e.get("conf", 1.0) >= REAL_CONF]
+    left = [e["xyxy"][2] for e in real
+            if e["xyxy"][2] < x0 and abs(e["xyxy"][1] - y0) < MAX_STAFF_REACH_SP * sp
+            and (e.get("cls", "").split("_")[0] in ("clef", "keySig", "meterSig") or e.get("cls", "").startswith("barLine"))]
+    right = [_centre(e["xyxy"])[0] for e in real
+             if e.get("cls", "").startswith("barLine") and _centre(e["xyxy"])[0] > x1
+             and abs(e["xyxy"][1] - y0) < MAX_STAFF_REACH_SP * sp]
+    return max(left, default=x0 - 4 * sp) + 0.5 * sp, min(right, default=x1 + 4 * sp) - 0.5 * sp
 
 
 def _breves_to_multirests(dets: list[dict], tall: list[list[float]], sp: float, log=None) -> int:
@@ -189,18 +215,10 @@ def _breves_to_multirests(dets: list[dict], tall: list[list[float]], sp: float, 
         x0, y0, x1, y1 = d["xyxy"]
         cx = (x0 + x1) / 2
         t = next((b for b in tall if b[0] < cx < b[2] and 0 < y0 - (b[1] + b[3]) / 2 < 10 * sp), None)
-        left = [e["xyxy"][2] for e in dets
-                if e is not d and e.get("conf", 1.0) >= 0.5 and e["xyxy"][2] < x0
-                and (e.get("cls", "").split("_")[0] in ("clef", "keySig", "meterSig")
-                     or e.get("cls", "").startswith("barLine")) and abs(e["xyxy"][1] - y0) < 8 * sp]
-        right = [(e["xyxy"][0] + e["xyxy"][2]) / 2 for e in dets
-                 if e.get("conf", 1.0) >= 0.5 and e.get("cls", "").startswith("barLine")
-                 and (e["xyxy"][0] + e["xyxy"][2]) / 2 > x1 and abs(e["xyxy"][1] - y0) < 8 * sp]
-        bx0 = max(left, default=x0 - 4 * sp) + 0.5 * sp
-        bx1 = min(right, default=x1 + 4 * sp) - 0.5 * sp
+        bx0, bx1 = _bar_span_around(dets, d, sp)
         if t is None:      # no count digit seen (OCR miss): a very weak breve alone in its bar is still the H-bar
-            alone = not any(e is not d and e.get("conf", 1.0) >= 0.5 and bx0 < (e["xyxy"][0] + e["xyxy"][2]) / 2 < bx1
-                            and abs((e["xyxy"][1] + e["xyxy"][3]) / 2 - (y0 + y1) / 2) < 6 * sp
+            alone = not any(e is not d and e.get("conf", 1.0) >= REAL_CONF and bx0 < _centre(e["xyxy"])[0] < bx1
+                            and abs(_centre(e["xyxy"])[1] - (y0 + y1) / 2) < 6 * sp
                             and e.get("cls", "").split("_")[0] in ("note", "rest", "mRest", "multiRest") for e in dets)
             if d.get("conf", 1.0) >= BREVE_ALONE_CONF or not alone:
                 continue
@@ -208,7 +226,7 @@ def _breves_to_multirests(dets: list[dict], tall: list[list[float]], sp: float, 
         if log:
             log(f"  breve at ({x0:.0f},{y0:.0f}) conf {d.get('conf', 0):.2f} "
                 f"{'under a big digit' if t else 'alone in its bar'}: re-labelled multiRest")
-        d.update({"cls": "multiRest", "conf": 0.99, "xyxy": box, "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]]})
+        d.update(_multirest_det(box))
         d.pop("attrs", None), d.pop("attr_p", None), d.pop("attr_dist", None)
         fixed += 1
     return fixed
@@ -231,7 +249,7 @@ def drop_digit_repeat_marks(dets_path: Path, texts_path: Path, log=None) -> int:
     if not sp:
         return 0
     digits = [t["xyxy"] for t in texts if _DIGITS.fullmatch(str(t.get("text", "")).strip())
-              and t["xyxy"][3] - t["xyxy"][1] >= 3 * sp]
+              and t["xyxy"][3] - t["xyxy"][1] >= MIN_DIGIT_MARK_SP * sp]
     keep, dropped = [], 0
     for d in dets:
         if str(d.get("cls", "")).startswith("repeatMark_"):
@@ -297,8 +315,7 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> i
                    and y0 - 3 * sp <= (c["xyxy"][1] + c["xyxy"][3]) / 2 <= y1 + 3 * sp for c in content):
                 break
             box = [x0 + 0.02 * (x1 - x0), y0 - sp, x1 - 0.02 * (x1 - x0), y0 + 0.7 * (y1 - y0)]
-            dets.append({"cls": "multiRest", "conf": 0.99, "xyxy": box,
-                         "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]]})
+            dets.append(_multirest_det(box))
             content.append(dets[-1])
             added += 1
             if log:
