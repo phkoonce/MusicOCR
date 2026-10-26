@@ -195,9 +195,33 @@ def _rest_flag(src: Src) -> float:
 MUST_REST_COST = 3.0     # a played bar on a slot the print shows as a multi-rest contradicts the print itself
 
 
+METER_CHANGE_COST = 1.5   # a source bar that changes meter landing where the other parts do not (or the reverse)
+
+
+def _src_changes(pg: Sequence[Src], prev: Optional[Tuple[int, int]]) -> List[Optional[bool]]:
+    """Per rest bar: does it declare a meter different from the one in force before it? (None: has notes)"""
+    out: List[Optional[bool]] = []
+    for s in pg:
+        mt = _declared(s[0])[1]
+        out.append((prev is not None and mt is not None and mt != prev) if is_rest_only(s[0]) else None)
+        prev = mt or prev
+    return out
+
+
+def _last_meter(pg: Sequence[Src], prev: Optional[Tuple[int, int]]) -> Optional[Tuple[int, int]]:
+    for s in pg:
+        prev = _declared(s[0])[1] or prev
+    return prev
+
+
 def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
                     ins_cost: Optional[Sequence[float]] = None,
-                    must_rest: Optional[Sequence[bool]] = None) -> List[Optional[int]]:
+                    must_rest: Optional[Sequence[bool]] = None,
+                    src_change: Optional[Sequence[Optional[bool]]] = None,
+                    ref_change: Optional[Sequence[float]] = None) -> List[Optional[int]]:
+    # ``src_change[i]``: rest bar i changes meter (None for a bar with notes: its declaration may really
+    # belong to a lost multi-rest bar before it, the system's first bar); ``ref_change[j]``: share of the
+    # other parts that change meter at slot j
     """Map each of ``len(ref)`` target slots to a source bar index (None = synthesise a rest).
 
     Needleman-Wunsch over the rest-only pattern: matching costs the disagreement with the
@@ -224,6 +248,8 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
             if i < n and j < m:
                 mc = d + abs(rest_src[i] - ref[j]) + (MUST_REST_COST * (1 - rest_src[i])
                                                        if must_rest is not None and must_rest[j] else 0.0)
+                if src_change is not None and ref_change is not None and src_change[i] is not None:
+                    mc += METER_CHANGE_COST * abs(float(src_change[i]) - ref_change[j])
                 if mc < D[i + 1][j + 1]:
                     D[i + 1][j + 1], B[i + 1][j + 1] = mc, "m"
             if i < n and allow_del:
@@ -484,50 +510,77 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                     acc[1] += 1
     ref = {b: v[0] / v[1] for b, v in sums.items()}
 
-    # repair mismatched pages, then lay every part out on bars 1..total
-    bars: Dict[str, List[Optional[Src]]] = {}
-    flags: Dict[str, Dict[int, str]] = {}
-    for pid, d in data.items():
-        seq: List[Optional[Src]] = []
-        for pg, a, t, ok in zip(d["pages"], d["start"], d["target"], d["good"]):
-            if ok:
-                seq.extend(pg)
-                continue
-            if t <= 0:
-                report.append(f"  {pid} page starting bar {a}: no printed bars (cover/text page?) "
-                              f"-> {len(pg)} measure(s) ignored")
-                continue
-            r = [1.0 if (a + j) in d["rests"] else ref.get(a + j) for j in range(t)]
-            if sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
-                ins = [0.01 if (a + j) in d["rests"] else 2.0 for j in range(t)] if d["rests"] else None
-                slots = align_to_target([_rest_flag(s) for s in pg],
-                                        [0.5 if x is None else x for x in r], ins,
-                                        [(a + j) in d["rests"] for j in range(t)] if d["rests"] else None)
-                dropped = sorted(set(range(len(pg))) - {s for s in slots if s is not None})
-                added = [a + j for j, s in enumerate(slots) if s is None]
-                outside = [b for b in added if d["rests"] and b not in d["rests"]]
-                report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
-                              f" -> aligned to the other parts' rest pattern; dropped source bar(s) "
-                              f"{[a + k for k in dropped]}, inserted rest bar(s) at {added}"
-                              + (f", {len(outside)} of them outside the printed multi-rests {outside}"
-                                 if outside else "") + " -- check")
-                seq.extend(None if s is None else pg[s] for s in slots)
-                fl = flags.setdefault(pid, {})
-                for b in added:
-                    if not d["rests"] or b not in d["rests"]:      # inside a printed multi-rest: a lost count, not a doubt
-                        fl[b] = "check: bar inserted (the page read one bar short)"
-                for k in dropped:
-                    nxt_slot = next((j for j, s in enumerate(slots) if s is not None and s > k), None)
-                    if nxt_slot is not None:
-                        fl.setdefault(a + nxt_slot, "check: a source bar was dropped just before here")
-            else:
-                seq.extend((pg + [None] * t)[:t])
-                report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
-                              f" and no reference to align by -> padded/truncated at the end -- CHECK")
-        if len(seq) < total:
-            seq += [None] * (total - len(seq))
-            report.append(f"  {pid}: ends {total - len([s for s in seq if s is not None])} bar(s) early -> padded")
-        bars[pid] = seq[:total]
+    def lay_out(report: List[str], decl_ref_by: Optional[Dict[str, List[float]]] = None):
+        """Every part on bars 1..total; ``decl_ref_by[pid]`` (per bar: the share of the *other* parts that
+        change meter there) lets a source bar's own meter change steer where it lands."""
+        bars: Dict[str, List[Optional[Src]]] = {}
+        flags: Dict[str, Dict[int, str]] = {}
+        for pid, d in data.items():
+            seq: List[Optional[Src]] = []
+            meter_before = None
+            for pg, a, t, ok in zip(d["pages"], d["start"], d["target"], d["good"]):
+                prev_meter, meter_before = meter_before, _last_meter(pg, meter_before)
+                if ok:
+                    seq.extend(pg)
+                    continue
+                if t <= 0:
+                    report.append(f"  {pid} page starting bar {a}: no printed bars (cover/text page?) "
+                                  f"-> {len(pg)} measure(s) ignored")
+                    continue
+                r = [1.0 if (a + j) in d["rests"] else ref.get(a + j) for j in range(t)]
+                if sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
+                    ins = [0.01 if (a + j) in d["rests"] else 2.0 for j in range(t)] if d["rests"] else None
+                    slots = align_to_target([_rest_flag(s) for s in pg],
+                                            [0.5 if x is None else x for x in r], ins,
+                                            [(a + j) in d["rests"] for j in range(t)] if d["rests"] else None,
+                                            _src_changes(pg, prev_meter),
+                                            decl_ref_by[pid][a - 1:a - 1 + t] if decl_ref_by else None)
+                    dropped = sorted(set(range(len(pg))) - {s for s in slots if s is not None})
+                    added = [a + j for j, s in enumerate(slots) if s is None]
+                    outside = [b for b in added if d["rests"] and b not in d["rests"]]
+                    report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
+                                  f" -> aligned to the other parts' rest pattern; dropped source bar(s) "
+                                  f"{[a + k for k in dropped]}, inserted rest bar(s) at {added}"
+                                  + (f", {len(outside)} of them outside the printed multi-rests {outside}"
+                                     if outside else "") + " -- check")
+                    seq.extend(None if s is None else pg[s] for s in slots)
+                    fl = flags.setdefault(pid, {})
+                    for b in added:
+                        if not d["rests"] or b not in d["rests"]:      # inside a printed multi-rest: a lost count, not a doubt
+                            fl[b] = "check: bar inserted (the page read one bar short)"
+                    for k in dropped:
+                        nxt_slot = next((j for j, s in enumerate(slots) if s is not None and s > k), None)
+                        if nxt_slot is not None:
+                            fl.setdefault(a + nxt_slot, "check: a source bar was dropped just before here")
+                else:
+                    seq.extend((pg + [None] * t)[:t])
+                    report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
+                                  f" and no reference to align by -> padded/truncated at the end -- CHECK")
+            if len(seq) < total:
+                seq += [None] * (total - len(seq))
+                report.append(f"  {pid}: ends {total - len([s for s in seq if s is not None])} bar(s) early -> padded")
+            bars[pid] = seq[:total]
+        return bars, flags
+
+    def meter_changes(bars) -> Dict[str, List[bool]]:
+        out = {}
+        for pid, seq in bars.items():
+            cm, row = None, []
+            for s in seq:
+                mt = _declared(s[0])[1] if s is not None else None
+                row.append(cm is not None and mt is not None and mt != cm)
+                cm = mt or cm
+            out[pid] = row
+        return out
+
+    bars, flags = lay_out([])                                  # first look (report discarded)
+    if len(data) > 2:
+        # a part that lost bars may land them one off; the other parts' meter changes pin them
+        ch = meter_changes(bars)
+        decl_ref = {pid: [sum(ch[q][b] for q in ch if q != pid) / (len(ch) - 1) for b in range(total)] for pid in ch}
+        bars, flags = lay_out(report, decl_ref)
+    else:
+        bars, flags = lay_out(report)
 
     # consensus key / meter per bar, and the pickup
     key_by: Dict[str, List[Optional[int]]] = {}

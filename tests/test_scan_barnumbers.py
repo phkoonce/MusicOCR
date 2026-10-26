@@ -86,3 +86,14 @@ def test_align_never_puts_a_played_bar_on_a_printed_multirest_slot():
     ins = [0.01 if m else 2.0 for m in must]
     slots = align_to_target(src, ref, ins, must)
     assert slots[2] == 2 and slots[3] == 3 and slots[4] == 4        # the notes stay on bars 3 and 4
+
+
+def test_a_rest_bars_meter_change_pins_where_it_lands():
+    from musicocr.combine import align_to_target
+    # source: R(declares a change) N N N; the print has 6 slots with two lost rests before it. The other
+    # parts change meter at slot 2, so the rest bar belongs there, not at slot 0.
+    src = [1.0, 0.0, 0.0, 0.0]
+    ref = [0.5] * 6
+    ins = [0.01] * 6
+    slots = align_to_target(src, ref, ins, None, [True, None, None, None], [0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+    assert slots.index(0) == 2
