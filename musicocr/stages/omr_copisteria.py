@@ -28,7 +28,7 @@ from musicocr.copisteria_fixes import (drop_ghost_bars, fill_empty_measures, fix
 from musicocr.copisteria_second_pass import gap_bars, merge_second_pass
 from musicocr.errors import StageError, StageResult
 from musicocr.multirest import apply_multirest_form
-from musicocr.page_text import (add_missing_multirest_dets, boost_multirest_dets, mark_small_graces,
+from musicocr.page_text import (add_missing_multirest_dets, drop_digit_repeat_marks, boost_multirest_dets, mark_small_graces,
                                 pdf_has_text, write_ocr_texts_json, write_texts_json)
 from musicocr.second_pass_detect import empty_measures
 from musicocr.pipeline import PipelineContext
@@ -91,6 +91,7 @@ def run(ctx: PipelineContext) -> StageResult:
                     else:
                         ctx.log(f"  {img.stem}: empty-bar fill: {(res.output.strip().splitlines() or [''])[-1]}")
                 if texts_found:
+                    drop_digit_repeat_marks(dets, texts, log=ctx.log)
                     if cfg.synth_multirest:
                         add_missing_multirest_dets(dets, texts, log=ctx.log)
                     boost_multirest_dets(dets, texts, log=ctx.log)

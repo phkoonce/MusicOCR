@@ -214,6 +214,39 @@ def _breves_to_multirests(dets: list[dict], tall: list[list[float]], sp: float, 
     return fixed
 
 
+def drop_digit_repeat_marks(dets_path: Path, texts_path: Path, log=None) -> int:
+    """Remove ``repeatMark_*`` (segno/coda) detections that sit on a big digit.
+
+    A multi-rest's count numeral ("5", "8", "6") is set large and has the curl of a segno; the detector
+    reports it as one (0.4-0.8 confident, HTTYD2 scans) and the reader writes a segno over the next bar.
+    A digit box from the page text that holds the detection's centre is the evidence it is a numeral.
+    Rewrites ``dets_path`` in place; returns the number of detections removed.
+    """
+    try:
+        dets = json.loads(dets_path.read_text())
+        texts = json.loads(texts_path.read_text())
+    except (OSError, ValueError):
+        return 0
+    sp = _staff_space(dets)
+    if not sp:
+        return 0
+    digits = [t["xyxy"] for t in texts if _DIGITS.fullmatch(str(t.get("text", "")).strip())
+              and t["xyxy"][3] - t["xyxy"][1] >= 3 * sp]
+    keep, dropped = [], 0
+    for d in dets:
+        if str(d.get("cls", "")).startswith("repeatMark_"):
+            cx, cy = (d["xyxy"][0] + d["xyxy"][2]) / 2, (d["xyxy"][1] + d["xyxy"][3]) / 2
+            if any(b[0] <= cx <= b[2] and b[1] <= cy <= b[3] for b in digits):
+                dropped += 1
+                if log:
+                    log(f"  {d['cls']} at ({cx:.0f},{cy:.0f}) conf {d.get('conf', 0):.2f} dropped: a count digit sits there")
+                continue
+        keep.append(d)
+    if dropped:
+        dets_path.write_text(json.dumps(keep))
+    return dropped
+
+
 def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
     """Add a ``multiRest`` detection to an *empty* bar that has a big count digit over it.
 

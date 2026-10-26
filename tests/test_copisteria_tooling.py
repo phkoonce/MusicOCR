@@ -566,6 +566,19 @@ def test_lone_very_weak_breve_is_a_multirest_even_without_a_digit(tmp_path):
         assert add_missing_multirest_dets(d, t) == 0
 
 
+def test_repeat_marks_on_a_count_digit_are_dropped(tmp_path):
+    import json
+    from musicocr.page_text import drop_digit_repeat_marks
+    dets = [{"cls": "measure", "conf": 0.99, "xyxy": [0, 100, 1000, 202]},                      # sp ~25
+            {"cls": "repeatMark_segno", "conf": 0.43, "xyxy": [480, 0, 540, 90]},               # on the "5"
+            {"cls": "repeatMark_segno", "conf": 0.95, "xyxy": [800, 0, 860, 90]}]               # a real one
+    texts = [{"text": "5", "xyxy": [470, 0, 550, 95]}]
+    d, t = tmp_path / "p.dets.json", tmp_path / "p.texts.json"
+    d.write_text(json.dumps(dets)), t.write_text(json.dumps(texts))
+    assert drop_digit_repeat_marks(d, t) == 1
+    assert [x["xyxy"][0] for x in json.loads(d.read_text()) if x["cls"].startswith("repeat")] == [800]
+
+
 def test_printed_multirest_span_regex():
     from musicocr.combine import _RANGE
     assert _RANGE.fullmatch("58–60") and _RANGE.fullmatch("98 — 101")
