@@ -101,8 +101,7 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
 
 
 _RANGE_TOKEN = re.compile(r"\D{0,2}(\d{1,3})\s*[-\u2013\u2014_]\s*(\d{1,3})\D{0,2}")   # OCR adds stray marks ("130-133\u0142")
-
-
+_OCR_CACHE_VERSION = "v9"   # bump when the strip geometry / token handling changes: cached OCR words are stale
 _MAX_RANGE = 60       # longest multi-rest read as a range; "1-123" is two numbers glued together
 
 
@@ -127,6 +126,7 @@ def _strip_tokens(img, path, box, ranges: bool = False):
 
 
 def _ocr_tokens(crop, path, x0, y0, resample, ranges):
+    """Vision OCR of ``crop`` upscaled 3x with ``resample``: (x0, y0, x1, y1, text, range_match) tuples in page-image pixels."""
     from musicocr.ocr_backends import ocr_words
     crop = crop.resize((crop.width * 3, crop.height * 3), resample)
     crop.save(path)
@@ -157,8 +157,7 @@ def _pick_system_starts(cands: List[List[tuple]]) -> List[Optional[tuple]]:
     val = lambda t: int((t[5].group(1) if t[5] else t[4]))
     state: dict = {0: ((0, 0), [])}          # last bar number taken -> ((staves covered, -leftness), choice per staff)
     for toks in cands:
-        nxt = dict(state)                    # skip this staff
-        nxt = {v: (sc, ch + [None]) for v, (sc, ch) in nxt.items()}
+        nxt = {v: (sc, ch + [None]) for v, (sc, ch) in state.items()}      # skip this staff
         for v, (sc, ch) in state.items():
             for rank, t in enumerate(toks[:4]):
                 if val(t) > v:
@@ -188,7 +187,7 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
     from PIL import Image
     from musicocr.ocr_backends import _CACHE
     st = Path(pdf).stat()
-    key = hashlib.sha1(f"v9|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
+    key = hashlib.sha1(f"{_OCR_CACHE_VERSION}|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
     cache = _CACHE / "pdf-ocr" / f"{key}.json"
     if cache.exists():
         return [tuple(w) for w in json.loads(cache.read_text())]
