@@ -90,6 +90,19 @@ def run(ctx: PipelineContext) -> StageResult:
 
     fix_time_signatures_files(page_files, log=ctx.log)
 
+    if ctx.config.stages.tuplets_enabled:
+        # needs the repaired meters: it only touches bars that do not add up to their time signature
+        from musicocr.tuplets import fix_tuplets_file
+
+        for pf in page_files:
+            try:
+                n = fix_tuplets_file(pf, flag=ctx.config.stages.tuplets_flag, log=ctx.log)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  {pf.name}: tuplet clean-up failed ({type(exc).__name__}: {exc})")
+            else:
+                if n:
+                    ctx.log(f"  {pf.name}: rebuilt {n} bar(s) with inconsistent tuplets")
+
     if len(page_files) == 1:
         master.write_bytes(page_files[0].read_bytes())
         ctx.artifacts.musicxml = master

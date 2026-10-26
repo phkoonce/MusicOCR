@@ -191,6 +191,8 @@ class OutputConfig:
 class StagesConfig:
     correct_enabled: bool = False
     normalize_enabled: bool = True
+    tuplets_enabled: bool = True   # rebuild inconsistent tuplets in bars that do not add up (musicocr/tuplets.py)
+    tuplets_flag: bool = True      # colour / annotate the rebuilt runs
     transpose: TransposeConfig = field(default_factory=TransposeConfig)
 
     @classmethod
@@ -198,6 +200,8 @@ class StagesConfig:
         return cls(
             correct_enabled=bool((d.get("correct", {}) or {}).get("enabled", False)),
             normalize_enabled=bool((d.get("normalize", {}) or {}).get("enabled", True)),
+            tuplets_enabled=bool((d.get("tuplets", {}) or {}).get("enabled", True)),
+            tuplets_flag=bool((d.get("tuplets", {}) or {}).get("flag", True)),
             transpose=TransposeConfig.from_dict(dict(d.get("transpose", {}) or {})),
         )
 

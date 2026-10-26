@@ -276,6 +276,17 @@ not bugs. `validate.py` flags plain whole-measure rests as a weak
 (false-positive-prone) `info`-level hint that one might be a dropped multi-rest,
 when running the homr engine.
 
+### Tuplet clean-up (any engine)
+
+A tuplet read as a mix (3:2 with 6:4 and 5:4, a bracket starting on the third note, a 0.4-beat rest)
+leaves the bar the wrong length, and MuseScore spreads the damage to the next bar when it is edited.
+`[stages.tuplets]` (on by default; `musicocr/tuplets.py`; also `musicocr tuplets FILE...` on existing
+files) runs inside `extract` after the meter repair. In a bar that does not add up to its time
+signature it rebuilds the inconsistent tuplet runs with the ratio most of their notes carry,
+durations from the printed note values and whole bracket groups, and keeps the result only if the
+bar then has exactly the right length. Bars that add up are never touched. Rebuilt notes are purple
+with a "check: tuplet rebuilt" text (`flag`), since the fix is a guess from the printed values.
+
 ## Poor scans
 
 If `report.md` shows most of the page missing or garbled, check the scan

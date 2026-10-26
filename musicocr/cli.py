@@ -171,6 +171,17 @@ def cmd_combine(args) -> int:
     return 0
 
 
+def cmd_tuplets(args) -> int:
+    from musicocr.tuplets import fix_tuplets_file
+    total = 0
+    for f in args.files:
+        path = Path(f).expanduser()
+        print(f"{path}:")
+        total += fix_tuplets_file(path, flag=not args.no_flag)
+    print(f"{total} tuplet run(s) rebuilt")
+    return 0
+
+
 def cmd_marks(args) -> int:
     from musicocr.marks import MarksOptions, normalize_file
 
@@ -380,6 +391,13 @@ def build_parser() -> argparse.ArgumentParser:
     mk.add_argument("--rules", default="dedupe,hairpins", help="comma list of dedupe, hairpins, fill, or all")
     mk.add_argument("--no-colour", action="store_true", help="do not colour inserted marks")
     mk.set_defaults(func=cmd_marks)
+
+    tp = sub.add_parser(
+        "tuplets", help="rebuild inconsistent tuplets (mixed ratios, misaligned brackets) in MusicXML files, in place",
+        description="The tuplet clean-up of the OMR stages (musicocr/tuplets.py), run on existing files.")
+    tp.add_argument("files", nargs="+", help="MusicXML files to rewrite in place")
+    tp.add_argument("--no-flag", action="store_true", help="do not colour/annotate runs whose timing was guessed")
+    tp.set_defaults(func=cmd_tuplets)
 
     t = sub.add_parser(
         "transpose",

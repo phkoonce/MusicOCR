@@ -178,6 +178,15 @@ crop_pad_frac = 0.035  # whitespace to leave above/below the outer staves
 # in the Audiveris GUI, correct it, and re-run from `extract`. Off for v1.
 enabled = false
 
+[stages.tuplets]
+# After extract's meter repair: in a bar that does not add up to its time signature, rebuild tuplet
+# runs read inconsistently (mixed 3:2/6:4/5:4 ratios, a bracket starting on the third note, a
+# 0.4-beat rest) -- one ratio per run, durations from the printed note values, whole bracket
+# groups -- and keep the result only if the bar then has the right length (musicocr/tuplets.py).
+# Engine-agnostic. flag colours the rebuilt notes and adds a "check: tuplet rebuilt" text.
+enabled = true
+flag = true
+
 [stages.normalize]
 # After extract, force every measure whose notes don't sum to its time
 # signature (the dominant homr rhythm-misread pattern -- see
