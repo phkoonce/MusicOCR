@@ -135,7 +135,7 @@ def _rehearsal(text: str) -> ET.Element:
 def concat_scenes(scores: Sequence[ET.Element], scenes: Sequence[Scene], title: str) -> ET.Element:
     """One score from per-scene scores (same parts, in the same order).
 
-    Measures are renumbered consecutively; each scene opens with a rehearsal mark ("1M1  Dragon
+    Bar numbers restart at 1 in each scene (an upbeat is bar 0); each scene opens with a rehearsal mark ("1M1  Dragon
     Racing") on a new system, and its ``until`` box text sits above the scene's last bar.
     """
     out = ET.Element("score-partwise", version="3.1")
@@ -159,7 +159,9 @@ def concat_scenes(scores: Sequence[ET.Element], scenes: Sequence[Scene], title: 
                     m.insert(idx, _rehearsal(f"{scene.label}  {scene.title}".strip()))
                 if k == len(ms) - 1 and scene.until:
                     m.insert(idx + (1 if k == 0 else 0), _words(scene.until, "above", True))
-                m.set("number", str(len(dst) + 1))
+                # bar numbers restart in every scene (an upbeat is bar 0), as printed
+                n_in_scene = k + 1 - (1 if ms[0].get("implicit") == "yes" else 0)
+                m.set("number", str(n_in_scene))
                 dst.append(m)
     return out
 

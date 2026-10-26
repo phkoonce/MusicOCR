@@ -57,7 +57,7 @@ def test_concat_scenes_labels_and_numbers(tmp_path):
             + "</part></score-partwise>")
     out = concat_scenes([sc(2), sc(1)], [Scene("1M0", "Logo", 1, 1, "0:09 until 1M1"), Scene("1M1", "Racing", 2, 3)], "T")
     ms = out.find("part").findall("measure")
-    assert [m.get("number") for m in ms] == ["1", "2", "3"]
+    assert [m.get("number") for m in ms] == ["1", "2", "1"]                  # bar numbers restart in each scene
     assert [r.text for r in out.iter("rehearsal")] == ["1M0  Logo", "1M1  Racing"]
     assert [w.text for w in out.iter("words")] == ["0:09 until 1M1"]
     assert ms[2].find("print").get("new-system") == "yes"

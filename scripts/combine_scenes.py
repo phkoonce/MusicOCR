@@ -107,6 +107,9 @@ def main() -> int:
         mscz = xml.with_suffix(".mscz")
         run_cmd_lenient([cfg["tools"]["musescore"], "-f", "-o", str(mscz), str(xml)], timeout=900, log=print)
         print(f"MuseScore: {mscz} ({'ok' if mscz.exists() else 'FAILED'})")
+        if mscz.exists():
+            from musicocr.mscz_sections import add_section_breaks, section_ends
+            print(f"{add_section_breaks(mscz, section_ends(xml))} section break(s): bar numbers restart at 1 in each scene")
     return 0
 
 
