@@ -167,7 +167,7 @@ def boost_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
     return raised
 
 
-MIN_TALL_SP = 4.0     # a multi-rest count is set big (4.5-10 staff spaces tall); tuplet digits, bar numbers
+MIN_TALL_SP = 3.5     # a multi-rest count is set big (3.7-10 staff spaces tall, by scan and OCR box); tuplet digits, bar numbers
                       # and fingerings are 2-3 spaces
 BREVE_MAX_CONF = 0.5  # a breve detected below this under a count digit is really the multi-rest H-bar
 
