@@ -17,11 +17,19 @@ Clef = Tuple[str, str]  # (sign, line)
 
 def is_rest_only(m: ET.Element) -> bool:
     """True if every ``<note>`` in the measure is a rest (also for empty measures)."""
-    return all(n.find("rest") is not None for n in m.findall("note"))
+    return all(n.find("rest") is not None for n in m.findall("note") if n.find("cue") is None)
 
 
 def measure_total(m: ET.Element) -> int:
-    """Sum of note durations (chords and grace notes excluded), in the measure's divisions."""
+    """Sum of note durations (chords and grace notes excluded), in the measure's divisions.
+    A bar with a ``<backup>`` holds several voices: its length is that of the longest voice."""
+    if m.find("backup") is not None:
+        per: dict = {}
+        for n in m.findall("note"):
+            if n.find("chord") is None and n.find("grace") is None:
+                v = n.findtext("voice") or "1"
+                per[v] = per.get(v, 0) + int(n.findtext("duration") or 0)
+        return max(per.values(), default=0)
     return sum(int(n.findtext("duration") or 0) for n in m.findall("note")
                if n.find("chord") is None and n.find("grace") is None)
 
@@ -91,7 +99,7 @@ def rest_measure(number: int, length: int, full: bool = True) -> ET.Element:
 def copy_notes(src: ET.Element, dst: ET.Element, src_divisions: int = DIV) -> None:
     """Deep-copy ``src``'s notes into ``dst`` (stems dropped, durations rescaled to ``DIV``)."""
     for ch in src:
-        if ch.tag != "note":
+        if ch.tag not in ("note", "backup", "forward"):
             continue
         nn = copy.deepcopy(ch)
         for e in nn.findall("stem"):

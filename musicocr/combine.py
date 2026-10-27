@@ -422,7 +422,7 @@ def copy_marks(src: ET.Element, dst: ET.Element, src_divisions: int, *, notes: b
     only the directions/double bars, for a bar that is rewritten as a whole-bar rest."""
     scale = DIV / src_divisions if src_divisions else 1
     for ch in src:
-        if ch.tag == "note" and notes:
+        if ch.tag in ("note", "backup", "forward") and notes:
             nn = copy.deepcopy(ch)
             for e in nn.findall("stem"):
                 nn.remove(e)
@@ -466,6 +466,12 @@ def balance_wedges(measures: List[ET.Element]) -> int:
         if d in list(m):
             m.remove(d)
     return len(drop)
+
+
+def _has_cue(m: ET.Element) -> bool:
+    """True if the bar carries cue notes (moved over a whole-bar rest by ``barrests``); such a bar is
+    a rest bar for the alignment but keeps its cue line when written out."""
+    return m.find("note/cue") is not None
 
 
 CHECK_COLOR = "#D32F2F"
@@ -669,7 +675,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                            clef=want)
             cur_clef = want or cur_clef
             length = bar_len(spec, b)
-            if src is None or is_rest_only(src[0]):
+            if src is None or (is_rest_only(src[0]) and not _has_cue(src[0])):
                 full_bar = length == meter[0] * DIV * 4 // meter[1]
                 if src is not None:
                     copy_marks(src[0], m, src[1], notes=False)
