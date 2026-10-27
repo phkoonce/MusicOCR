@@ -1,0 +1,55 @@
+# Lexicon for the text layer (musicocr/text_classify.py). Extend or override with
+# [omr.copisteria.text_layer] lexicon = ["my_terms.toml"]: same format; lists are appended.
+#
+# Entries match case-insensitively, ignoring dots and hyphens ("rit." = "rit"), as one whole
+# phrase ("a tempo", "con sord.") or word by word. Words of 5+ letters also match with one OCR
+# error (edit distance 1) and the confusions in [confusions]; shorter ones exactly. The text
+# shown is the canonical spelling given here.
+#
+# Kind priority when a phrase mixes kinds: tempo_change > tempo > technique > expression.
+# "words" are kind-bearing entries; "modifiers" only extend one ("poco" + "rit.").
+
+[tempo]
+words = ["Allegro", "Allegretto", "Moderato", "Andante", "Andantino", "Adagio", "Adagietto", "Presto",
+         "Prestissimo", "Largo", "Larghetto", "Lento", "Grave", "Vivace", "Vivo", "Moderately", "Slow",
+         "Fast", "Faster", "Slower", "Tempo", "Allegro moderato", "Andante con moto", "Tempo di marcia"]
+modifiers = ["Sl.", "Slightly", "Much", "Little", "Poco", "Molto", "Piu", "Meno", "Un poco", "Quasi"]
+
+[tempo_change]
+words = ["rit.", "ritard.", "ritardando", "rall.", "rallentando", "accel.", "accelerando", "a tempo",
+         "tempo primo", "Tempo I", "stringendo", "allargando", "meno mosso", "piu mosso",
+         "l'istesso tempo", "morendo", "calando", "ad lib.", "rubato"]
+modifiers = ["poco a poco", "poco", "molto", "subito", "sub."]
+
+[expression]
+words = ["dolce", "cantabile", "espr.", "espressivo", "sostenuto", "maestoso", "solo", "soli", "tutti",
+         "tranquillo", "grazioso", "giocoso", "agitato", "feroce", "pesante", "leggiero", "leggero",
+         "con fuoco", "con brio", "con moto", "con anima", "misterioso", "sonoro", "lontano", "calmo",
+         "energico", "marziale", "scherzando", "affettuoso", "appassionato", "cresc.", "dim.",
+         "decresc.", "con forza", "delicato", "mesto"]
+modifiers = ["sempre", "poco", "molto", "piu", "meno", "assai", "sub.", "ancora", "un poco", "quasi"]
+
+[technique]
+words = ["marc.", "marcato", "stacc.", "staccato", "sim.", "simile", "con sord.", "senza sord.", "sord.",
+         "open", "muted", "mute", "flutter", "flz.", "ten.", "tenuto", "pizz.", "arco", "non legato",
+         "straight mute", "cup mute", "harmon", "harmon mute", "plunger", "bells up", "gliss.",
+         "glissando", "port.", "portato", "legato", "St. Mute", "Cup", "Straight"]
+modifiers = ["sempre", "poco", "molto", "to"]
+
+# Whole-phrase regular expressions (case-insensitive).
+[patterns]
+technique = ["^to\\s+(?:the\\s+)?[A-Za-z][A-Za-z.\\-]{2,}(?:\\s+[A-Za-z][A-Za-z.\\-]{2,})?$"]
+navigation = ["^segue\\b.*", "^attacca\\b.*", "^vamp\\b.*", "^tacet\\b.*", "^fine$", "^d\\.?\\s?[cs]\\.?\\b.*",
+              "^lunga$"]
+cue = ["^\\(?\\+?\\s*(?:V[lI1]n|F[lI1]|Hn|Hrn|Tpt|Tbn|Tba|Hps|Hp|Ce[lI1]|Ob|Cl|Bsn|Fg|Perc|Timp|Vc|Va|Cb|Choir|Pno|Org|Sax)s?(?![A-Za-z])[.,]?\\s*\\d{0,2}(?:[-,]\\s*\\d)?(?:[\\s,+&/]+(?:V[lI1]n|F[lI1]|Hn|Hrn|Tpt|Tbn|Tba|Hps|Hp|Ce[lI1]|Ob|Cl|Bsn|Fg|Perc|Timp|Vc|Va|Cb|Choir|Pno|Org|Sax)s?(?![A-Za-z])[.,]?\\s*\\d{0,2})*(?:\\s+(?:solo|soli))?\\)?[.,]?$"]
+
+# Never a marking: dynamics (the detector draws them), text with no letters, bar-number ranges.
+[ignore]
+patterns = ["^[(\\[]?[pmfszr]{1,5}[)\\]]?[-\\u2013\\u2014=<>.~_ ]*$",
+            "^[\\W\\d_]*$",
+            "\\buntil\\b",
+            "^\\d+[\\s\\-\\u2013\\u2014_]+\\d+$"]
+
+[confusions]
+# OCR confusion pairs tried (both directions) before the edit-distance-1 test
+pairs = [["rn", "m"], ["1", "l"], ["0", "o"], ["l", "i"], ["vv", "w"], ["cl", "d"]]

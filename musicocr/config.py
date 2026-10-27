@@ -52,6 +52,34 @@ class HomrConfig:
 
 
 @dataclass
+class TextLayerConfig:
+    """[omr.copisteria.text_layer]: tempo/expression/technique words as <direction>s (musicocr/text_layer.py)."""
+    mode: str = "flag"        # "off" | "flag" (classified + flagged unknown text) | "on" (classified only)
+    backend: str = "auto"     # OCR backend for scans ("auto" = macOS Vision, then all backends if it finds nothing)
+    passes: tuple = ("lanczos", "bicubic")   # resampling filters; each band is read under each, results unioned
+    lexicon: tuple = ()       # extra TOML lexicon files merged over musicocr/text_lexicon.toml
+    above_sp: float = 8.0     # zone above a staff, in staff spaces
+    below_sp: float = 6.0
+    min_unknown_letters: int = 3
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "TextLayerConfig":
+        base = cls()
+        mode = str(d.get("mode", base.mode))
+        if mode not in ("off", "flag", "on"):
+            raise ConfigError("[omr.copisteria.text_layer] mode must be 'off', 'flag' or 'on'")
+        backend = str(d.get("backend", base.backend))
+        if backend not in ("auto", "rapidocr", "vision"):
+            raise ConfigError("[omr.copisteria.text_layer] backend must be 'auto', 'rapidocr' or 'vision'")
+        return cls(mode=mode, backend=backend,
+                   passes=tuple(str(x) for x in d.get("passes", base.passes)),
+                   lexicon=tuple(str(x) for x in d.get("lexicon", base.lexicon)),
+                   above_sp=float(d.get("above_sp", base.above_sp)),
+                   below_sp=float(d.get("below_sp", base.below_sp)),
+                   min_unknown_letters=int(d.get("min_unknown_letters", base.min_unknown_letters)))
+
+
+@dataclass
 class CopisteriaConfig:
     detector: str = "28m"   # "28m" (default) or "2m" (smaller, faster)
     fix_empty: bool = True   # give bare-<forward> bars a whole-measure rest
@@ -73,6 +101,7 @@ class CopisteriaConfig:
     ocr_backend: str = "auto"   # texts = "ocr": "auto" (union of all that work), "rapidocr" or "vision"
     multirest_form: str = "collapse"   # "collapse" (homr's form), "expand", or "keep"
     repo: str = str(REPO_ROOT / "omr-eval" / "copisteria" / "repo")
+    text_layer: TextLayerConfig = field(default_factory=TextLayerConfig)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "CopisteriaConfig":
@@ -105,7 +134,8 @@ class CopisteriaConfig:
                    small_graces=bool(d.get("small_graces", False)),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),
                    multirest_form=form, ocr_backend=ocr_backend,
-                   repo=str(d.get("repo", base.repo)))
+                   repo=str(d.get("repo", base.repo)),
+                   text_layer=TextLayerConfig.from_dict(d.get("text_layer", {})))
 
 
 @dataclass

@@ -257,6 +257,33 @@ the normal way to iterate without paying for another full OMR pass.
   or a tuplet note shorter than a 32nd (Copisteria infers tuplets from spacing
   and can invent them while still summing to the right bar length).
 
+### Text layer: tempo, expression and technique words (Copisteria)
+
+The detector reads symbols and the page text only supplies digits, so printed words
+used to be lost. `[omr.copisteria.text_layer]` (default `mode = "flag"`) recovers them as
+MusicXML `<direction>`s: `musicocr/text_words.py` gets the words (the PDF text layer when the
+page has one, else Vision OCR of bands around each staff, read at ~1.5x under two resampling
+filters and unioned, because Vision garbles small italic words in one crop and reads them in
+another), `musicocr/text_classify.py` + `musicocr/text_lexicon.toml` classify the phrases, and
+`musicocr/text_layer.py` filters page furniture and writes `<page>.textlayer.json`, which
+`copisteria_run.py` turns into directions in the staff and bar the phrase sits in.
+
+* Tempo: `Sl. Faster (quarter) = 103` becomes `<words>` + `<metronome>` + `<sound tempo>` (a dotted
+  beat unit is read from the glyph's pixels; the OCR text cannot tell `J.` from `J`). Tempo
+  change (`poco accel.`, `rall. poco a poco`), expression (`maestoso`, `molto cantabile`, `Solo`),
+  technique (`marc.`, `sim.`, `to St. Mute`, `Open`), cue labels (`Vln. 1`, `(+Tpt2-3)`) and
+  navigation (`Segue to 3M21`) become `<words>`. Dynamics words are ignored (the detector draws
+  them); only `<direction>` elements are added, never notes, rests or timing.
+* Precision first: a phrase gets a kind only when every word is in the lexicon (one OCR error is
+  tolerated in words of 5+ letters). Other text above a staff is kept as purple
+  `check: <text>` words (`mode = "flag"`); `mode = "on"` keeps classified text only, `"off"` disables.
+  Text sitting on detected music symbols (accents read as letters), the title block above the first
+  staff, tempo marks under a staff and (OCR) rehearsal letters are never emitted.
+* Extend the vocabulary with `lexicon = ["my_terms.toml"]` (same format as `text_lexicon.toml`; lists are
+  appended). `<page>.textlayer.dropped.json` next to a page lists what was left out and why.
+* Not done (v1): cue-size notes (`5.7`), lyrics/chord symbols, title metadata, tempo voting across
+  parts at combine time (each part keeps its own tempo marks).
+
 ### homr-specific pre/post-processing
 
 `omr-eval/README.md` documents two recurring homr failure modes found across a
@@ -455,6 +482,7 @@ musicocr/
   combine.py / combine_cli.py  # align + merge parts by printed bar number (`musicocr combine`)
   scenes.py / mscz_sections.py  # scene-structured scans; section breaks in a converted .mscz
   page_text.py          # PDF-layer / OCR page text and multi-rest detection prep for Copisteria
+  text_words.py / text_classify.py / text_lexicon.toml / text_layer.py  # tempo/expression/technique words -> <direction>
   transpose.py / instruments.py  # semitone transposition + shared instrument table
   stages/               # ingest, omr (dispatches to omr_homr/omr_audiveris),
                          # correct, extract, normalize, transpose, validate, convert, qa

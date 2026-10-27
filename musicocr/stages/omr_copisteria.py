@@ -120,10 +120,31 @@ def run(ctx: PipelineContext) -> StageResult:
         if n:
             ctx.log(f"  {img.stem}: {n} digit box(es) from {src}")
         _prepare_dets(img, texts_found=bool(n))
+        _write_text_layer(img, page, have_pdf)
         cmd = _page_cmd(img, pdir)
         if detector != "28m":
             cmd += ["--detector", detector]
         return cmd, repo
+
+    def _write_text_layer(img: Path, page: int, have_pdf: bool) -> None:
+        """Tempo / expression / technique words -> <stem>.textlayer.json (copisteria_run.py adds them
+        as <direction>s). Best effort: a failure leaves the page without text marks."""
+        cfg = ctx.config.omr.copisteria.text_layer
+        dst = img.with_name(f"{img.stem}.textlayer.json")
+        if cfg.mode == "off":
+            dst.unlink(missing_ok=True)
+            return
+        try:
+            from musicocr.preprocess import PageGeometry
+            from musicocr.text_layer import write_textlayer_json
+            n = write_textlayer_json(
+                img, cfg, log=ctx.log, pdftotext=pdftotext if have_pdf else None,
+                pdf=source_pdf if have_pdf else None, page=page, geom=PageGeometry.load(img),
+                ocr_python=ctx.config.resolve_tool("homr_python"))
+            if n:
+                ctx.log(f"  {img.stem}: {n} text mark(s) (tempo/expression/technique)")
+        except Exception as exc:  # noqa: BLE001
+            ctx.log(f"  {img.stem}: text layer skipped ({type(exc).__name__}: {exc})")
 
     def _page_cmd(img: Path, pdir: Path) -> list:
         cmd = [py, str(run_script), str(img), "--out", str(pdir)]
@@ -140,7 +161,8 @@ def run(ctx: PipelineContext) -> StageResult:
             return False
         work = pdir / ("second_pass" if first else f"second_pass_{scale:g}")
         work.mkdir(exist_ok=True)
-        for f in (img, *pdir.glob(f"{img.stem}.texts.json"), *pdir.glob(f"{img.stem}.geom.json")):
+        for f in (img, *pdir.glob(f"{img.stem}.texts.json"), *pdir.glob(f"{img.stem}.geom.json"),
+                  *pdir.glob(f"{img.stem}.textlayer.json")):
             (work / f.name).write_bytes(f.read_bytes())
         res = run_cmd_lenient(
             [py, str(script), str(work / img.name), str(base[0]), str(work / base[0].name),

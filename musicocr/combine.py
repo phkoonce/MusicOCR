@@ -37,6 +37,7 @@ from musicocr.alignment.build import (add_attributes, build_score, check_length,
 from musicocr.alignment.spec import DIV, bar_len
 from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words_or_ocr
 from musicocr.marks import MarksOptions, normalize_marks
+from musicocr.text_tempo import unify_tempo
 from musicocr.instruments import INFO, canonical_name, semitones_for
 from musicocr.transpose import _CLEF_FAMILY, _declare_transpose, clef_family, fifths_shift
 
@@ -497,6 +498,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             spans_of: Callable[[Path], List[Tuple[int, int]]] = None,
             max_bar_of: Callable[[Path], Optional[int]] = None,
             marks: Optional["MarksOptions"] = None,
+            tempo_vote: bool = True,
             ) -> Tuple[ET.Element, List[str], Dict[str, Any]]:
     reads_pdfs = last_start_of is None       # callers that inject the print structure (tests) bring their own
     starts_of = starts_of or (lambda pdf: printed_page_starts(pdf, pdftotext))
@@ -701,6 +703,8 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         stats, lines = normalize_marks([(infos[n]["name"], built[n]) for n in infos], marks)
         report.extend(lines)
         summary["marks"] = stats
+    if tempo_vote:                       # one tempo mark per bar (plurality of the parts), in the first part
+        report.extend(unify_tempo(built))
     score = build_score(spec, built, infos)
     # The notes stay as printed (written pitch); declare each part's transposition so the
     # score sounds right (the per-part files carry it, the page files this reads do not).
