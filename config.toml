@@ -109,6 +109,7 @@ fill_empty_bars = true
 # reader leaves unmarked (the bar then shows a gap): run it via copisteria_run.py, which
 # tags the heads under the digit (and ignores small digits as multi-rest counts).
 text_tuplets = true
+# (see [omr.copisteria.text_layer] below for tempo / expression / technique words)
 # Fallback: synthesise a multiRest detection when a tall count digit (page text) sits over an
 # empty bar the detector read nothing in. The digit must be centred over its bar and not one of
 # a stacked pair (a time signature); with those guards it added nothing wrongly on any Zerberus
@@ -135,6 +136,25 @@ reveal_gaps = true
 multirest_form = "collapse"
 # Clone Copisteria runs from (it looks for models/ relative to its repo root).
 # repo = "/path/to/omr-eval/copisteria/repo"
+
+# Tempo / expression / technique words as MusicXML directions (musicocr/text_layer.py,
+# docs/text-layer-design.md). PDF text layer when the page has one, else OCR of the bands
+# around each staff.
+[omr.copisteria.text_layer]
+# "off" | "flag" (classified words + unknown text above a staff as purple "check: ..." words)
+# | "on" (classified words only)
+mode = "flag"
+# OCR backend for scans: "auto" = macOS Vision (then every backend if it found nothing),
+# "vision" or "rapidocr".
+backend = "auto"
+# Resampling filters each OCR band is read under (results unioned; Vision is fragile to the filter).
+passes = ["lanczos", "bicubic"]
+# Extra TOML lexicons merged over musicocr/text_lexicon.toml (same format; lists are appended).
+lexicon = []
+# Zone a phrase may sit in around a staff, in staff spaces.
+above_sp = 8.0
+below_sp = 6.0
+min_unknown_letters = 3
 
 # Audiveris application "constants" (see `Audiveris -help`). Real tuning is
 # iterative: run once, inspect report.md + qa images, then add constants here.

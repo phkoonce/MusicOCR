@@ -1,6 +1,7 @@
 # Design: a text layer for tempo, expression and technique markings
 
-Status: proposal (nothing here is implemented). Written 2026-10-26 after the HTTYD2 trumpet runs.
+Status: v1 implemented 2026-10-27 (cue-note marking, 5.7, is out of scope and handled separately); see
+"Implementation notes" at the end. Written 2026-10-26 after the HTTYD2 trumpet runs.
 
 ## 1. Problem
 
@@ -226,3 +227,32 @@ module to the pipeline diagram.
 3. Where should tempo live in multi-part output: first part only (proposed) or every part?
 4. For the quartets books: are titles/composer lines worth reading into score metadata
    (`<work-title>`, `<creator>`)? The same OCR words would feed it.
+
+## 9. Implementation notes (v1, 2026-10-27)
+
+Phase 0 probe (macOS Vision, bands around each staff, 1.5x, Lanczos + bicubic; HTTYD2 trumpet 1,
+350-dpi page images): go for scans.
+
+| Printed | Read |
+|---|---|
+| `marc.`, `cantabile`, `maestoso`, `molto cantabile`, `Solo`/`Soli`, `sim.`, `stacc.`, `feroce`, `poco accel.`, `poco rit.`, `to St. Mute`, `Open`, `Vln. 1`, `Fl, Vln`, `Ob Solo`, `Segue to 3M21` | read, in one pass or the other (occasionally garbled in one: `Tocter`, `marc.y`) |
+| `Sl. Faster (quarter) = 103`, `Much Slower (dotted quarter) = 59`, `(quarter) = 124` | words and number read; the note glyph is read as `.`, `•`, `d`, `J` or dropped; `=` sometimes twice |
+| accents, note clusters, hairpins | read as letters (`Ibv`, `AAA`, `>>>>`): must be filtered |
+
+Scale 1.5x is enough (1x also finds most; 2-4x not needed). Per band the two filters are unioned; a
+box read two ways keeps the reading the lexicon (or a metronome pattern) understands.
+
+Departures from the proposal, and section 8 answers:
+* `pdftotext -bbox-layout` has no fonts, so the PDF path uses plain `-bbox` words and no font style;
+  style comes from the lexicon kind (expression italic, technique/tempo bold). A `pdftohtml -xml`
+  font lookup would add real italic/bold (not done).
+* Placement is done in `copisteria_run.py` (`place_items`, staff and bar from Copisteria's own layout),
+  from a sidecar `<page>.textlayer.json`; classification, furniture and OCR stay in `musicocr/`.
+  Tempo marks are attached to the staff *below* them (they print above their staff).
+* Beat unit: the unit is read from the glyph: PDF text gives `q`/`e`/`h` and a dot; on scans a dot
+  between note and `=` is found from the pixels (`is_dotted_beat`), since OCR cannot tell `J.` from `J`.
+* Q8.1 words only, no MuseScore staff-text styles. Q8.3 tempo in the first part only
+  (`text_tempo.unify_tempo`, called from `combine`, plurality per bar; disagreements are reported).
+  Q8.2 cue-size marking is out of scope for this work. Q8.4 not done (titles are only ignored).
+* Not in v1: rehearsal letters from scans (OCR reads accents as letters; PDF layer only), rehearsal
+  boxed numbers, `(note = note)` equivalence marks, dynamics words (ignored), fermatas.
