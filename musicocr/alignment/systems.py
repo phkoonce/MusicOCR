@@ -101,7 +101,8 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
 
 
 _RANGE_TOKEN = re.compile(r"\D{0,2}(\d{1,3})\s*[-\u2013\u2014_]\s*(\d{1,3})\D{0,2}")   # OCR adds stray marks ("130-133\u0142")
-_OCR_CACHE_VERSION = "v9"   # bump when the strip geometry / token handling changes: cached OCR words are stale
+_OCR_CACHE_VERSION = "v10"   # bump when the strip geometry / token handling changes: cached OCR words are stale
+_START_MAX_DY_SP = 3.0   # a system's first bar number sits right under its staff; digits lower down are tempo marks etc.
 _MAX_RANGE = 60       # longest multi-rest read as a range; "1-123" is two numbers glued together
 
 
@@ -146,6 +147,16 @@ def _strip_numbers(img, path, box, left: int, k: float) -> List[Word]:
     """Digit words from a strip above a staff, in PDF points, x shifted so the staff's left end is at ``_LEFT_REF_PT``."""
     return [((x0 - left) * k + _LEFT_REF_PT, y0 * k, (x1 - left) * k + _LEFT_REF_PT, y1 * k, t)
             for x0, y0, x1, y1, t, _ in _strip_tokens(img, path, box) if t.isdigit()]
+
+
+def _start_candidates(toks: List[tuple], top: float, bot: float) -> List[tuple]:
+    """The strip tokens that can be a system's first bar number: ranges, and digits right under the staff.
+
+    Digits further down are something else -- a tempo mark ("\u2669 = 104") printed between systems read
+    as bar 10 and threw a whole page's numbering off (HTTYD2 5M38-39A).
+    """
+    space = max((bot - top) / 4, 4)
+    return [t for t in toks if t[5] or (t[1] - bot) / space <= _START_MAX_DY_SP]
 
 
 def _pick_system_starts(cands: List[List[tuple]]) -> List[Optional[tuple]]:
@@ -211,7 +222,8 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
                 nxt = staves[n + 1][0] - space if n + 1 < len(staves) else img.height
                 y0, y1 = int(bot + 0.8 * space), int(min(bot + 6 * space, nxt))
                 lower.append(_strip_tokens(img, Path(tmp) / f"b{n}.png", (x0, y0, int(img.width * .97), y1), ranges=True))
-            for (top, bot, left), toks, pick in zip(staves, lower, _pick_system_starts(lower)):
+            near = [_start_candidates(toks, top, bot) for (top, bot, _), toks in zip(staves, lower)]
+            for (top, bot, left), toks, pick in zip(staves, lower, _pick_system_starts(near)):
                 for t in toks:
                     if t[5]:                                 # a printed multi-rest range, at its own place
                         below.append((t[0] * k, t[1] * k, t[2] * k, t[3] * k, f"{t[5].group(1)}\u2013{t[5].group(2)}"))

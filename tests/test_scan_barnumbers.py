@@ -97,3 +97,12 @@ def test_a_rest_bars_meter_change_pins_where_it_lands():
     ins = [0.01] * 6
     slots = align_to_target(src, ref, ins, None, [True, None, None, None], [0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     assert slots.index(0) == 2
+
+
+def test_digits_far_below_the_staff_are_not_system_starts():
+    from musicocr.alignment.systems import _start_candidates
+    top, bot = 100, 200                                  # staff space 25
+    near = (14, 230, 30, 245, "104", None)               # 1.2 spaces under the staff: a bar number
+    tempo = (14, 308, 30, 320, "104", None)              # 4.3 spaces under: "= 104" before the next system
+    rng = (300, 330, 330, 345, "116-123", object())      # a range label is kept wherever it sits
+    assert _start_candidates([tempo, near, rng], top, bot) == [near, rng]
