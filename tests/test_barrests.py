@@ -123,3 +123,18 @@ def test_combine_keeps_cue_voice_and_flags_nothing(tmp_path):
     m2 = score.findall("part")[0].findall("measure")[1]
     assert m2.find("backup") is not None
     assert len([n for n in m2.findall("note") if n.find("cue") is not None]) == 3
+
+
+def test_voice_two_already_split_gets_cue_marks_and_one_bar_backup():
+    # measure 5 of the table: voice 1 = cue-line rest + whole-bar rest, voice 2 after a forward
+    m5 = (QREST + WHOLE + "<backup><duration>24</duration></backup><forward><duration>6</duration><voice>2</voice></forward>"
+          + _n("A", 6, "quarter").replace("<voice>1", "<voice>2") + _n("B", 6, "quarter").replace("<voice>1", "<voice>2"))
+    m6 = WHOLE + "<backup><duration>18</duration></backup>" + _n("G", 18, "half").replace("<voice>1", "<voice>2")
+    root = _score34(m5, m6)
+    assert fix_tree(root, log=lambda *_: None) == 2
+    from musicocr.alignment.build import measure_total
+    a, b = root.findall("part/measure")
+    assert measure_total(a) == 18 and a.find("backup/duration").text == "18" and len(a.findall("note")) == 3
+    assert all(n.find("cue") is not None for n in a.findall("note") if n.findtext("voice") == "2")
+    assert b.find("note[voice='2']/cue") is not None
+    assert fix_tree(root, log=lambda *_: None) == 0          # idempotent

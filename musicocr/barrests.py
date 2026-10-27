@@ -81,12 +81,53 @@ def cue_notes_over_rest(measure: ET.Element, capacity: Optional[int]) -> bool:
     return True
 
 
+def cue_voice_over_rest(measure: ET.Element, capacity: Optional[int]) -> bool:
+    """The OMR already split the bar into two voices: voice 1 holds a whole-bar rest (typeless, bar
+    length), voice 2 the cue notes -- but voice 1 may also hold the cue line's own rests, so it
+    overflows the bar (``backup`` = capacity + those rests). Drop those rests (voice 2 starts after
+    a ``forward`` of their length), make the backup one bar, and mark voice 2 as cue notes."""
+    if capacity is None:
+        return False
+    kids = [c for c in measure if c.tag in ("note", "backup", "forward")]
+    backs = [i for i, c in enumerate(kids) if c.tag == "backup"]
+    if len(backs) != 1:
+        return False
+    b = backs[0]
+    v1, v2 = kids[:b], kids[b + 1:]
+    if any(c.tag != "note" or c.find("rest") is None or c.find("grace") is not None for c in v1):
+        return False
+    if any(c.find("time-modification") is not None for c in v1 + v2 if c.tag == "note"):
+        return False
+    whole = [c for c in v1 if c.find("type") is None]
+    if len(whole) != 1 or whole[0].findtext("duration") != str(capacity):
+        return False
+    extra = [c for c in v1 if c is not whole[0]]
+    d = sum(int(c.findtext("duration") or 0) for c in extra)
+    back = kids[b]
+    if back.findtext("duration") != str(capacity + d):
+        return False
+    notes2 = [c for c in v2 if c.tag == "note"]
+    if not any(c.find("pitch") is not None for c in notes2) or any(c.findtext("voice") == "1" for c in notes2):
+        return False
+    if sum(int(c.findtext("duration") or 0) for c in v2 if c.tag in ("forward",) or (c.tag == "note" and c.find("chord") is None and c.find("grace") is None)) != capacity:
+        return False
+    changed = bool(extra)
+    for c in extra:
+        measure.remove(c)
+    back.find("duration").text = str(capacity)
+    for n in notes2:
+        if n.find("cue") is None:
+            n.insert(1 if n.find("grace") is not None else 0, ET.Element("cue"))
+            changed = True
+    return changed
+
+
 def fix_tree(root: ET.Element, log: Callable[[str], None] = print) -> int:
     """Fix every part of a ``score-partwise``; returns the number of bars changed."""
     fixed = 0
     for part in root.findall("part"):
         for m, div, cap in measures_with_capacity(part):
-            if cue_notes_over_rest(m, cap):
+            if cue_notes_over_rest(m, cap) or cue_voice_over_rest(m, cap):
                 log(f"  measure {m.get('number')}: cue notes moved to voice 2")
                 fixed += 1
             elif fix_measure(m, cap):
