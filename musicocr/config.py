@@ -31,6 +31,7 @@ class Tools:
     audiveris: str = ""
     homr_python: str = str(REPO_ROOT / "omr-eval" / "homr" / ".venv" / "bin" / "python")
     copisteria_python: str = str(REPO_ROOT / "omr-eval" / "copisteria" / ".venv" / "bin" / "python")
+    legato2_python: str = str(REPO_ROOT / "omr-eval" / "legato2" / ".venv" / "bin" / "python")
     musescore: str = ""
     pdfinfo: str = "pdfinfo"
     pdftoppm: str = "pdftoppm"
@@ -139,6 +140,25 @@ class CopisteriaConfig:
 
 
 @dataclass
+class Legato2Config:
+    model: str = "guangyangmusic/legato-2"   # HF repo id (gated) or a local snapshot directory
+    device: str = "auto"       # "auto" (cuda > mps > cpu), or an explicit torch device
+    beam_size: int = 1         # greedy by default (the model card's default)
+    yolo_conf: float = 0.7     # system-segmentation confidence
+    repo: str = str(REPO_ROOT / "omr-eval" / "legato2" / "repo")
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Legato2Config":
+        base = cls()
+        beam = int(d.get("beam_size", base.beam_size))
+        if beam < 1:
+            raise ConfigError("[omr.legato2] beam_size must be >= 1")
+        return cls(model=str(d.get("model", base.model)), device=str(d.get("device", base.device)),
+                   beam_size=beam, yolo_conf=float(d.get("yolo_conf", base.yolo_conf)),
+                   repo=str(d.get("repo", base.repo)))
+
+
+@dataclass
 class OmrConfig:
     engine: str = "homr"
     profile: str = "default"
@@ -149,6 +169,7 @@ class OmrConfig:
     profiles: Dict[str, List[str]] = field(default_factory=lambda: {"default": []})
     homr: HomrConfig = field(default_factory=HomrConfig)
     copisteria: CopisteriaConfig = field(default_factory=CopisteriaConfig)
+    legato2: Legato2Config = field(default_factory=Legato2Config)
     # Extra Audiveris constants from the CLI (--constant); never read from TOML.
     extra_constants: List[str] = field(default_factory=list)
 
@@ -175,6 +196,7 @@ class OmrConfig:
             profiles=profiles,
             homr=HomrConfig.from_dict(d.get("homr", {}) or {}),
             copisteria=CopisteriaConfig.from_dict(d.get("copisteria", {}) or {}),
+            legato2=Legato2Config.from_dict(d.get("legato2", {}) or {}),
         )
 
 

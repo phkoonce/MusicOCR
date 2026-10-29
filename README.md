@@ -156,9 +156,13 @@ Inserted dynamics and moved hairpin stops are coloured blue; every change is in 
   published benchmarks are on multi-staff scores, so it is being evaluated
   side by side with homr on parts. Also leaves `pNNN.reading.json` (per-symbol
   evidence) and `pNNN.html` (viewer) beside each page's MusicXML.
-* **`legato2`** — reserved placeholder. LEGATO 2 (arXiv:2607.05769) has no
-  released code or weights yet; selecting it fails with an explanatory error.
-  See `musicocr/stages/omr_legato2.py` for the wiring checklist.
+* **`legato2`** — [LEGATO 2](https://huggingface.co/guangyangmusic/legato-2) (arXiv:2607.05769,
+  Apache-2.0, 0.9B): finds systems on the page, transcribes each to ABC notation, which is converted
+  to MusicXML with music21 (`musicocr/abc_convert.py`). Own venv under `omr-eval/legato2/`
+  (`omr-eval/setup.sh`); the weights are gated on Hugging Face (log in and accept the terms), and
+  the inference code (`legato.pipeline.Legato2`) must be present in `omr-eval/legato2/repo`.
+  Settings in `[omr.legato2]` (`model`, `device`, `beam_size`, `yolo_conf`). No Copisteria-style
+  post-fixes: you get the model's raw reading, which is what `musicocr compare` wants.
 * **`audiveris`** — the original classical pipeline. Still the better choice
   for full scores / multi-staff systems, and the only engine with a hand
   correction workflow (see below).
@@ -438,7 +442,7 @@ identically:
 <output>/<book>/compare.md, compare.json   the comparison
 ```
 
-Engines that are unavailable (missing tool, or the `legato2` placeholder) are
+Engines that are unavailable (missing tool or code) are
 skipped with a message. Each engine stops after `validate` unless `--convert`
 is given (then convert and qa run too). Other flags: `--pages`, `--force`,
 `--keep-going`, `--preprocess/--deskew/--crop` (and `--no-*`),
@@ -456,7 +460,7 @@ after an engine drops a multi-rest count) to look up in the scan. Re-running
 into the same directory reuses finished pages, so stage timings then show ~0
 for OMR; use `--force` for fresh timings.
 
-Not yet: batch-TOML `engines=[...]`, ground-truth scoring (`--truth`), LEGATO 2.
+Not yet: batch-TOML `engines=[...]`, ground-truth scoring (`--truth`).
 
 ## No-scan smoke test
 

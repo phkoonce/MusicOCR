@@ -26,7 +26,8 @@ pdftotext = "pdftotext"
 #                 regardless of [preprocess] enabled.
 #   "copisteria" - page-image reader with a learned evidence model (omr-eval/setup.sh).
 #                 Benchmarked by its authors on multi-staff scores, not yet on parts here.
-#   "legato2"   - placeholder; the model is not released (paper only).
+#   "legato2"   - LEGATO 2 (full-page, emits ABC -> MusicXML via music21). Gated weights;
+#                 see omr-eval/setup.sh and [omr.legato2] below.
 #   "audiveris" - classical segment-classify-reconstruct pipeline, tunable via
 #                 [omr.profiles.*] constants, the only engine with a GUI
 #                 hand-correction round-trip ([stages.correct]).
@@ -58,6 +59,16 @@ merge_pages = true
 # export right after homr writes it, before merge/validate see it. See
 # musicocr/homr_fixes.py and omr-eval/README.md's 2026-09-12 finding.
 fix_multirest = true
+
+[omr.legato2]
+# HF repo id (gated: `huggingface-cli login` + accept terms) or a local snapshot directory.
+model = "guangyangmusic/legato-2"
+# "auto" picks cuda > mps > cpu.
+device = "auto"
+# 1 = greedy (the model card's default); larger is slower, maybe more accurate.
+beam_size = 1
+# System-segmentation confidence for the YOLO line detector.
+yolo_conf = 0.7
 
 [omr.copisteria]
 # Symbol detector: "28m" (default, more accurate) or "2m" (smaller, faster).

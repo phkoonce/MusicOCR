@@ -117,7 +117,8 @@ def test_collect_metrics_and_render(tmp_path):
 
 def test_engine_unavailable(tmp_path):
     cfg = Config(path=tmp_path / "c.toml")
-    assert "released" in compare.engine_unavailable(cfg, "legato2")
+    cfg.tools.legato2_python = "python3"   # tool present; the missing code is what's reported
+    assert "LEGATO 2 code not found" in compare.engine_unavailable(cfg, "legato2")
     assert compare.engine_unavailable(cfg, "homr") is None or \
         "not found" in compare.engine_unavailable(cfg, "homr")
 

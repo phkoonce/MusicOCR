@@ -11,7 +11,7 @@ Capabilities are declared per engine rather than tested by name at call sites:
 * ``checks``       - engine-specific validate heuristics to enable.
 * ``available``    - False for placeholders whose model isn't released yet; they
   are accepted by config/CLI so the name is reserved, but running one fails with
-  ``note``.
+  ``note``. (No engine is a placeholder at the moment.)
 """
 from __future__ import annotations
 
@@ -34,9 +34,7 @@ ENGINES: dict[str, Engine] = {e.name: e for e in (
            checks=frozenset({"dropped_multirest"})),
     Engine("audiveris", "omr_audiveris", "Audiveris", "audiveris"),
     Engine("copisteria", "omr_copisteria", "Copisteria", "copisteria_python"),
-    Engine("legato2", "omr_legato2", "LEGATO 2", "",
-           available=False,
-           note="LEGATO 2 (arXiv:2607.05769) has no released code or weights yet"),
+    Engine("legato2", "omr_legato2", "LEGATO 2", "legato2_python"),
 )}
 
 VALID_ENGINES = frozenset(ENGINES)

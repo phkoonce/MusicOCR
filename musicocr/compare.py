@@ -382,6 +382,8 @@ def engine_unavailable(config, name: str) -> str | None:
         return f"tool {eng.tool!r} not found (see `musicocr doctor`)"
     if name == "copisteria" and not Path(config.omr.copisteria.repo).expanduser().is_dir():
         return f"Copisteria repo not found at {config.omr.copisteria.repo!r}"
+    if name == "legato2" and not (Path(config.omr.legato2.repo).expanduser() / "legato").is_dir():
+        return f"LEGATO 2 code not found at {config.omr.legato2.repo!r} (run omr-eval/setup.sh)"
     return None
 
 
