@@ -97,3 +97,22 @@ def test_beamed_note_missing_its_tuplet_ratio_is_adopted():
     assert last.findtext("duration") == "10" and last.findtext("time-modification/actual-notes") == "3"
     assert [t.get("type") for t in last.iter("tuplet")] == ["stop"]
     assert sum(int(d.findtext("duration")) for d in _m(root).findall("note")) == 90
+
+
+def test_bar_whose_tuplet_has_no_notation_is_cleared_to_a_rest():
+    # 3:2 run of quarter, eighth rest, eighth (4/3 beat), then an eighth pair: adds up to 2 beats yet unwritable
+    root = _bar(_n(dur=20, tm=(3, 2), typ="quarter"), _n("rest", 10, tm=(3, 2)), _n(dur=10, tm=(3, 2)),
+                _n("rest", 10, tm=(3, 2), typ="eighth"), _n(dur=10, tm=(3, 2)), _n("rest", 10, tm=(3, 2)),
+                _n(dur=15), _n(dur=15), beats=3)
+    logs = []
+    assert fix_tree(root, log=logs.append) == 1 and logs[0].strip().startswith("measure 1: cleared")
+    m = _m(root)
+    notes = m.findall("note")
+    assert len(notes) == 1 and notes[0].find("rest") is not None and notes[0].findtext("duration") == "90"
+    assert m.find("direction/direction-type/words").text.startswith("check:")
+
+
+def test_writable_triplets_are_left_alone():
+    root = _bar(*[_n(dur=10, tm=(3, 2)) for _ in range(3)], _n(dur=30, typ="quarter"), _n(dur=60, typ="half"))
+    assert fix_tree(root, log=lambda *_: None) == 0
+    assert len(_m(root).findall("note")) == 5

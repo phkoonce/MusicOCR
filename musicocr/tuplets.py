@@ -19,6 +19,10 @@ open). The rebuilt bar is kept only if it then has exactly the length of the bar
 left as read. Plenty of OMR tuplets look odd (adjacent groups of mixed note values, a trailing
 note without a bracket) yet add up, and are left alone. A rebuilt run is coloured and gets a
 "check" text above it (``flag=True``): the right fix is a guess from the printed note values.
+
+A bar with a tuplet that has no notation at all (groups filling 4/3 of a beat, say) is different: it
+may add up to the time signature, yet MuseScore cannot lay it out. ``clear_unwritable`` replaces such
+a bar by a rest (flagged), to be re-entered by hand.
 """
 from __future__ import annotations
 
@@ -275,14 +279,76 @@ def fix_measure(measure: ET.Element, div: int, capacity: Optional[int], flag: bo
             f"{F(capacity, div)} beats (it has {F(before, div)})"]
 
 
+def _note_value(beats: F) -> bool:
+    """A span MuseScore can write as one (dotted) note: 1/8 .. 8 quarters, plain or dotted."""
+    return any(beats == F(2) ** k * m for k in range(-3, 4) for m in (1, F(3, 2)))
+
+
+def _unwritable(run: List[ET.Element], div: int) -> Optional[str]:
+    """Why ``run`` (one ratio throughout) cannot be notated as complete tuplets, else None.
+
+    A tuplet of ``actual-notes`` notes fills one note value (a triplet of eighths a quarter). A run
+    whose consecutive groups fill something else (a quarter, an eighth rest and an eighth in a
+    3:2 run fill 4/3 of a beat) has no notation: MuseScore lays it out with overlapping groups at
+    negative offsets and pads the bar with ever shorter rests.
+    """
+    ratios = {_ratio(n) for n in run}
+    if len(ratios) != 1 or None in ratios:
+        return None
+    actual, _ = next(iter(ratios))
+    if actual <= 0:
+        return None
+    if len(run) % actual:
+        return f"{len(run)} notes in {actual}-note tuplets"
+    for i in range(0, len(run), actual):
+        span = F(sum(_dur(n) for n in run[i:i + actual]), div)
+        if not _note_value(span):
+            return f"a {actual}-note tuplet filling {span} beats"
+    return None
+
+
+def clear_unwritable(measure: ET.Element, div: int, capacity: Optional[int], flag: bool = True) -> List[str]:
+    """Replace a bar whose tuplets cannot be notated by one bar-long rest; returns the message, if any.
+
+    Nothing in such a bar is a faithful reading, so keeping it only gives a bar that cannot be
+    edited (deleting its contents corrupts the next bar). The rest is flagged for re-entry by hand.
+    """
+    if measure.find("backup") is not None or measure.find("forward") is not None:
+        return []
+    why = next((w for run in _voice_runs(measure) if (w := _unwritable(run, div))), None)
+    if why is None:
+        return []
+    notes = measure.findall("note")
+    total = capacity if capacity is not None else _total(measure)       # a regular bar, whatever the notes added up to
+    first = list(measure).index(notes[0])
+    for n in notes:
+        measure.remove(n)
+    rest = ET.Element("note", color=FLAG_COLOR) if flag else ET.Element("note")
+    whole_bar = capacity is not None
+    ET.SubElement(rest, "rest", measure="yes") if whole_bar else ET.SubElement(rest, "rest")
+    ET.SubElement(rest, "duration").text = str(total)
+    ET.SubElement(rest, "voice").text = "1"
+    if not whole_bar:
+        ET.SubElement(rest, "type").text = "quarter"
+    measure.insert(first, rest)
+    if flag:
+        d = ET.Element("direction", placement="above")
+        ET.SubElement(ET.SubElement(d, "direction-type"), "words", color=FLAG_COLOR).text = "check: bar cleared (unreadable tuplet)"
+        measure.insert(first, d)
+    return [f"cleared: {why}; bar replaced by a rest"]
+
+
 def fix_tree(root: ET.Element, flag: bool = True, log: Callable[[str], None] = print) -> int:
-    """Clean up every part of a ``score-partwise``; returns the number of bars rebuilt."""
+    """Clean up every part of a ``score-partwise``; returns the number of bars rebuilt or cleared."""
     fixed = 0
     for part in root.findall("part"):
         for m, div, cap in measures_with_capacity(part):
-            for msg in fix_measure(m, div, cap, flag):
+            msgs = fix_measure(m, div, cap, flag)
+            if not any(msg.startswith("rebuilt") for msg in msgs):
+                msgs += clear_unwritable(m, div, cap, flag)
+            for msg in msgs:
                 log(f"  measure {m.get('number')}: {msg}")
-                fixed += msg.startswith("rebuilt")
+                fixed += msg.startswith(("rebuilt", "cleared"))
     return fixed
 
 
