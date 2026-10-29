@@ -149,6 +149,11 @@ and expression word: classified as expression when a metronome mark is not adjac
 - Per-part text stays per part (parts differ legitimately).
 - Tempo/tempo-change: plurality across parts per bar; written in the first part only (like the
   transposition declaration) to avoid N copies; voted across parts also fixes single-part OCR misses.
+- Words printed above the same bar in 2+ parts ("Allegro", "a tempo", "rit.") are written once, in the
+  first part, as system text (`<direction system="only-top">`, which MuseScore imports as System Text
+  instead of Staff Text); `musicocr/text_system.py`. Texts only one part prints stay staff text.
+- Without printed bar numbers the same texts steer the rhythm alignment (`align_by_rhythm`): a bar
+  carrying a text the other parts print over a slot is pulled to that slot.
 - Scene concatenation (`scenes.py`) already carries directions with bar content; no change.
 
 ### 5.7 Cue notes (optional second phase)

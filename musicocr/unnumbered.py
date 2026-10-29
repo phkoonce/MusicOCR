@@ -14,6 +14,8 @@ from typing import FrozenSet, List, Optional, Sequence
 TICKS = 12          # onset resolution: twelfths of a quarter note (triplets and sixteenths both land on it)
 INDEL_BASE = 0.3    # an inserted/dropped bar costs this plus up to 0.7 for the bar that has notes
 INSERT_TIEBREAK = 1e-4
+TEXT_AGREE = 0.6    # a text ("rit.", "Allegro") over a source bar and over the same slot of another part lowers the cost
+TEXT_ELSEWHERE = 0.3  # a text the other parts print, but over other slots only, raises it
 
 
 def onsets(measure: ET.Element, divisions: int) -> FrozenSet[int]:
@@ -39,21 +41,36 @@ def dissimilarity(a: FrozenSet[int], b: FrozenSet[int]) -> float:
     return 1.0 - len(a & b) / len(a | b)
 
 
-def align_by_rhythm(src: Sequence[FrozenSet[int]], ref: Sequence[Sequence[FrozenSet[int]]]) -> List[Optional[int]]:
+def align_by_rhythm(src: Sequence[FrozenSet[int]], ref: Sequence[Sequence[FrozenSet[int]]],
+                    src_text: Optional[Sequence[FrozenSet[str]]] = None,
+                    ref_text: Optional[Sequence[Sequence[FrozenSet[str]]]] = None) -> List[Optional[int]]:
     """Map each of ``len(ref)`` slots to a source bar index (None = synthesise a rest).
 
     ``ref[j]`` holds the other parts' onsets at slot j. A bar matched to a slot costs its mean
     dissimilarity to them; as in ``combine.align_to_target`` only the length difference's worth of
     indels is allowed, so a one-bar misread never becomes a rearrangement. Dropping a rest bar and
     inserting where the others rest are cheap.
+
+    ``src_text[i]`` / ``ref_text[j]`` (optional) are the texts above the source bar and above the
+    other parts' bars at slot j (``text_system.text_keys``): a text shared by both is strong evidence
+    that they are the same bar, one the others print only elsewhere is evidence against.
     """
     n, m = len(src), len(ref)
     allow_del, allow_ins = n >= m, n <= m
     INF = 1e18
 
+    anywhere = frozenset().union(*(s for r in ref_text for s in r)) if ref_text else frozenset()
+
     def match(i: int, j: int) -> float:
         r = ref[j]
-        return sum(dissimilarity(src[i], x) for x in r) / len(r) if r else 0.5
+        c = sum(dissimilarity(src[i], x) for x in r) / len(r) if r else 0.5
+        if src_text is not None and ref_text is not None and src_text[i]:
+            here = frozenset().union(*ref_text[j]) if ref_text[j] else frozenset()
+            if src_text[i] & here:
+                c = max(c - TEXT_AGREE, 0.0)
+            elif (src_text[i] & anywhere) - here:
+                c += TEXT_ELSEWHERE
+        return c
 
     played_ref = [sum(1 for x in r if x) / len(r) if r else 0.5 for r in ref]
     D = [[INF] * (m + 1) for _ in range(n + 1)]

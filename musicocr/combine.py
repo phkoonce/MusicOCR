@@ -37,6 +37,7 @@ from musicocr.alignment.build import (add_attributes, build_score, check_length,
 from musicocr.alignment.spec import DIV, bar_len
 from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words_or_ocr
 from musicocr.marks import MarksOptions, normalize_marks
+from musicocr.text_system import text_keys, unify_system_text
 from musicocr.text_tempo import unify_tempo
 from musicocr.unnumbered import align_by_rhythm, onsets
 from musicocr.instruments import INFO, canonical_name, semitones_for
@@ -283,14 +284,16 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
 
 def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int, report: List[str],
                   decl_ref: Optional[List[float]] = None,
-                  rhythm_ref: Optional[List[List[Any]]] = None) -> Tuple[List[Optional[Src]], Dict[int, str]]:
+                  rhythm_ref: Optional[List[List[Any]]] = None,
+                  text_ref: Optional[List[List[Any]]] = None) -> Tuple[List[Optional[Src]], Dict[int, str]]:
     """One part's bars on 1..total: pages that read the printed bar count are taken as they are, the
     others are aligned to the printed structure (``align_to_target``); a short part is padded.
 
     ``ref[bar]`` is the share of the other parts resting at ``bar``; ``decl_ref`` (per bar: the share of
     the *other* parts that change meter there) lets a source bar's own meter change steer where it
     lands. ``rhythm_ref`` (parts without printed bar numbers: per bar, the other parts' onsets there)
-    aligns a part of the wrong length by rhythm instead (``musicocr.unnumbered``). Returns ``(bars, flags)``, ``flags[bar]`` being the "check" text to put on that bar.
+    aligns a part of the wrong length by rhythm instead (``musicocr.unnumbered``); ``text_ref`` (per bar: the
+    other parts' texts there) adds the tempo/expression words above the bars as a hint. Returns ``(bars, flags)``, ``flags[bar]`` being the "check" text to put on that bar.
     """
     seq: List[Optional[Src]] = []
     flags: Dict[int, str] = {}
@@ -309,7 +312,9 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
         if by_rhythm or sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
             ins = [0.01 if (a + j) in d["rests"] else 2.0 for j in range(t)] if d["rests"] else None
             if by_rhythm:
-                slots = align_by_rhythm([onsets(*s) for s in pg], rhythm_ref)
+                slots = align_by_rhythm([onsets(*s) for s in pg], rhythm_ref,
+                                        [text_keys(s[0]) for s in pg] if text_ref else None,
+                                        text_ref[a - 1:a - 1 + t] if text_ref else None)
             else:
                 slots = align_to_target([_rest_flag(s) for s in pg],
                                         [0.5 if x is None else x for x in r], ins,
@@ -609,14 +614,23 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         return {pid: [[o[b] for q, o in on.items() if q != pid and b < len(o) and o[b] is not None]
                       for b in range(total)] for pid in bars_by}
 
+    def text_refs(bars_by: Dict[str, List[Optional[Src]]], usable) -> Dict[str, List[List[Any]]]:
+        """Per part and bar: the texts above the *other* usable parts' bars there."""
+        tx = {pid: [text_keys(s[0]) if s is not None else None for s in seq] for pid, seq in bars_by.items()
+              if usable(pid, seq)}
+        return {pid: [[o[b] for q, o in tx.items() if q != pid and b < len(o) and o[b] is not None]
+                      for b in range(total)] for pid in bars_by}
+
     def lay_out(report: List[str], decl_ref_by: Optional[Dict[str, List[float]]] = None,
-                rhythm_by: Optional[Dict[str, List[List[Any]]]] = None):
+                rhythm_by: Optional[Dict[str, List[List[Any]]]] = None,
+                text_by: Optional[Dict[str, List[List[Any]]]] = None):
         """Every part on bars 1..total (see ``_lay_out_part``)."""
         bars: Dict[str, List[Optional[Src]]] = {}
         flags: Dict[str, Dict[int, str]] = {}
         for pid, d in data.items():
             bars[pid], fl = _lay_out_part(pid, d, ref, total, report, decl_ref_by[pid] if decl_ref_by else None,
-                                          rhythm_by[pid] if rhythm_by else None)
+                                          rhythm_by[pid] if rhythm_by else None,
+                                          text_by[pid] if text_by else None)
             if fl:
                 flags[pid] = fl
         return bars, flags
@@ -633,13 +647,16 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         # rhythm, then every part is aligned again to all the others
         full = {pid: [s for pg in d["pages"] for s in pg] for pid, d in data.items()
                 if all(d["good"])}
-        bars, flags = lay_out([], rhythm_by=rhythm_refs({**{p: [None] * total for p in data}, **full},
-                                                        lambda pid, seq: pid in full))
+        ref_full = {**{p: [None] * total for p in data}, **full}
+        only_full = lambda pid, seq: pid in full
+        bars, flags = lay_out([], rhythm_by=rhythm_refs(ref_full, only_full),
+                              text_by=text_refs(ref_full, only_full))
         if len(data) > 2:
-            bars, flags = lay_out(report, rhythm_by=rhythm_refs(bars, lambda pid, seq: True))
+            bars, flags = lay_out(report, rhythm_by=rhythm_refs(bars, lambda pid, seq: True),
+                                  text_by=text_refs(bars, lambda pid, seq: True))
         else:
-            bars, flags = lay_out(report, rhythm_by=rhythm_refs({**{p: [None] * total for p in data}, **full},
-                                                                lambda pid, seq: pid in full))
+            bars, flags = lay_out(report, rhythm_by=rhythm_refs(ref_full, only_full),
+                                  text_by=text_refs(ref_full, only_full))
 
     # consensus key / meter per bar, and the pickup
     key_by: Dict[str, List[Optional[int]]] = {}
@@ -741,6 +758,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
         summary["marks"] = stats
     if tempo_vote:                       # one tempo mark per bar (plurality of the parts), in the first part
         report.extend(unify_tempo(built))
+    report.extend(unify_system_text(built))      # words the parts print over the same bar: system text, once
     score = build_score(spec, built, infos)
     # The notes stay as printed (written pitch); declare each part's transposition so the
     # score sounds right (the per-part files carry it, the page files this reads do not).
