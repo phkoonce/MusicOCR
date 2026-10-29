@@ -49,6 +49,7 @@ class Part:
     instrument: str = ""  # transposition-table name; empty = leave pitches as written
     score: bool = True    # include in `musicocr combine` (False for e.g. percussion)
     small_graces: bool = False  # copisteria: small noteheads are ruff/flam grace notes (timpani, drums)
+    source_pdf: Optional[Path] = None  # this part's own PDF (a book per part); default: the batch's source_pdf
 
 
 @dataclass(frozen=True)
@@ -82,13 +83,16 @@ def _require(data: dict, field_name: str, kind: type):
 
 def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
     """Build a BatchSpec from decoded TOML ``data``; ``name`` is the spec file stem."""
-    source = Path(_require(data, "source_pdf", str)).expanduser()
-    prefix = data.get("key_prefix", "")
-    if not isinstance(prefix, str):
-        raise BatchSpecError("batch spec: 'key_prefix' must be str")
     raw_parts = data.get("parts")
     if not isinstance(raw_parts, list) or not raw_parts:
         raise BatchSpecError("batch spec: need at least one [[parts]] entry")
+    if "source_pdf" in data or not all("source_pdf" in r for r in raw_parts):
+        source = Path(_require(data, "source_pdf", str)).expanduser()
+    else:                                   # every part names its own PDF
+        source = Path(raw_parts[0]["source_pdf"]).expanduser()
+    prefix = data.get("key_prefix", "")
+    if not isinstance(prefix, str):
+        raise BatchSpecError("batch spec: 'key_prefix' must be str")
     parts: List[Part] = []
     seen = set()
     for raw in raw_parts:
@@ -100,6 +104,7 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
             instrument=raw.get("instrument", ""),
             score=bool(raw.get("score", True)),
             small_graces=bool(raw.get("small_graces", False)),
+            source_pdf=Path(raw["source_pdf"]).expanduser() if raw.get("source_pdf") else None,
         )
         if part.first_page < 1 or part.last_page < part.first_page:
             raise BatchSpecError(f"batch spec: bad page range for part '{part.id}'")
@@ -227,7 +232,7 @@ def split_pdf(spec: BatchSpec, part: Part) -> Path:
     template = spec.input_dir / f"_{key}-%d.pdf"
     subprocess.run(
         ["pdfseparate", "-f", str(part.first_page), "-l", str(part.last_page),
-         str(spec.source_pdf), str(template)],
+         str(part.source_pdf or spec.source_pdf), str(template)],
         check=True,
     )
     pieces = [spec.input_dir / f"_{key}-{n}.pdf" for n in range(part.first_page, part.last_page + 1)]

@@ -188,3 +188,22 @@ def test_run_batch_jobs_runs_every_part_once(tmp_path):
     state = batch.run_batch(spec, runner=runner, splitter=lambda s, p: tmp_path / f"{p.id}.pdf", jobs=3)
     assert sorted(seen) == ["a", "b"] and peak[0] == 2
     assert all(v["status"] == "done" for v in state.values())
+
+
+def test_part_source_pdf_overrides_batch_source(tmp_path):
+    d = _data()
+    d["parts"][1]["source_pdf"] = "~/x/other.pdf"
+    spec = batch.parse_spec(d, "demo", root=tmp_path)
+    assert spec.parts[0].source_pdf is None
+    assert spec.parts[1].source_pdf == Path("~/x/other.pdf").expanduser()
+
+
+def test_batch_source_optional_when_every_part_has_one(tmp_path):
+    d = _data()
+    del d["source_pdf"]
+    with pytest.raises(BatchSpecError):
+        batch.parse_spec(d, "demo", root=tmp_path)
+    for p in d["parts"]:
+        p["source_pdf"] = "~/x/book.pdf"
+    spec = batch.parse_spec(d, "demo", root=tmp_path)
+    assert spec.parts[0].source_pdf == Path("~/x/book.pdf").expanduser()
