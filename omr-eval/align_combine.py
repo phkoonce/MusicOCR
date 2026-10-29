@@ -27,10 +27,10 @@ import argparse
 from pathlib import Path
 from typing import List, Optional
 
-from musicocr.alignment import AlignmentError
-from musicocr.alignment.build import write_score
-from musicocr.alignment.spec import load_spec
-from musicocr.alignment.units import combine
+from musicocr.assemble.alignment import AlignmentError
+from musicocr.assemble.alignment.build import write_score
+from musicocr.assemble.alignment.spec import load_spec
+from musicocr.assemble.alignment.units import combine
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:

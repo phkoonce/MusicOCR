@@ -4,7 +4,7 @@ from __future__ import annotations
 from xml.etree import ElementTree as ET
 
 from musicocr.barcheck import check_bar_counts, check_page, page_files_of
-from musicocr.copisteria_fixes import drop_ghost_bars
+from musicocr.engines.copisteria.fixes import drop_ghost_bars
 
 
 def _pitch(step="F", alt=1, octv=4, dur=16, typ="whole", extra=""):

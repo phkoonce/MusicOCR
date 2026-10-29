@@ -14,8 +14,8 @@ signature as a measure) produces one unit too many; one that loses a bar
 system when the page's MusicXML carries ``<print new-system="yes">`` marks that
 line up with the printed system numbers (homr), otherwise per page (Copisteria
 writes no system marks). It reuses the text-layer parsing of
-:mod:`musicocr.alignment.systems`, and counts either multi-rest spelling the
-same way via :func:`musicocr.multirest.collapsed_units`.
+:mod:`musicocr.assemble.alignment.systems`, and counts either multi-rest spelling the
+same way via :func:`musicocr.fixes.multirest.collapsed_units`.
 
 Scanned PDFs have no text layer: nothing is found and nothing is reported.
 The last system of the last page (or of a page whose successor is not in the
@@ -29,8 +29,8 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 from xml.etree import ElementTree as ET
 
-from musicocr.alignment.systems import _SYSTEM_Y_PAD, page_text_layout, pdf_words
-from musicocr.multirest import collapsed_units
+from musicocr.assemble.alignment.systems import _SYSTEM_Y_PAD, page_text_layout, pdf_words
+from musicocr.fixes.multirest import collapsed_units
 
 _PAGE_FILE = re.compile(r"\.p(\d+)\.musicxml$")
 

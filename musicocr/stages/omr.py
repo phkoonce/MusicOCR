@@ -2,15 +2,16 @@
 
 Dispatches on ``[omr] engine`` in config.toml, using the registry in
 ``musicocr.engines``:
-  * ``homr``       (default) - musicocr.stages.omr_homr — an end-to-end OMR
+  * ``homr``       (default) - musicocr.engines.homr.stage — an end-to-end OMR
     model that consistently outperformed Audiveris on monophonic wind/brass
     parts in local evaluation (see omr-eval/README.md).
-  * ``audiveris``  - musicocr.stages.omr_audiveris — the classical
+  * ``audiveris``  - musicocr.engines.audiveris — the classical
     segment-classify-reconstruct engine, tunable via ``[omr.profiles.*]``
     constants and the only engine with a GUI hand-correction round-trip.
-  * ``copisteria`` - musicocr.stages.omr_copisteria — page-image reader with a
+  * ``copisteria`` - musicocr.engines.copisteria.stage — page-image reader with a
     learned evidence model.
-  * ``legato2``    - placeholder until the model is released.
+  * ``legato2``    - musicocr.engines.legato2.stage — LEGATO 2 (system finder + ABC
+    transcription, converted to MusicXML with music21).
 
 Downstream stages (correct, extract) only see the shared artifacts every
 engine writes (``mxl_files``, ``mxl_by_page``, ``omr_failed_pages``,
@@ -30,7 +31,7 @@ _ENGINES: dict = {}
 
 def _module(name: str):
     if name not in _ENGINES:
-        _ENGINES[name] = importlib.import_module(f"musicocr.stages.{ENGINES[name].module}")
+        _ENGINES[name] = importlib.import_module(ENGINES[name].module)
     return _ENGINES[name]
 
 

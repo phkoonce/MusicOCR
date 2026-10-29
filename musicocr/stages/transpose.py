@@ -1,5 +1,5 @@
 """Stage 6 (between normalize and validate, optional): handle instrument
-transposition via ``musicocr.transpose``.
+transposition via ``musicocr.scoreops.transpose``.
 
 ``mode = "written"`` (default) keeps the notes as printed and declares the
 instrument and its ``<transpose>`` on the part, so MuseScore shows the written
@@ -8,7 +8,7 @@ pitches and keys at concert pitch.
 
 Off by default (``[stages.transpose] enabled``). Shift comes from, in order:
 ``semitones`` (all parts), ``instrument`` (looked up in
-``musicocr/instruments.py``), or neither -- each part is identified by its
+``musicocr/scoreops/instruments.py``), or neither -- each part is identified by its
 ``<part-name>``. Typical OMR'd single parts have a generic name, so for those
 set ``instrument``.
 
@@ -27,7 +27,7 @@ import shutil
 from musicocr.errors import StageError, StageResult
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._common import disabled, require_musicxml
-from musicocr.transpose import transpose_file
+from musicocr.scoreops.transpose import transpose_file
 
 
 def run(ctx: PipelineContext) -> StageResult:

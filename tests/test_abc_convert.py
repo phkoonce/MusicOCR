@@ -1,6 +1,6 @@
 import pytest
 
-from musicocr.abc_convert import AbcConversionError, abc_to_musicxml
+from musicocr.engines.legato2.abc_convert import AbcConversionError, abc_to_musicxml
 
 
 def test_abc_roundtrip(tmp_path):

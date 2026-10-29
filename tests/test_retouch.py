@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from musicocr.retouch import RetouchOptions, octavize_bass_clefs, retouch_tree
+from musicocr.scoreops.retouch import RetouchOptions, octavize_bass_clefs, retouch_tree
 
 DOC = """<score-partwise version="3.1"><movement-title>x.musicxml</movement-title>
 <identification><creator type="composer">Music21</creator></identification>

@@ -1,5 +1,5 @@
 """Stage 5b (between normalize and transpose, optional): edition-specific touch-ups via
-``musicocr.retouch`` -- old-notation bass clefs, and the piece's title and composer.
+``musicocr.scoreops.retouch`` -- old-notation bass clefs, and the piece's title and composer.
 
 Off unless ``--old-bass-clef``, ``--title`` or ``--composer`` is given (or ``[stages.retouch]`` sets
 them). Re-runnable like transpose: the untouched file is kept under ``<workdir>/pre-retouch/`` and
@@ -11,7 +11,7 @@ import shutil
 
 from musicocr.errors import StageResult
 from musicocr.pipeline import PipelineContext
-from musicocr.retouch import RetouchOptions, retouch_file
+from musicocr.scoreops.retouch import retouch_file
 from musicocr.stages._common import disabled, require_musicxml
 
 

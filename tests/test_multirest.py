@@ -1,13 +1,12 @@
-"""Tests for musicocr.multirest (collapse/expand) and the Copisteria config option."""
+"""Tests for musicocr.fixes.multirest (collapse/expand) and the Copisteria config option."""
 from __future__ import annotations
 
-from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import pytest
 
 from musicocr.config import ConfigError, CopisteriaConfig
-from musicocr.multirest import collapse_multirests, expand_multirests
+from musicocr.fixes.multirest import collapse_multirests, expand_multirests
 
 ATTR = ("<attributes><divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type>"
         "</time></attributes>")

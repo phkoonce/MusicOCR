@@ -28,7 +28,7 @@ The typeless rest (`<rest/>` or `<rest measure="yes"/>`, no `<type>`) has exactl
 (18 = 3 beats x 6); the other notes add up to exactly one more bar. Bars 35-40 of the combined scene
 (Trumpet 2) and 36-41 (Trumpet 3) are flagged "LENGTH 6 beats, expected 3" because of this.
 The same printed pattern appeared in scene 1M2S, where the cue notes were read as *grace* notes and the
-rest came out too long instead; that case is already handled by `musicocr/barrests.py` (a lone
+rest came out too long instead; that case is already handled by `musicocr/fixes/barrests.py` (a lone
 overlong rest is cut to the bar). This design covers the case where the cue notes are *ordinary* notes.
 
 ## 2. Goal and non-goals
@@ -62,7 +62,7 @@ the cue is information the player wants.
 
 ## 5. Code changes (where)
 
-1. `musicocr/barrests.py`: add `cue_notes_over_rest(measure, capacity) -> bool` next to `fix_measure`
+1. `musicocr/fixes/barrests.py`: add `cue_notes_over_rest(measure, capacity) -> bool` next to `fix_measure`
    and call it from `fix_tree` (same capacity walk, `musicocr.util.measures_with_capacity`). Log
    "cue notes moved to voice 2". Wired already into the extract stage through `fix_file`, so new pages get
    it automatically.
@@ -72,7 +72,7 @@ the cue is information the player wants.
    combine LENGTH check all see the true bar length. Check every caller (grep `measure_total`).
 3. `musicocr/alignment/build.py::is_rest_only`: ignore `<cue/>` notes (a bar whose sounding voice is a
    rest is a rest bar for the alignment's rest pattern; `combine._rest_flag` uses it).
-4. `musicocr/combine.py::copy_marks`: copies only `note`, `direction` and light-light barline children.
+4. `musicocr/assemble/combine.py::copy_marks`: copies only `note`, `direction` and light-light barline children.
    It must also copy `backup`/`forward` (rescaled like durations) and keep `<voice>`, otherwise voice 2
    is appended after voice 1 and the bar overflows again. Same for `alignment/build.py::copy_notes`
    (used by the non-scene path).
@@ -99,7 +99,7 @@ only for data). Symlink `.venv` and `omr-eval/copisteria` from it into the workt
 `PYTHONPATH=<worktree> /Users/philip/Dev/MusicOCR/.venv/bin/python`, and run `pytest -q` (297 pass today).
 
 1. Apply the new step to the existing page files without re-running OMR:
-   `from musicocr.barrests import fix_file` over
+   `from musicocr.fixes.barrests import fix_file` over
    `output/httyd2/HTTYD2_tpt{1,2,3}/HTTYD2_tpt?.p0??.musicxml` (make a backup copy first).
 2. Re-combine only the scene:
    `PYTHONPATH=<wt> .../python scripts/combine_scenes.py --batch <scratchpad>/httyd2.toml --cues batches/httyd2.cues.json --only 5M38-39A --convert`

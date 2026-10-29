@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import typing
 from pathlib import Path
 
 from musicocr.artifacts import Artifacts
-from musicocr.pipeline import PipelineContext
 from musicocr.state import (STATE_FILE, artifacts_from_json, artifacts_to_json,
                             load_state, restore_missing, save_state)
 

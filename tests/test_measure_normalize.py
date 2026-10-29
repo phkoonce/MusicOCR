@@ -1,4 +1,4 @@
-"""Tests for musicocr.measure_normalize against the "note read a step too
+"""Tests for musicocr.fixes.measure_normalize against the "note read a step too
 long" homr failure mode documented in omr-eval/README.md."""
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import pytest
 music21 = pytest.importorskip("music21")
 from music21 import clef, meter, note, stream  # noqa: E402
 
-from musicocr.measure_normalize import normalize_part  # noqa: E402
+from musicocr.fixes.measure_normalize import normalize_part  # noqa: E402
 
 
 def _part(measure_lengths: list[float]) -> stream.Part:

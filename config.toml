@@ -57,7 +57,7 @@ merge_pages = true
 # rest is exported with a <multiple-rest> tag but no note/rest content at all
 # (liebharc/homr#140, open upstream as of 2026-09). Runs on each page's raw
 # export right after homr writes it, before merge/validate see it. See
-# musicocr/homr_fixes.py and omr-eval/README.md's 2026-09-12 finding.
+# musicocr/engines/homr/fixes.py and omr-eval/README.md's 2026-09-12 finding.
 fix_multirest = true
 
 [omr.legato2]
@@ -79,16 +79,16 @@ detector = "28m"
 # prepped page image (works on scans; see ocr_backend); "auto" = pdf-layer when the page has a text layer, else ocr;
 # "none" skips.
 texts = "auto"
-# OCR engine for texts = "ocr"/"auto" (musicocr/ocr_backends.py): "rapidocr" (PP-OCR via
+# OCR engine for texts = "ocr"/"auto" (musicocr/text/ocr_backends.py): "rapidocr" (PP-OCR via
 # the homr venv, offline), "vision" (macOS Vision via a Swift helper compiled on first
 # use) or "auto" = union of both (they miss different isolated numerals).
 ocr_backend = "auto"
 # Copisteria writes a bar it found no content for as a bare <forward>; give it a
-# whole-measure rest (musicocr/copisteria_fixes.py), like homr's fix_multirest.
+# whole-measure rest (musicocr/engines/copisteria/fixes.py), like homr's fix_multirest.
 fix_empty = true
 # Drop a misread "bar" made of a cautionary key/time signature after a double bar
 # (key-change bar with a spurious note, whose time change sits in the next bar).
-# Logged; musicocr/copisteria_fixes.py. validate's bar-count check reports the rest.
+# Logged; musicocr/engines/copisteria/fixes.py. validate's bar-count check reports the rest.
 fix_ghost_bars = true
 # A staff that opens with a clef but no key reading means "no key signature printed"
 # (C major / cancelled key); without this the previous system's sharps/flats carry over.
@@ -128,7 +128,7 @@ text_tuplets = true
 synth_multirest = true
 # Note detections much smaller than the page's ordinary notes (< 0.8 x 0.9) are grace notes
 # (ruffs/flams); the detector sometimes labels them "not grace" and the reader then writes
-# real notes (overfull bar, dropped note). musicocr/page_text.py mark_small_graces.
+# real notes (overfull bar, dropped note). musicocr/text/page_text.py mark_small_graces.
 # OFF by default: tuned on the timpani part only, it also catches ordinary beamed eighths
 # (narrower boxes than the page's quarters/halves) and turns them into zero-length graces --
 # on Zerberus Horn 1 it ate ~50 notes. Enable per run for parts that really have ruffs/flams.
@@ -143,12 +143,12 @@ reveal_gaps = true
 # plus its N-1 following rest bars into one bar like homr writes (what the
 # align_* tools expect; bar numbers then drift from print), "expand" writes the
 # standard N-bar form from collapsed input, "keep" leaves Copisteria's output
-# untouched. See musicocr/multirest.py.
+# untouched. See musicocr/fixes/multirest.py.
 multirest_form = "collapse"
 # Clone Copisteria runs from (it looks for models/ relative to its repo root).
 # repo = "/path/to/omr-eval/copisteria/repo"
 
-# Tempo / expression / technique words as MusicXML directions (musicocr/text_layer.py,
+# Tempo / expression / technique words as MusicXML directions (musicocr/text/layer.py,
 # docs/text-layer-design.md). PDF text layer when the page has one, else OCR of the bands
 # around each staff.
 [omr.copisteria.text_layer]
@@ -213,7 +213,7 @@ enabled = false
 # After extract's meter repair: in a bar that does not add up to its time signature, rebuild tuplet
 # runs read inconsistently (mixed 3:2/6:4/5:4 ratios, a bracket starting on the third note, a
 # 0.4-beat rest) -- one ratio per run, durations from the printed note values, whole bracket
-# groups -- and keep the result only if the bar then has the right length (musicocr/tuplets.py).
+# groups -- and keep the result only if the bar then has the right length (musicocr/fixes/tuplets.py).
 # Engine-agnostic. flag colours the rebuilt notes and adds a "check: tuplet rebuilt" text.
 enabled = true
 flag = true
@@ -234,7 +234,7 @@ enabled = true
 # printed and sets the part's instrument name + <transpose>, so MuseScore shows
 # the written score and its concert-pitch toggle does the shift. `mode =
 # "concert"` instead rewrites pitches and keys at concert pitch. Give `semitones` (all parts) or
-# `instrument` (looked up in musicocr/instruments.py); with neither, each part
+# `instrument` (looked up in musicocr/scoreops/instruments.py); with neither, each part
 # is identified by its <part-name>. `clef` ("treble"/"bass"/"c") overrides the
 # first-clef detection for clef-dependent instruments (baritone, tuba...).
 # CLI: --transpose / --no-transpose / --transpose-instrument / --transpose-semitones.
@@ -249,3 +249,15 @@ enabled = false
 formats = ["musicxml", "mscz", "midi", "qa-pdf"]
 # DPI for the side-by-side QA page renders.
 qa_dpi = 150
+
+[fixes]
+# Automatic repairs of OMR output, by name (`musicocr fixes` lists them with their state;
+# `musicocr run --no-fix NAME` / `--fix NAME` override this for one run). A name not set here
+# keeps its older config key ([omr.copisteria] fix_*, [omr.homr] fix_multirest,
+# [stages.tuplets] / [stages.normalize] enabled) or its default, which is on. Examples:
+#   time_signatures = false    # homr numerator repair
+#   whole_bar_rests = false    # cut whole-bar rests longer than the bar
+#   tuplets         = false    # rebuild inconsistent tuplets
+#   measure_lengths = false    # normalize stage: pad/truncate bars to the meter
+#   homr_multirest, key_cancel, time_inherit, empty_bars, ghost_bars, pickup,
+#   half_tuplets, reveal_gaps, multirest_form

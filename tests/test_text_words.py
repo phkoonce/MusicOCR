@@ -1,7 +1,7 @@
-"""Bands, phrases and the union of OCR passes (musicocr/text_words.py)."""
+"""Bands, phrases and the union of OCR passes (musicocr/text/words.py)."""
 from __future__ import annotations
 
-from musicocr.text_words import (Staff, Word, bands, phrases, stack_tempo_lines, union_words)
+from musicocr.text.words import (Staff, Word, bands, phrases, stack_tempo_lines, union_words)
 
 SP = 26.0
 

@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 
-from musicocr.text_system import text_key, text_keys, unify_system_text
-from musicocr.unnumbered import align_by_rhythm
+from musicocr.assemble.text_system import text_key, unify_system_text
+from musicocr.assemble.unnumbered import align_by_rhythm
 
 
 def bar(*words, placement="above"):
@@ -43,7 +43,6 @@ def test_text_steers_the_rhythm_alignment():
     same = frozenset({0, 12})
     src = [same, same, same]
     ref = [[same]] * 3
-    src_text = [frozenset(), frozenset({"rit"}), frozenset()]
     ref_text = [[frozenset()], [frozenset()], [frozenset({"rit"})]]
     # one source bar short of three slots: the text decides where the rest goes
     slots = align_by_rhythm(src[:2], ref, [frozenset(), frozenset({"rit"})], ref_text)

@@ -1,7 +1,7 @@
-"""Tests for musicocr.timesig."""
+"""Tests for musicocr.fixes.timesig."""
 from xml.etree import ElementTree as ET
 
-from musicocr.timesig import fix_time_signatures
+from musicocr.fixes.timesig import fix_time_signatures
 
 
 def _score(blocks):
@@ -52,7 +52,7 @@ def test_no_clear_majority_or_too_few_measures_untouched():
 
 
 def test_files_treated_as_one_part_and_signature_carried(tmp_path):
-    from musicocr.timesig import fix_time_signatures_files
+    from musicocr.fixes.timesig import fix_time_signatures_files
 
     a = _score([(4, 4, [4] * 10), (8, 8, [3] * 4)])
     b = _score([(0, None, [3] * 12)])

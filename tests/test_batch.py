@@ -32,7 +32,7 @@ def test_parse_spec_defaults_and_paths(tmp_path):
     assert spec.parts[1].label == "b"  # label defaults to id
     assert spec.output_dir == tmp_path / "output/demo"
     assert spec.state_path == tmp_path / "output/demo/_state.json"
-    assert spec.doc_path == tmp_path / "docs/demo-progress.md"
+    assert spec.doc_path == tmp_path / "batches/demo-progress.md"
     assert spec.input_dir == tmp_path / "input/demo"
 
 

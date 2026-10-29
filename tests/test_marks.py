@@ -1,6 +1,6 @@
 import xml.etree.ElementTree as ET
 
-from musicocr.marks import MarksOptions, normalize_marks, _pairs, _scan
+from musicocr.scoreops.marks import MarksOptions, normalize_marks, _pairs, _scan
 
 
 def bar(n, *items, notes=4):

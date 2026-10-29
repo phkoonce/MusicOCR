@@ -183,7 +183,7 @@ def test_many_tuplets(tmp_path):
 
 
 def test_homr_engine_runs_whole_rest_heuristic(tmp_path, monkeypatch):
-    import musicocr.homr_fixes as hf
+    import musicocr.engines.homr.fixes as hf
     monkeypatch.setattr(hf, "suspicious_whole_rests", lambda p: ["m.2 maybe multirest"])
     xml = _score(_part("P1", [_measure(1, _note(), _attrs(key=0))]))
     _, val = _run(tmp_path, xml, engine="homr")
@@ -195,7 +195,7 @@ def test_homr_engine_runs_whole_rest_heuristic(tmp_path, monkeypatch):
 
 
 def test_homr_heuristic_failure_is_logged_not_fatal(tmp_path, monkeypatch):
-    import musicocr.homr_fixes as hf
+    import musicocr.engines.homr.fixes as hf
 
     def boom(p):
         raise RuntimeError("nope")

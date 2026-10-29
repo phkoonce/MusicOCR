@@ -1,0 +1,801 @@
+"""Combine per-part OMR output into one score aligned to the printed bar numbers.
+
+Engine-agnostic and spec-free: everything the old hand-written ``omr-eval/specs``
+carried is derived from the data.
+
+* **Printed structure** comes from each part PDF's text layer: the bar number at the
+  start of the first system of every page (``page_text_layout``), so a page's expected
+  bar count is the difference of consecutive page starts. The last page's end is the
+  consensus total over all parts (the mode of start-of-last-page + bars found).
+* **Multi-rests** are expanded from their ``<multiple-rest>`` tag (the tagged bar plus
+  N-1 rest bars), so a bar's index within the page is its printed bar number.
+* **Page-level repair.** A page whose bar count differs from the printed one is aligned
+  to the printed bars by dynamic programming against the *other* parts' rest-only
+  pattern at the same bar numbers (bars that most parts rest in are cheap to insert /
+  delete); every repair is listed in the report as "check".
+* **Key and meter** at each bar are the plurality over the parts' (carried-forward)
+  declarations; the pickup length of bar 1 is the plurality of the parts' bar 1.
+* Notes are copied from the part's own bar; bars that are rests only are rewritten as
+  whole-measure rests of the consensus length, and any other bar whose notes do not fill
+  the consensus meter is reported.
+
+``combine`` returns ``(score, report, summary)``; ``musicocr combine`` is the CLI.
+"""
+from __future__ import annotations
+
+import copy
+import re
+import xml.etree.ElementTree as ET
+from collections import Counter
+from dataclasses import dataclass
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+from musicocr.assemble.alignment.build import (add_attributes, build_score, check_length,
+                                      is_rest_only, measure_total, rest_measure)
+from musicocr.assemble.alignment.spec import DIV, bar_len
+from musicocr.assemble.alignment.systems import page_text_layout, pdf_page_count, pdf_words_or_ocr
+from musicocr.musicxml import check_direction, multirest_count
+from musicocr.scoreops.marks import MarksOptions, normalize_marks
+from musicocr.assemble.text_system import text_keys, unify_system_text
+from musicocr.assemble.text_tempo import unify_tempo
+from musicocr.assemble.unnumbered import align_by_rhythm, onsets
+from musicocr.scoreops.instruments import INFO, canonical_name, semitones_for
+from musicocr.scoreops.transpose import _CLEF_FAMILY, _declare_transpose, clef_family, fifths_shift
+
+Src = Tuple[ET.Element, int]            # (measure, its <divisions>)
+
+
+@dataclass
+class PartInput:
+    pid: str
+    label: str
+    instrument: str
+    pdf: Optional[Path]
+    pages: List[Path]
+
+
+# ---- reading a part ---------------------------------------------------------------
+
+def read_page(path: Path) -> List[Src]:
+    """A page's measures with multi-rests expanded into one rest bar per printed bar."""
+    part = ET.parse(path).getroot().find("part")
+    out: List[Src] = []
+    div = 1
+    bar: Optional[int] = None                 # length of a bar in divisions, once a time signature has been seen
+    for m in (part.findall("measure") if part is not None else []):
+        dv = m.find("attributes/divisions")
+        if dv is not None and (dv.text or "").strip().isdigit():
+            div = int(dv.text)
+        _, mt = _declared(m)
+        if mt:
+            bar = None
+            if div * 4 * mt[0] % mt[1] == 0:
+                bar = div * 4 * mt[0] // mt[1]
+        out.append((m, div))
+        n = multirest_count(m)
+        if n > 1:
+            tail = _take_tail(m)
+            unit = max(measure_total(m), 1)
+            if bar and unit == n * bar and is_rest_only(m):
+                unit = bar                    # the whole run was written as one n-bar-long measure: back to one bar
+                for du in m.findall("note/duration"):
+                    du.text = str(bar)
+            for k in range(n - 1):
+                rm = rest_measure(0, unit, True)
+                if k == n - 2:
+                    rm.extend(tail)          # the closing barline / courtesy clef end the last bar
+                out.append((rm, div))
+    return out
+
+
+def _take_tail(m: ET.Element) -> List[ET.Element]:
+    """Remove and return what closes a measure: its right barline and any attributes after the notes."""
+    tail, seen_note = [], False
+    for el in list(m):
+        if el.tag == "note":
+            seen_note = True
+        elif (el.tag == "attributes" and seen_note) or (el.tag == "barline" and el.get("location", "right") == "right"):
+            m.remove(el)
+            tail.append(el)
+    return tail
+
+
+def printed_page_starts(pdf: Path, pdftotext: str = "pdftotext") -> List[Optional[int]]:
+    """Bar number at the start of the first system of each page (None = unreadable)."""
+    out: List[Optional[int]] = []
+    for pg in range(1, pdf_page_count(str(pdf)) + 1):
+        starts, _ = page_text_layout(pdf_words_or_ocr(str(pdf), pg, pdftotext))
+        n = starts[0][1] if starts else None
+        out.append(1 if pg == 1 and (n is None or n > 3) else n)
+    return out
+
+
+def split_overlong(m: ET.Element, div: int, meter: Tuple[int, int]) -> Optional[List[ET.Element]]:
+    """Split a measure that holds k >= 2 whole bars of ``meter`` (two bars read as one).
+
+    Returns the k measures when every bar line falls exactly on a note boundary of this
+    single-voice measure, else None. Attributes stay on the first piece, a trailing
+    barline goes to the last.
+    """
+    if m.find("backup") is not None or m.find("forward") is not None:
+        return None
+    bar = div * 4 * meter[0] // meter[1]
+    if bar <= 0 or div * 4 * meter[0] % meter[1]:
+        return None
+    total = measure_total(m)
+    if total < 2 * bar or total % bar:
+        return None
+    k = total // bar
+    pieces = [ET.Element("measure", number="0") for _ in range(k)]
+    pos, idx = 0, 0
+    for el in list(m):
+        if el.tag == "note":
+            if el.find("chord") is None and el.find("grace") is None:
+                if pos % bar and pos // bar != (pos + int(el.findtext("duration") or 0) - 1) // bar:
+                    return None             # a note straddles a bar line
+                idx = min(pos // bar, k - 1)
+                pos += int(el.findtext("duration") or 0)
+        elif el.tag == "barline":
+            idx = k - 1
+        elif el.tag != "attributes" and pos and pos % bar == 0 and idx < pos // bar:
+            idx = min(pos // bar, k - 1)    # a direction right at the bar line starts the next bar
+        pieces[0 if el.tag == "attributes" else idx].append(el)
+    return pieces if all(p.find("note") is not None for p in pieces) else None
+
+
+def printed_last_system_start(pdf: Path, pdftotext: str = "pdftotext") -> Optional[int]:
+    """Bar number at the start of the last numbered system on the part's last page."""
+    n = pdf_page_count(str(pdf))
+    for pg in range(n, 0, -1):
+        starts, _ = page_text_layout(pdf_words_or_ocr(str(pdf), pg, pdftotext))
+        if starts:
+            return starts[-1][1]
+    return None
+
+
+def printed_max_bar(pdf: Path, pdftotext: str = "pdftotext") -> Optional[int]:
+    """Highest bar number printed on the part's last numbered page (scans: every bar's number is OCR'd,
+    so the last bar's own number lower-bounds the piece better than the last system's first number)."""
+    for pg in range(pdf_page_count(str(pdf)), 0, -1):
+        words = pdf_words_or_ocr(str(pdf), pg, pdftotext)
+        starts, _ = page_text_layout(words)
+        if starts:
+            nums = [int(w[1:]) for *_, w in words if w.startswith("#") and w[1:].isdigit()]
+            return max([starts[-1][1]] + [n for n in nums if n >= starts[-1][1]])
+    return None
+
+
+_RANGE = re.compile(r"(\d+)\s*[\u2013\u2014]\s*(\d+)")
+
+
+def printed_multirest_spans(pdf: Path, pdftotext: str = "pdftotext") -> List[Tuple[int, int]]:
+    """Bar ranges printed under multi-rests ("58\u201360") in the text layer, when the engraver
+    prints them. En/em dash only: a hyphen is too often something else ("1-4")."""
+    out: List[Tuple[int, int]] = []
+    for pg in range(1, pdf_page_count(str(pdf)) + 1):
+        for *_, w in pdf_words_or_ocr(str(pdf), pg, pdftotext):
+            m = _RANGE.fullmatch(w.strip())
+            if m and int(m.group(2)) > int(m.group(1)):
+                out.append((int(m.group(1)), int(m.group(2))))
+    return sorted(set(out))
+
+
+# ---- alignment --------------------------------------------------------------------
+
+def _rest_flag(src: Src) -> float:
+    return 1.0 if is_rest_only(src[0]) else 0.0
+
+
+# align_to_target cost weights (one mismatching rest/played flag costs 1.0)
+MUST_REST_COST = 3.0      # a played bar on a slot the print shows as a multi-rest contradicts the print itself
+METER_CHANGE_COST = 1.5   # a source bar that changes meter landing where the other parts do not (or the reverse)
+INDEL_BASE_COST = 0.2     # dropping a source bar / inserting a slot; the other 0.8 depends on rest vs. played
+INSERT_TIEBREAK = 1e-4    # prefers inserting later in the page (see align_to_target)
+
+
+def _src_changes(pg: Sequence[Src], prev: Optional[Tuple[int, int]]) -> List[Optional[bool]]:
+    """Per rest bar: does it declare a meter different from the one in force before it? (None: has notes)"""
+    out: List[Optional[bool]] = []
+    for s in pg:
+        mt = _declared(s[0])[1]
+        out.append((prev is not None and mt is not None and mt != prev) if is_rest_only(s[0]) else None)
+        prev = mt or prev
+    return out
+
+
+def _last_meter(pg: Sequence[Src], prev: Optional[Tuple[int, int]]) -> Optional[Tuple[int, int]]:
+    for s in pg:
+        prev = _declared(s[0])[1] or prev
+    return prev
+
+
+def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
+                    ins_cost: Optional[Sequence[float]] = None,
+                    must_rest: Optional[Sequence[bool]] = None,
+                    src_change: Optional[Sequence[Optional[bool]]] = None,
+                    ref_change: Optional[Sequence[float]] = None) -> List[Optional[int]]:
+    """Map each of ``len(ref)`` target slots to a source bar index (None = synthesise a rest).
+
+    Needleman-Wunsch over the rest-only pattern: matching costs the disagreement with the
+    reference (fraction of other parts resting there); inserting a slot is cheap where the
+    reference rests, deleting a source bar is cheap if it is a rest. Only as many indels as
+    the length difference needs are allowed (insertions only when the source is short,
+    deletions only when it is long), so a one-bar error never becomes a rearrangement.
+
+    ``ins_cost`` (per slot) overrides the default insertion cost: a part that prints its
+    multi-rest spans can only have lost bars inside them. ``must_rest`` marks the slots the
+    print shows inside a multi-rest, where a bar with notes never belongs (the other parts' rest
+    pattern is unreliable there: parts that play different things rest at different bars).
+    ``src_change[i]`` says rest bar i changes meter (None for a bar with notes: its declaration may
+    really belong to a lost multi-rest bar before it, the system's first bar) and ``ref_change[j]``
+    is the share of the other parts that change meter at slot j; a mismatch costs ``METER_CHANGE_COST``.
+    """
+    n, m = len(rest_src), len(ref)
+    allow_del, allow_ins = n >= m, n <= m
+    INF = 1e18
+    D = [[INF] * (m + 1) for _ in range(n + 1)]
+    B: List[List[Optional[str]]] = [[None] * (m + 1) for _ in range(n + 1)]
+    D[0][0] = 0.0
+    for i in range(n + 1):
+        for j in range(m + 1):
+            d = D[i][j]
+            if d >= INF:
+                continue
+            if i < n and j < m:
+                mc = d + abs(rest_src[i] - ref[j]) + (MUST_REST_COST * (1 - rest_src[i])
+                                                       if must_rest is not None and must_rest[j] else 0.0)
+                if src_change is not None and ref_change is not None and src_change[i] is not None:
+                    mc += METER_CHANGE_COST * abs(float(src_change[i]) - ref_change[j])
+                if mc < D[i + 1][j + 1]:
+                    D[i + 1][j + 1], B[i + 1][j + 1] = mc, "m"
+            if i < n and allow_del:
+                c = d + INDEL_BASE_COST + (1 - INDEL_BASE_COST) * (1 - rest_src[i])
+                if c < D[i + 1][j]:
+                    D[i + 1][j], B[i + 1][j] = c, "d"
+            if j < m and allow_ins:
+                # a hair cheaper later in the page: a lost bar is inserted *after* its run's
+                # first bar, so a key/meter declaration stays on the first bar of the run
+                base = ins_cost[j] if ins_cost is not None else INDEL_BASE_COST + (1 - INDEL_BASE_COST) * (1 - ref[j])
+                c = d + base + INSERT_TIEBREAK * (m - j) / max(m, 1)
+                if c < D[i][j + 1]:
+                    D[i][j + 1], B[i][j + 1] = c, "i"
+    slots: List[Optional[int]] = [None] * m
+    i, j = n, m
+    while i or j:
+        op = B[i][j]
+        if op == "m":
+            slots[j - 1] = i - 1
+            i, j = i - 1, j - 1
+        elif op == "d":
+            i -= 1
+        else:
+            j -= 1
+    return slots
+
+
+def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int, report: List[str],
+                  decl_ref: Optional[List[float]] = None,
+                  rhythm_ref: Optional[List[List[Any]]] = None,
+                  text_ref: Optional[List[List[Any]]] = None) -> Tuple[List[Optional[Src]], Dict[int, str]]:
+    """One part's bars on 1..total: pages that read the printed bar count are taken as they are, the
+    others are aligned to the printed structure (``align_to_target``); a short part is padded.
+
+    ``ref[bar]`` is the share of the other parts resting at ``bar``; ``decl_ref`` (per bar: the share of
+    the *other* parts that change meter there) lets a source bar's own meter change steer where it
+    lands. ``rhythm_ref`` (parts without printed bar numbers: per bar, the other parts' onsets there)
+    aligns a part of the wrong length by rhythm instead (``musicocr.assemble.unnumbered``); ``text_ref`` (per bar: the
+    other parts' texts there) adds the tempo/expression words above the bars as a hint. Returns ``(bars, flags)``, ``flags[bar]`` being the "check" text to put on that bar.
+    """
+    seq: List[Optional[Src]] = []
+    flags: Dict[int, str] = {}
+    meter_before = None
+    for pg, a, t, ok in zip(d["pages"], d["start"], d["target"], d["good"]):
+        prev_meter, meter_before = meter_before, _last_meter(pg, meter_before)
+        if ok:
+            seq.extend(pg)
+            continue
+        if t <= 0:
+            report.append(f"  {pid} page starting bar {a}: no printed bars (cover/text page?) "
+                          f"-> {len(pg)} measure(s) ignored")
+            continue
+        r = [1.0 if (a + j) in d["rests"] else ref.get(a + j) for j in range(t)]
+        by_rhythm = rhythm_ref is not None and len(rhythm_ref) == t
+        if by_rhythm or sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
+            ins = [0.01 if (a + j) in d["rests"] else 2.0 for j in range(t)] if d["rests"] else None
+            if by_rhythm:
+                slots = align_by_rhythm([onsets(*s) for s in pg], rhythm_ref,
+                                        [text_keys(s[0]) for s in pg] if text_ref else None,
+                                        text_ref[a - 1:a - 1 + t] if text_ref else None)
+            else:
+                slots = align_to_target([_rest_flag(s) for s in pg],
+                                        [0.5 if x is None else x for x in r], ins,
+                                        [(a + j) in d["rests"] for j in range(t)] if d["rests"] else None,
+                                        _src_changes(pg, prev_meter),
+                                        decl_ref[a - 1:a - 1 + t] if decl_ref else None)
+            dropped = sorted(set(range(len(pg))) - {s for s in slots if s is not None})
+            added = [a + j for j, s in enumerate(slots) if s is None]
+            outside = [b for b in added if d["rests"] and b not in d["rests"]]
+            report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
+                          f" -> aligned to the other parts' {'rhythm' if by_rhythm else 'rest pattern'}; dropped source bar(s) "
+                          f"{[a + k for k in dropped]}, inserted rest bar(s) at {added}"
+                          + (f", {len(outside)} of them outside the printed multi-rests {outside}"
+                             if outside else "") + " -- check")
+            seq.extend(None if s is None else pg[s] for s in slots)
+            for b in added:
+                if not d["rests"] or b not in d["rests"]:      # inside a printed multi-rest: a lost count, not a doubt
+                    flags[b] = "check: bar inserted (the page read one bar short)"
+            for k in dropped:
+                nxt_slot = next((j for j, s in enumerate(slots) if s is not None and s > k), None)
+                if nxt_slot is not None:
+                    flags.setdefault(a + nxt_slot, "check: a source bar was dropped just before here")
+        else:
+            seq.extend((pg + [None] * t)[:t])
+            report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
+                          f" and no reference to align by -> padded/truncated at the end -- CHECK")
+    if len(seq) < total:
+        seq += [None] * (total - len(seq))
+        report.append(f"  {pid}: ends {total - len([s for s in seq if s is not None])} bar(s) early -> padded")
+    return seq[:total], flags
+
+
+def _others_meter_change_share(bars: Dict[str, List[Optional[Src]]], total: int) -> Dict[str, List[float]]:
+    """Per part and bar 1..total: the share of the *other* parts that declare a new meter there."""
+    ch: Dict[str, List[bool]] = {}
+    for pid, seq in bars.items():
+        cm, row = None, []
+        for s in seq:
+            mt = _declared(s[0])[1] if s is not None else None
+            row.append(cm is not None and mt is not None and mt != cm)
+            cm = mt or cm
+        ch[pid] = row
+    return {pid: [sum(ch[q][b] for q in ch if q != pid) / (len(ch) - 1) for b in range(total)] for pid in ch}
+
+
+# ---- declarations -----------------------------------------------------------------
+
+def _declared(m: ET.Element) -> Tuple[Optional[int], Optional[Tuple[int, int]]]:
+    k = m.find("attributes/key/fifths")
+    t = m.find("attributes/time")
+    key = int(k.text) if k is not None and (k.text or "").lstrip("-").isdigit() else None
+    meter = None
+    if t is not None:
+        try:
+            meter = (int(t.findtext("beats")), int(t.findtext("beat-type")))
+        except (TypeError, ValueError):
+            pass
+    return key, meter
+
+
+def _clefs(src: Optional[Src]) -> Tuple[Optional[Tuple[str, str]], Optional[Tuple[str, str]]]:
+    """(leading, trailing) clef of a source bar. Copisteria writes the courtesy clef printed at the end
+    of a system as an ``<attributes>`` *after* the bar's last note: it takes effect in the next bar."""
+    lead = trail = None
+    seen_note = False
+    for el in (src[0] if src is not None else []):
+        if el.tag == "note":
+            seen_note = True
+        elif el.tag == "attributes":
+            c = el.find("clef")
+            if c is not None and c.findtext("sign"):
+                val = (c.findtext("sign"), c.findtext("line") or "2")
+                if seen_note:
+                    trail = val
+                else:
+                    lead = val
+    return lead, trail
+
+
+def _first_clef(srcs: Sequence[Optional[Src]]) -> Tuple[str, str]:
+    for s in srcs:
+        lead, _ = _clefs(s)
+        if lead:
+            return lead
+    return ("G", "2")
+
+
+def _is_unpitched(seq: Sequence[Optional[Src]]) -> bool:
+    """True for an unpitched-percussion part (percussion clef or ``<unpitched>`` notes): it has no
+    key signature, so it neither votes on the score's key nor gets one written."""
+    for s in seq:
+        if s is not None and (s[0].find("attributes/clef[sign='percussion']") is not None
+                              or s[0].find("note/unpitched") is not None):
+            return True
+    return False
+
+
+def _plurality(values: Sequence[Any], default: Any) -> Any:
+    vals = [v for v in values if v is not None]
+    return Counter(vals).most_common(1)[0][0] if vals else default
+
+
+def part_info(label: str, instrument: str) -> Dict[str, Any]:
+    canon = canonical_name(instrument) if instrument else None
+    canon = canon or canonical_name(label)
+    label = label.rsplit(" - ", 1)[-1].strip()  # batch labels may be "<piece> - Horn 1"
+    num = re.search(r"(\d+)\s*$", label)
+    suffix = f" {num.group(1)}" if num else ""
+    if canon in INFO:
+        _, abbr, sound, program = INFO[canon]
+        return dict(name=label, abbr=abbr.rstrip(".") + suffix, program=program, sound=sound)
+    return dict(name=label, abbr=label[:4].strip() + suffix, program=1)
+
+
+def copy_marks(src: ET.Element, dst: ET.Element, src_divisions: int, *, notes: bool = True) -> None:
+    """Copy a source bar's content into ``dst`` in document order: notes (as ``copy_notes``),
+    the directions (dynamics, hairpins) that sit between them, and double bars. A light-heavy
+    barline is dropped (the combined score writes its own final one). ``notes=False`` copies
+    only the directions/double bars, for a bar that is rewritten as a whole-bar rest."""
+    scale = DIV / src_divisions if src_divisions else 1
+    for ch in src:
+        if ch.tag in ("note", "backup", "forward") and notes:
+            nn = copy.deepcopy(ch)
+            for e in nn.findall("stem"):
+                nn.remove(e)
+            du = nn.find("duration")
+            if du is not None and src_divisions != DIV:
+                du.text = str(round(int(du.text) * scale))
+            dst.append(nn)
+        elif ch.tag == "direction" or (ch.tag == "barline" and ch.findtext("bar-style") == "light-light"):
+            nn = copy.deepcopy(ch)
+            off = nn.find("offset")
+            if off is not None and off.text:
+                off.text = str(round(int(float(off.text)) * scale))
+            if nn.tag == "direction" and not notes:
+                for t in nn.findall("staff"):
+                    nn.remove(t)
+            dst.append(nn)
+
+
+def balance_wedges(measures: List[ET.Element]) -> int:
+    """Drop hairpin starts without a later stop and stops without an open start (a repaired or
+    dropped bar can orphan one). Returns how many were removed."""
+    opened: Optional[ET.Element] = None
+    owner: Dict[int, ET.Element] = {}
+    drop: List[Tuple[ET.Element, ET.Element]] = []
+    for m in measures:
+        for d in m.findall("direction"):
+            for w in d.iter("wedge"):
+                kind = w.get("type")
+                if kind in ("crescendo", "diminuendo"):
+                    if opened is not None:
+                        drop.append(owner[id(opened)])
+                    opened = w
+                    owner[id(w)] = (m, d)
+                elif kind == "stop":
+                    if opened is None:
+                        drop.append((m, d))
+                    opened = None
+    if opened is not None:
+        drop.append(owner[id(opened)])
+    for m, d in drop:
+        if d in list(m):
+            m.remove(d)
+    return len(drop)
+
+
+def _has_cue(m: ET.Element) -> bool:
+    """True if the bar carries cue notes (moved over a whole-bar rest by ``barrests``); such a bar is
+    a rest bar for the alignment but keeps its cue line when written out."""
+    return m.find("note/cue") is not None
+
+
+CHECK_COLOR = "#D32F2F"
+
+
+def _flag_bar(m: ET.Element, text: str) -> None:
+    """Colour the bar's notes/rests and put a short note above it, so a bar that needs a human look
+    stands out in MuseScore (gap rests keep their own orange)."""
+    for n in m.findall("note"):
+        n.set("color", n.get("color") or CHECK_COLOR)
+    idx = 1 if m.find("attributes") is not None else 0
+    m.insert(idx, check_direction(text, CHECK_COLOR))
+
+
+# ---- combine ----------------------------------------------------------------------
+#
+# ``combine`` runs the phases below in order; each takes the shared ``data`` (one dict per part,
+# keyed by part id) and appends to ``report``.
+
+def _read_parts(parts: Sequence[PartInput], read_pages, starts_of, spans_of, bar_numbers: bool,
+                report: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Read every part's pages and the print structure (page start bars, multi-rest spans)."""
+    data: Dict[str, Dict[str, Any]] = {}
+    for p in parts:
+        pages, meter = [], (4, 4)
+        for f in p.pages:
+            pg: List[Src] = []
+            for src in read_pages(f):
+                _, mt = _declared(src[0])
+                meter = mt or meter
+                parts_ = split_overlong(src[0], src[1], meter) if not multirest_count(src[0]) else None
+                if parts_:
+                    report.append(f"  {p.pid}: a {len(parts_)}-bar-long measure read as one (page "
+                                  f"{len(pages) + 1}, measure {len(pg) + 1}) -> split at the bar lines")
+                    pg.extend((q, src[1]) for q in parts_)
+                else:
+                    pg.append(src)
+            pages.append(pg)
+        starts = starts_of(p.pdf) if p.pdf and p.pdf.exists() else [None] * len(pages)
+        if not bar_numbers:
+            starts = [None] * len(pages)
+        elif len(starts) != len(pages):
+            report.append(f"{p.pid}: {len(pages)} page file(s) but {len(starts)} PDF page(s) "
+                          f"-- structure not verified")
+            starts = [None] * len(pages)
+        # a bar number never repeats: if a later page starts at bar 1, every page before it
+        # (a cover or text page) holds no printed bars
+        for k, s in enumerate(starts):
+            if k and s == 1:
+                starts[:k] = [1] * k
+                report.append(f"{p.pid}: page {k + 1} starts at bar 1 -> page(s) 1-{k} hold no printed bars")
+                break
+        if all(s is None for s in starts):       # scan / no text layer: the part is one "page"
+            pages, starts = [[s for pg in pages for s in pg]], [1]
+            report.append(f"{p.pid}: no printed bar numbers" + ("" if not bar_numbers else " (scan?)")
+                          + " -> checked against the other parts' total only")
+        spans = spans_of(p.pdf) if p.pdf and p.pdf.exists() else []
+        data[p.pid] = dict(p=p, pages=pages, starts=starts, spans=spans,
+                           rests={b for a, e in spans for b in range(a, e + 1)})
+    return data
+
+
+def _score_total(data: Dict[str, Dict[str, Any]], last_start_of, max_bar_of, report: List[str]) -> int:
+    """The score's bar count: the consensus of the parts' last-page totals, bounded below by the print."""
+    # score-wide total: start of a part's last page + the bars it found there
+    totals = [d["starts"][-1] - 1 + len(d["pages"][-1]) for d in data.values()
+              if d["starts"] and d["starts"][-1] is not None]
+    if not totals:
+        raise ValueError("no part has a readable printed bar number; cannot derive the structure")
+    # the last printed system starts at bar L, so the piece has at least L bars
+    lasts = [last_start_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
+    lasts += [max_bar_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
+    lasts = [x for x in lasts if x and (not totals or x <= 1.5 * max(totals) + 5)]     # a misread number (811) must not set the length
+    ends = [e for d in data.values() for _, e in d["spans"]]
+    lower = max([x for x in lasts if x] + ends + [0])
+    cand = [t for t in totals if t >= lower]
+    if cand:
+        top = Counter(cand).most_common()
+        total = max(t for t, c in top if c == top[0][1])     # a tie goes to the larger total
+    else:                        # every part is short (lost multi-rests): the print's own lower bound
+        total = lower
+        report.append(f"score: no part reaches the printed lower bound ({lower}); using it")
+    report.append(f"score: {len(data)} parts, {total} bars "
+                  f"(last-page totals {dict(Counter(totals))})")
+    return total
+
+
+def _plan_pages(data: Dict[str, Dict[str, Any]], total: int) -> Dict[int, float]:
+    """Set each page's printed start and target length; return the rest-only pattern per bar."""
+    # per-page target length; mark pages that already match the print
+    for pid, d in data.items():
+        d["target"], d["start"], bar = [], [], 1
+        for i, pg in enumerate(d["pages"]):
+            s = d["starts"][i]
+            if s is not None:
+                bar = s
+            nxt = d["starts"][i + 1] if i + 1 < len(d["pages"]) else total + 1
+            tgt = (nxt - bar) if nxt is not None else len(pg)
+            d["start"].append(bar)
+            d["target"].append(tgt)
+            bar += tgt
+        d["good"] = [len(pg) == t for pg, t in zip(d["pages"], d["target"])]
+
+    # global rest-only pattern over bars that sit on a matching page
+    sums: Dict[int, List[float]] = {}
+    for d in data.values():
+        for pg, a, ok in zip(d["pages"], d["start"], d["good"]):
+            if ok:
+                for j, s in enumerate(pg):
+                    acc = sums.setdefault(a + j, [0.0, 0.0])
+                    acc[0] += _rest_flag(s)
+                    acc[1] += 1
+    return {b: v[0] / v[1] for b, v in sums.items()}
+
+
+def _rhythm_refs(bars_by: Dict[str, List[Optional[Src]]], usable, total: int) -> Dict[str, List[List[Any]]]:
+    """Per part and bar: the onsets of the *other* usable parts there (no printed bar numbers)."""
+    on = {pid: [onsets(*s) if s is not None else None for s in seq] for pid, seq in bars_by.items()
+          if usable(pid, seq)}
+    return {pid: [[o[b] for q, o in on.items() if q != pid and b < len(o) and o[b] is not None]
+                  for b in range(total)] for pid in bars_by}
+
+
+def _text_refs(bars_by: Dict[str, List[Optional[Src]]], usable, total: int) -> Dict[str, List[List[Any]]]:
+    """Per part and bar: the texts above the *other* usable parts' bars there."""
+    tx = {pid: [text_keys(s[0]) if s is not None else None for s in seq] for pid, seq in bars_by.items()
+          if usable(pid, seq)}
+    return {pid: [[o[b] for q, o in tx.items() if q != pid and b < len(o) and o[b] is not None]
+                  for b in range(total)] for pid in bars_by}
+
+
+def _lay_out(data, ref, total, report: List[str], decl_ref_by=None, rhythm_by=None, text_by=None):
+    """Every part on bars 1..total (see ``_lay_out_part``)."""
+    bars: Dict[str, List[Optional[Src]]] = {}
+    flags: Dict[str, Dict[int, str]] = {}
+    for pid, d in data.items():
+        bars[pid], fl = _lay_out_part(pid, d, ref, total, report, decl_ref_by[pid] if decl_ref_by else None,
+                                      rhythm_by[pid] if rhythm_by else None,
+                                      text_by[pid] if text_by else None)
+        if fl:
+            flags[pid] = fl
+    return bars, flags
+
+
+def _lay_out_all(data, ref, total: int, bar_numbers: bool, report: List[str]):
+    """Place every part's bars on the printed grid (by bar number, or by rhythm for an ensemble book)."""
+    if bar_numbers:
+        bars, flags = _lay_out(data, ref, total, [])                          # first look (report discarded)
+        if len(data) > 2:
+            # a part that lost bars may land them one off; the other parts' meter changes pin them
+            return _lay_out(data, ref, total, report, _others_meter_change_share(bars, total))
+        return _lay_out(data, ref, total, report)
+    # parts that already have the full length are the reference; the others are aligned to them by
+    # rhythm, then every part is aligned again to all the others
+    full = {pid: [s for pg in d["pages"] for s in pg] for pid, d in data.items() if all(d["good"])}
+    ref_full = {**{p: [None] * total for p in data}, **full}
+    only_full = lambda pid, seq: pid in full
+    bars, flags = _lay_out(data, ref, total, [], rhythm_by=_rhythm_refs(ref_full, only_full, total),
+                           text_by=_text_refs(ref_full, only_full, total))
+    if len(data) > 2:
+        return _lay_out(data, ref, total, report, rhythm_by=_rhythm_refs(bars, lambda pid, seq: True, total),
+                        text_by=_text_refs(bars, lambda pid, seq: True, total))
+    return _lay_out(data, ref, total, report, rhythm_by=_rhythm_refs(ref_full, only_full, total),
+                    text_by=_text_refs(ref_full, only_full, total))
+
+
+def _consensus(bars, data, total: int, title: str, report: List[str]):
+    """Key and meter per bar by plurality over the parts, and the pickup; returns the score spec.
+
+    Also returns ``shifts`` (each part's key shift from concert pitch), ``unpitched`` (part ids
+    without pitches) and ``changes`` (the concert-pitch key/meter changes, for the summary).
+    """
+    key_by: Dict[str, List[Optional[int]]] = {}
+    met_by: Dict[str, List[Optional[Tuple[int, int]]]] = {}
+    for pid, seq in bars.items():
+        ck: Optional[int] = 0                 # no key signature printed = written C major (also for a first bar that declares none)
+        cm: Optional[Tuple[int, int]] = None
+        ks, ms = [], []
+        for s in seq:
+            if s is not None:
+                k, mt = _declared(s[0])
+                ck, cm = (k if k is not None else ck), (mt if mt is not None else cm)
+            ks.append(ck)
+            ms.append(cm)
+        key_by[pid], met_by[pid] = ks, ms
+    # The parts are printed in written pitch, so a transposing part's key signature differs from the
+    # score's: vote on the *concert* key (written fifths + the part's shift) and write each part's
+    # own key back as concert - shift.
+    shifts: Dict[str, int] = {}
+    for pid, seq in bars.items():
+        d = data[pid]["p"]
+        try:
+            semis = semitones_for(d.instrument or d.label, _CLEF_FAMILY.get(_first_clef(seq)[0]))
+        except ValueError:
+            semis = 0
+        shifts[pid] = fifths_shift(semis, [0])
+    unpitched = {pid for pid, seq in bars.items() if _is_unpitched(seq)}
+    keys = [_plurality([None if key_by[p][b] is None else key_by[p][b] + shifts[p]
+                        for p in bars if p not in unpitched], 0)
+            for b in range(total)]
+    meters = [_plurality([met_by[p][b] for p in bars], (4, 4)) for b in range(total)]
+    first_len = _plurality(
+        [round(measure_total(s[0]) / s[1], 4) for s in (seq[0] for seq in bars.values())
+         if s is not None and s[0].find("note") is not None], None)
+    full = meters[0][0] * 4 / meters[0][1]
+    first_beats = first_len if first_len and first_len < full - 1e-6 else None
+    spec = SimpleNamespace(TITLE=title, COMPOSER="", TOTAL_BARS=total,
+                           meter=lambda b: meters[b - 1], key_fifths=lambda b: keys[b - 1],
+                           FIRST_BAR_BEATS=first_beats, MARKS={})
+    if first_beats:
+        report.append(f"score: bar 1 is a {first_beats:g}-beat pickup (plurality of the parts)")
+    changes = [(b + 1, keys[b], meters[b]) for b in range(total)
+               if b == 0 or keys[b] != keys[b - 1] or meters[b] != meters[b - 1]]
+    report.append("score: key/meter changes at concert pitch (bar, fifths, meter): "
+                  + "; ".join(f"{b}: {k:+d} {m[0]}/{m[1]}" for b, k, m in changes))
+    return spec, shifts, unpitched, changes
+
+
+def _build_parts(bars, flags, data, spec, shifts, unpitched, report: List[str], summary: Dict[str, Any]):
+    """Write every part's measures; returns ``(built, infos)`` keyed by part number."""
+    built: Dict[int, List[ET.Element]] = {}
+    infos: Dict[int, Dict[str, Any]] = {}
+    for n, (pid, seq) in enumerate(bars.items(), 1):
+        d = data[pid]
+        infos[n] = part_info(d["p"].label, d["p"].instrument)
+        report.append(f"part {n} ({d['p'].label}):")
+        clef = _first_clef(seq)
+        cur_clef: Optional[Tuple[str, str]] = None
+        prev_key = prev_met = None
+        prev_trail = None
+        out: List[ET.Element] = []
+        for b, src in enumerate(seq, 1):
+            m = ET.Element("measure", number=str(b))
+            lead, trail = _clefs(src)
+            here = lead or prev_trail
+            prev_trail = trail
+            want = clef if cur_clef is None else (here if here and here != cur_clef else None)
+            key = 0 if pid in unpitched else spec.key_fifths(b) - shifts[pid]
+            meter = spec.meter(b)
+            add_attributes(m, divisions=DIV if not out else None,
+                           key=key if (not out or key != prev_key) else None,
+                           meter=meter if (not out or meter != prev_met) else None,
+                           clef=want)
+            cur_clef = want or cur_clef
+            length = bar_len(spec, b)
+            if src is None or (is_rest_only(src[0]) and not _has_cue(src[0])):
+                full_bar = length == meter[0] * DIV * 4 // meter[1]
+                if src is not None:
+                    copy_marks(src[0], m, src[1], notes=False)
+                m.append(rest_measure(b, length, full_bar).find("note"))
+            else:
+                copy_marks(src[0], m, src[1])
+                bad = check_length(m, spec, b)
+                if bad:
+                    report.append(f"  bar {b}: LENGTH {bad[0]:g} beats, expected {bad[1]:g}")
+                    summary["bad_bars"] += 1
+                    note = f"check: {bad[0]:g} beats, expected {bad[1]:g}"
+                    flags.setdefault(pid, {})[b] = note + (" / " + flags[pid][b] if b in flags.get(pid, {}) else "")
+            prev_key, prev_met = key, meter
+            if b in flags.get(pid, {}):
+                _flag_bar(m, flags[pid][b])
+            out.append(m)
+        built[n] = out
+        dropped = balance_wedges(out)
+        if dropped:
+            report.append(f"  dropped {dropped} unmatched hairpin(s)")
+    return built, infos
+
+
+def _declare_transpositions(score: ET.Element, infos, data, bars, report: List[str]) -> None:
+    """The notes stay as printed (written pitch); declare each part's transposition so the
+    score sounds right (the per-part files carry it, the page files this reads do not)."""
+    for n, pe in zip(infos, score.findall("part")):
+        d = data[list(bars)[n - 1]]["p"]
+        try:
+            semis = semitones_for(d.instrument or d.label, clef_family(pe))
+        except ValueError as e:
+            report.append(f"part {n} ({d.label}): no transposition declared ({e})")
+            continue
+        _declare_transpose(pe, semis)
+
+
+def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftotext",
+            read_pages: Callable[[Path], List[Src]] = read_page,
+            starts_of: Callable[[Path], List[Optional[int]]] = None,
+            last_start_of: Callable[[Path], Optional[int]] = None,
+            spans_of: Callable[[Path], List[Tuple[int, int]]] = None,
+            max_bar_of: Callable[[Path], Optional[int]] = None,
+            marks: Optional["MarksOptions"] = None,
+            tempo_vote: bool = True,
+            bar_numbers: bool = True,
+            ) -> Tuple[ET.Element, List[str], Dict[str, Any]]:
+    if not bar_numbers:          # an ensemble book: nothing printed to read, whatever OCR may take for numbers
+        starts_of, last_start_of = (lambda pdf: []), (lambda pdf: None)
+        spans_of, max_bar_of = (lambda pdf: []), (lambda pdf: None)
+    reads_pdfs = last_start_of is None       # callers that inject the print structure (tests) bring their own
+    starts_of = starts_of or (lambda pdf: printed_page_starts(pdf, pdftotext))
+    last_start_of = last_start_of or (lambda pdf: printed_last_system_start(pdf, pdftotext))
+    spans_of = spans_of or (lambda pdf: printed_multirest_spans(pdf, pdftotext))
+    max_bar_of = max_bar_of or ((lambda pdf: printed_max_bar(pdf, pdftotext)) if reads_pdfs else (lambda pdf: None))
+    report: List[str] = []
+    data = _read_parts(parts, read_pages, starts_of, spans_of, bar_numbers, report)
+    total = _score_total(data, last_start_of, max_bar_of, report)
+    ref = _plan_pages(data, total)
+    bars, flags = _lay_out_all(data, ref, total, bar_numbers, report)
+    spec, shifts, unpitched, changes = _consensus(bars, data, total, title, report)
+
+    summary = dict(total=total, parts=len(data), key_meter=changes, bad_bars=0, repairs=0)
+    built, infos = _build_parts(bars, flags, data, spec, shifts, unpitched, report, summary)
+    summary["repairs"] = sum(1 for r in report if "-- check" in r.lower())
+    if marks is not None:                # optional: make dynamics / hairpins consistent across parts
+        stats, lines = normalize_marks([(infos[n]["name"], built[n]) for n in infos], marks)
+        report.extend(lines)
+        summary["marks"] = stats
+    if tempo_vote:                       # one tempo mark per bar (plurality of the parts), in the first part
+        report.extend(unify_tempo(built))
+    report.extend(unify_system_text(built))      # words the parts print over the same bar: system text, once
+    score = build_score(spec, built, infos)
+    _declare_transpositions(score, infos, data, bars, report)
+    return score, report, summary

@@ -1,11 +1,11 @@
-"""Tests for musicocr.homr_fixes against the two homr failure modes documented
+"""Tests for musicocr.engines.homr.fixes against the two homr failure modes documented
 in omr-eval/README.md: the empty-multirest generator bug (fixable) and a
 dropped multi-rest (only flaggable, not fixable)."""
 from __future__ import annotations
 
 from xml.etree import ElementTree as ET
 
-from musicocr.homr_fixes import fix_multirest_file, fix_multirest_part, suspicious_whole_rests
+from musicocr.engines.homr.fixes import fix_multirest_file, fix_multirest_part, suspicious_whole_rests
 
 
 def _attrs(measure, *, divisions=None, beats=None, beat_type=None, multi_rest=None):

@@ -1,9 +1,9 @@
-"""Generic tuplet clean-up (musicocr/tuplets.py)."""
+"""Generic tuplet clean-up (musicocr/fixes/tuplets.py)."""
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from musicocr.tuplets import fix_measure, fix_tree
+from musicocr.fixes.tuplets import fix_tree
 
 DIV = 30
 
@@ -84,7 +84,7 @@ def test_stage_config_defaults_on():
 
 def test_beamed_note_missing_its_tuplet_ratio_is_adopted():
     def n(dur, typ, beam, tm=None, tup=None):
-        t = f"<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>" if tm else ""
+        t = "<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>" if tm else ""
         nt = f"<notations><tuplet type='{tup}'/></notations>" if tup else ""
         return (f"<note><pitch><step>E</step><octave>5</octave></pitch><duration>{dur}</duration><voice>1</voice>"
                 f"<type>{typ}</type>{t}<beam number='1'>{beam}</beam>{nt}</note>")

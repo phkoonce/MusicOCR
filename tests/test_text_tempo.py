@@ -1,9 +1,9 @@
-"""One tempo mark per bar across the parts of a combined score (musicocr/text_tempo.py)."""
+"""One tempo mark per bar across the parts of a combined score (musicocr/assemble/text_tempo.py)."""
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from musicocr.text_tempo import tempo_key, unify_tempo
+from musicocr.assemble.text_tempo import tempo_key, unify_tempo
 
 
 def bar(n, bpm=None, words=None, unit="quarter", dot=False, extra=""):
@@ -28,7 +28,7 @@ def test_plurality_wins_and_is_written_once_in_the_first_part():
     assert tempos(parts[2][0]) == [] and tempos(parts[3][0]) == []
     d = parts[1][0].find("direction")
     assert d.findtext("direction-type/words") == "Sl. Faster" and d.find("staff") is None
-    assert any("disagree" in l and "check" in l for l in lines)
+    assert any("disagree" in line and "check" in line for line in lines)
 
 
 def test_a_mark_missed_in_the_first_part_is_filled_in_from_the_others():

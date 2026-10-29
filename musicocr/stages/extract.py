@@ -15,7 +15,8 @@ import zipfile
 from pathlib import Path
 
 from musicocr.errors import StageError, StageResult
-from musicocr.musicxml_merge import merge_pages
+from musicocr.fixes import PAGE_FIXES, FixContext, run_fixes
+from musicocr.musicxml.merge import merge_pages
 from musicocr.pipeline import PipelineContext
 
 
@@ -85,34 +86,9 @@ def run(ctx: PipelineContext) -> StageResult:
             ctx.log(f"  extracted {t.name}")
     ctx.artifacts.musicxml_pages = page_files
 
-    # Before merging, so music21 never sees a page without its governing signature.
-    from musicocr.timesig import fix_time_signatures_files
-
-    fix_time_signatures_files(page_files, log=ctx.log)
-
-    from musicocr.barrests import fix_file as fix_bar_rests
-
-    for pf in page_files:
-        try:
-            n = fix_bar_rests(pf, log=ctx.log)
-        except Exception as exc:  # noqa: BLE001
-            ctx.log(f"  {pf.name}: whole-bar rest fix failed ({type(exc).__name__}: {exc})")
-        else:
-            if n:
-                ctx.log(f"  {pf.name}: {n} overlong whole-bar rest(s) cut to the bar length")
-
-    if ctx.config.stages.tuplets_enabled:
-        # needs the repaired meters: it only touches bars that do not add up to their time signature
-        from musicocr.tuplets import fix_tuplets_file
-
-        for pf in page_files:
-            try:
-                n = fix_tuplets_file(pf, flag=ctx.config.stages.tuplets_flag, log=ctx.log)
-            except Exception as exc:  # noqa: BLE001
-                ctx.log(f"  {pf.name}: tuplet clean-up failed ({type(exc).__name__}: {exc})")
-            else:
-                if n:
-                    ctx.log(f"  {pf.name}: rebuilt {n} bar(s) with inconsistent tuplets")
+    # Before merging: the repairs need each page's own bars (and music21 must never see a page
+    # without its governing signature).
+    run_fixes(PAGE_FIXES, FixContext(page_files, ctx.config, ctx.log))
 
     if len(page_files) == 1:
         master.write_bytes(page_files[0].read_bytes())

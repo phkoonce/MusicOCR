@@ -54,7 +54,7 @@ class HomrConfig:
 
 @dataclass
 class TextLayerConfig:
-    """[omr.copisteria.text_layer]: tempo/expression/technique words as <direction>s (musicocr/text_layer.py)."""
+    """[omr.copisteria.text_layer]: tempo/expression/technique words as <direction>s (musicocr/text/layer.py)."""
     mode: str = "flag"        # "off" | "flag" (classified + flagged unknown text) | "on" (classified only)
     backend: str = "auto"     # OCR backend for scans ("auto" = macOS Vision, then all backends if it finds nothing)
     passes: tuple = ("lanczos", "bicubic")   # resampling filters; each band is read under each, results unioned
@@ -259,7 +259,7 @@ class RetouchConfig:
 class StagesConfig:
     correct_enabled: bool = False
     normalize_enabled: bool = True
-    tuplets_enabled: bool = True   # rebuild inconsistent tuplets in bars that do not add up (musicocr/tuplets.py)
+    tuplets_enabled: bool = True   # rebuild inconsistent tuplets in bars that do not add up (musicocr/fixes/tuplets.py)
     tuplets_flag: bool = True      # colour / annotate the rebuilt runs
     transpose: TransposeConfig = field(default_factory=TransposeConfig)
     retouch: RetouchConfig = field(default_factory=RetouchConfig)
@@ -277,6 +277,43 @@ class StagesConfig:
 
 
 @dataclass
+class FixesConfig:
+    """``[fixes]``: per-fix on/off overrides, by fix name (see ``musicocr fixes``).
+
+    Names not set here fall back to each fix's older config key, then to its default. Engine
+    sub-tables such as ``[fixes.copisteria]`` are only a way to group names; they are flattened.
+    """
+    overrides: Dict[str, bool] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "FixesConfig":
+        from musicocr.fixes import FIXES_BY_NAME
+
+        flat: Dict[str, bool] = {}
+        for key, value in d.items():
+            group = value if isinstance(value, dict) else {key: value}
+            for name, on in group.items():
+                if name not in FIXES_BY_NAME:
+                    raise ConfigError(f"[fixes] unknown fix {name!r}; known: {sorted(FIXES_BY_NAME)}")
+                if not isinstance(on, bool):
+                    raise ConfigError(f"[fixes] {name} must be true or false")
+                flat[name] = on
+        return cls(flat)
+
+    def with_overrides(self, enable=(), disable=()) -> "FixesConfig":
+        """A copy with the named fixes forced on/off (the CLI's ``--fix`` / ``--no-fix``)."""
+        from musicocr.fixes import FIXES_BY_NAME
+
+        merged = dict(self.overrides)
+        for names, on in ((enable, True), (disable, False)):
+            for name in names:
+                if name not in FIXES_BY_NAME:
+                    raise ConfigError(f"unknown fix {name!r}; known: {sorted(FIXES_BY_NAME)}")
+                merged[name] = on
+        return FixesConfig(merged)
+
+
+@dataclass
 class Config:
     path: Path
     tools: Tools = field(default_factory=Tools)
@@ -284,6 +321,7 @@ class Config:
     preprocess: PreprocessOpts = field(default_factory=PreprocessOpts)
     stages: StagesConfig = field(default_factory=StagesConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
+    fixes: FixesConfig = field(default_factory=FixesConfig)
 
     def constants_for_profile(self, name: Optional[str] = None) -> List[str]:
         name = name or self.omr.profile
@@ -321,4 +359,5 @@ def load_config(path: Optional[Union[str, Path]] = None) -> Config:
         preprocess=PreprocessOpts.from_dict(dict(data.get("preprocess", {}))),
         stages=StagesConfig.from_dict(data.get("stages", {})),
         output=OutputConfig.from_dict(data.get("output", {})),
+        fixes=FixesConfig.from_dict(data.get("fixes", {})),
     )

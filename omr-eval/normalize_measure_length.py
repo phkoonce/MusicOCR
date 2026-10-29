@@ -1,10 +1,10 @@
-"""CLI wrapper around ``musicocr.measure_normalize.normalize_score``.
+"""CLI wrapper around ``musicocr.fixes.measure_normalize.normalize_score``.
 
 The fix itself now also runs automatically inside the main pipeline as the
 ``normalize`` stage (``[stages.normalize] enabled``, default on) -- see
 ``musicocr/stages/normalize.py``. Kept here as a standalone entry point for
 ad-hoc eval work (e.g. re-normalizing a concat_pages.py output outside a
-pipeline run). See musicocr/measure_normalize.py for the full explanation and
+pipeline run). See musicocr/fixes/measure_normalize.py for the full explanation and
 omr-eval/README.md's 2026-09-13 entry for the writeup.
 
 Run this on a *merged* per-part file (after concat_pages.py), not on
@@ -28,7 +28,7 @@ from pathlib import Path
 def normalize_file(path: Path, suffix: bool, log) -> None:
     from music21 import converter
 
-    from musicocr.measure_normalize import normalize_score
+    from musicocr.fixes.measure_normalize import normalize_score
 
     log(f"{path}")
     score = converter.parse(str(path))

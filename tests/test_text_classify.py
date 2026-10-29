@@ -1,9 +1,9 @@
-"""Classifying printed words around a staff (musicocr/text_classify.py, text_lexicon.toml)."""
+"""Classifying printed words around a staff (musicocr/text/classify.py, text_lexicon.toml)."""
 from __future__ import annotations
 
 import pytest
 
-from musicocr.text_classify import classify, load_lexicon
+from musicocr.text.classify import classify, load_lexicon
 
 
 @pytest.mark.parametrize("text,kind,shown", [

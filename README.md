@@ -22,7 +22,7 @@ see below).
 
 ```bash
 bash scripts/setup.sh          # brew install poppler + create .venv + pip install -e .
-bash omr-eval/setup.sh         # creates the homr venv (default OMR engine)
+bash omr-eval/setup.sh         # creates the engine venvs (homr, copisteria, legato2)
 source .venv/bin/activate
 python -m musicocr doctor       # verify all tools are found
 ```
@@ -75,7 +75,7 @@ has no whole-book mode to abort — it always runs one page per process.)
 homr has no way to hint the time signature, and it gets the *numerator* wrong
 whenever the signature changes mid-page (6/8 comes out as "8/8": the model reads the
 denominator, but the numerator is derived from the page's median bar length).
-`musicocr/timesig.py` re-derives each numerator from the bars it governs, treating
+`musicocr/fixes/timesig.py` re-derives each numerator from the bars it governs, treating
 the per-page files as one part, and carries the signature onto pages that declare
 none. It runs in `extract` just before the page merge and logs every change.
 
@@ -101,7 +101,7 @@ on `run`). The untransposed file is kept in `output/<book>/written/`, and re-run
 render is at the new pitch in `concert` mode, so it won't visually match a written-pitch scan.
 
 Pitches and key signatures move together and are respelled (C major horn part →
-F major). The shared instrument table lives in `musicocr/instruments.py`; values
+F major). The shared instrument table lives in `musicocr/scoreops/instruments.py`; values
 are semitones to add to written pitch, and clef-dependent instruments (baritone /
 tenor horn: treble −14, bass 0) are resolved from each part's first clef.
 Unknown part names are skipped, never guessed.
@@ -111,7 +111,7 @@ Unknown part names are skipped, never guessed.
 ```
 python -m musicocr run INPUT.pdf \
   --pages 1,4-5          # only these pages
-  --engine homr|audiveris # OMR engine (default: homr, config [omr] engine)
+  --engine homr|audiveris|copisteria|legato2 # OMR engine (default: config [omr] engine; built-in default homr)
   --profile clean-typeset # Audiveris constants preset from config.toml
   --constant k=v          # extra Audiveris constant, repeatable
   --force                 # re-run OMR even if output exists
@@ -124,7 +124,7 @@ python -m musicocr run INPUT.pdf \
 
 ### Dynamics / hairpin consistency (optional)
 
-`musicocr combine --normalize-marks [RULES]` runs a post-pass (`musicocr/marks.py`) that uses the
+`musicocr combine --normalize-marks [RULES]` runs a post-pass (`musicocr/scoreops/marks.py`) that uses the
 other parts as evidence to tidy dynamics and hairpins. `RULES` is a comma list; bare means
 `dedupe,hairpins`.
 
@@ -142,7 +142,8 @@ Inserted dynamics and moved hairpin stops are coloured blue; every change is in 
 
 `[omr] engine` in `config.toml` (or `--engine`) picks the transcription engine:
 
-* **`homr`** (default) — an end-to-end transformer OMR model. No whole-book
+* **`homr`** (the built-in default; this checkout's `config.toml` currently selects
+  `copisteria`, so check `[omr] engine` there) — an end-to-end transformer OMR model. No whole-book
   mode, no Audiveris-style constant tuning, no GUI correction round-trip; it
   just reads one rasterised page image and writes MusicXML. Needs its own
   venv: `bash omr-eval/setup.sh` (see `omr-eval/README.md` for background on
@@ -158,7 +159,7 @@ Inserted dynamics and moved hairpin stops are coloured blue; every change is in 
   evidence) and `pNNN.html` (viewer) beside each page's MusicXML.
 * **`legato2`** — [LEGATO 2](https://huggingface.co/guangyangmusic/legato-2) (arXiv:2607.05769,
   Apache-2.0, 0.9B): finds systems on the page, transcribes each to ABC notation, which is converted
-  to MusicXML with music21 (`musicocr/abc_convert.py`). Own venv under `omr-eval/legato2/`
+  to MusicXML with music21 (`musicocr/engines/legato2/abc_convert.py`). Own venv under `omr-eval/legato2/`
   (`omr-eval/setup.sh`); the weights are gated on Hugging Face (log in and accept the terms), and
   the inference code (`legato.pipeline.Legato2`) must be present in `omr-eval/legato2/repo`.
   Settings in `[omr.legato2]` (`model`, `device`, `beam_size`, `yolo_conf`). No Copisteria-style
@@ -175,16 +176,31 @@ Stages, in order: `ingest → omr → correct → extract → normalize → tran
 validate → convert → qa` (`transpose` is optional, off by default). Re-running `--from extract` after editing the `.mxl`/`.omr` is
 the normal way to iterate without paying for another full OMR pass.
 
+### Automatic repairs ("fixes")
+
+Every automatic repair of the OMR output is a named, switchable *fix*, declared once in
+`musicocr/fixes/registry.py` and run by one runner (`musicocr/fixes/base.py`): same switch, same log
+format, and one error policy (a fix that raises is logged and skipped, never fatal to the page).
+
+```bash
+python -m musicocr fixes                      # every fix, its engine, and whether it is on
+python -m musicocr run X.pdf --no-fix tuplets # suppress one for a run (repeatable; --fix forces one on)
+```
+
+In `config.toml`, `[fixes] name = false` turns one off for good. A name left unset keeps its older key
+(`[omr.copisteria] fix_*`, `[omr.homr] fix_multirest`, `[stages.tuplets]`, `[stages.normalize]`) or its
+default (on). Fixes declare ordering constraints (`after=`), which the registry checks when it loads.
+
 ### Copisteria-specific pre/post-processing
 
 * **Page text → multi-rest counts.** Copisteria only reads the count over a
   multi-measure rest from OCR text boxes (`pNNN.texts.json`). For born-digital
   PDFs the `omr` stage builds that file from the PDF's text layer
-  (`[omr.copisteria] texts = "pdf-layer"`, or the default `"auto"`; `musicocr/page_text.py`), mapping
+  (`[omr.copisteria] texts = "pdf-layer"`, or the default `"auto"`; `musicocr/text/page_text.py`), mapping
   the digit boxes onto the preprocessed page via the geometry `preprocess`
   records in `prepped/pNNN.geom.json` (DPI, deskew angle, crop offset).
   Scanned PDFs have no text layer; `texts = "ocr"` instead OCRs the prepped page
-  image (`musicocr/ocr_backends.py`, pluggable: RapidOCR from the homr venv and/or
+  image (`musicocr/text/ocr_backends.py`, pluggable: RapidOCR from the homr venv and/or
   macOS Vision through a tiny Swift helper compiled on first use; `ocr_backend`
   picks one or the union, the default, since each misses some isolated numerals) and
   `texts = "auto"` picks the PDF layer when the page has one, else OCR. Without
@@ -193,13 +209,13 @@ the normal way to iterate without paying for another full OMR pass.
   (a tagged bar plus N−1 following rest bars, so bar numbers match print);
   homr writes one collapsed bar per multi-rest. The pipeline's canonical form is
   collapsed, so `[omr.copisteria] multirest_form = "collapse"` (default) folds
-  Copisteria's output after the empty-bar fix (`musicocr/multirest.py`;
+  Copisteria's output after the empty-bar fix (`musicocr/fixes/multirest.py`;
   followers that aren't pure whole-measure rests are kept with a logged
   warning). `"expand"` does the inverse (for collapsed input only) and `"keep"`
   leaves the output as written.
 * **Empty bars** (bare `<forward>`, e.g. a multi-rest whose count it could not
   place) get a whole-measure rest (`[omr.copisteria] fix_empty`,
-  `musicocr/copisteria_fixes.py`).
+  `musicocr/engines/copisteria/fixes.py`).
 * **Ghost bars.** A cautionary key + time signature after a double bar can be read
   as an extra bar holding a key change and a spurious note, with the time change in
   the next bar. `[omr.copisteria] fix_ghost_bars` (default on) drops such a bar only
@@ -219,10 +235,10 @@ the normal way to iterate without paying for another full OMR pass.
   dotted quarter), but sees those notes at ~1.0 confidence one size up (which in
   turn reads bars worse). For a page whose first reading left gaps, the page is
   re-detected at `second_pass_scale`x, the extra note/rest detections are added
-  to the cached detections (`musicocr/second_pass_detect.py`), the page is
+  to the cached detections (`musicocr/engines/copisteria/detect.py`), the page is
   re-read, and the new version of each gap bar is spliced into the first reading
   only where it fills the gap and keeps the bar's attributes
-  (`musicocr/copisteria_second_pass.py`). The first reading is kept as
+  (`musicocr/engines/copisteria/second_pass.py`). The first reading is kept as
   `pNNN.pass1.musicxml`. Lowering confidence cutoffs does not help: the missing
   symbols are not low-confidence detections.
 * **Multi-scale second pass** (`second_pass_extra_scales` = 1.75, plus
@@ -234,7 +250,7 @@ the normal way to iterate without paying for another full OMR pass.
   into its neighbour -- a lost bar with no gap to see. Such pages are re-detected
   one size up and the confident note/rest/multi-rest detections inside the empty
   box are added before reading.
-* **Unmarked duplets/triplets** (`text_tuplets`, `musicocr/copisteria_run.py`):
+* **Unmarked duplets/triplets** (`text_tuplets`, `musicocr/engines/copisteria/run.py`):
   small "2"/"3" digits in the PDF text layer tag the note heads under them as
   2:3 / 3:2 tuplets (Copisteria's decoder only offers triplets), and small
   digits are no longer taken as multi-rest counts. `fix_half_tuplets` finishes
@@ -243,7 +259,7 @@ the normal way to iterate without paying for another full OMR pass.
   start that prints no key signature (reading.json evidence; skips multi-rest
   follower bars), `fix_time_inherit` makes a page's unprinted opening meter
   continue the previous page's.
-* **Scanned big-digit clean-up** (`musicocr/page_text.py`, runs with the page text on scans): a
+* **Scanned big-digit clean-up** (`musicocr/text/page_text.py`, runs with the page text on scans): a
   count digit is "big" from 3.5 staff spaces up (`MIN_TALL_SP`; OCR boxes of scanned counts measure
   3.7-10). `repeatMark_*` (segno/coda) detections sitting on a big digit are dropped
   (`drop_digit_repeat_marks`: a numeral's curl reads as a segno), and a weak `note_breve` under a big
@@ -265,11 +281,11 @@ the normal way to iterate without paying for another full OMR pass.
 
 The detector reads symbols and the page text only supplies digits, so printed words
 used to be lost. `[omr.copisteria.text_layer]` (default `mode = "flag"`) recovers them as
-MusicXML `<direction>`s: `musicocr/text_words.py` gets the words (the PDF text layer when the
+MusicXML `<direction>`s: `musicocr/text/words.py` gets the words (the PDF text layer when the
 page has one, else Vision OCR of bands around each staff, read at ~1.5x under two resampling
 filters and unioned, because Vision garbles small italic words in one crop and reads them in
-another), `musicocr/text_classify.py` + `musicocr/text_lexicon.toml` classify the phrases, and
-`musicocr/text_layer.py` filters page furniture and writes `<page>.textlayer.json`, which
+another), `musicocr/text/classify.py` + `musicocr/text_lexicon.toml` classify the phrases, and
+`musicocr/text/layer.py` filters page furniture and writes `<page>.textlayer.json`, which
 `copisteria_run.py` turns into directions in the staff and bar the phrase sits in.
 
 * Tempo: `Sl. Faster (quarter) = 103` becomes `<words>` + `<metronome>` + `<sound tempo>` (a dotted
@@ -297,7 +313,7 @@ full multi-part piece; the pipeline now handles both automatically:
   (`liebharc/homr#140`) where a correctly-recognised multi-measure rest is
   exported with a `<multiple-rest>` tag but no actual rest/duration content.
   The `omr` stage patches each page's export in place right after homr writes
-  it (`[omr.homr] fix_multirest`, on by default; `musicocr/homr_fixes.py`).
+  it (`[omr.homr] fix_multirest`, on by default; `musicocr/engines/homr/fixes.py`).
 * **Rhythm misreads that leave a measure's duration wrong** (e.g. a half note
   read as a whole note) can't be corrected — the actually-wrong note can't be
   identified without the scan — but they leave MuseScore's barlines out of
@@ -305,7 +321,7 @@ full multi-part piece; the pipeline now handles both automatically:
   tedious. The `normalize` stage (after `extract`, `[stages.normalize]`, on by
   default) mechanically truncates/pads every such measure to match its time
   signature, trading note accuracy (already wrong) for a uniform grid to
-  correct against. See `musicocr/measure_normalize.py`.
+  correct against. See `musicocr/fixes/measure_normalize.py`.
 
 Neither pass can fix a *misread* multi-rest count (e.g. a printed "3" read as
 "6") or a multi-rest dropped entirely — those are transformer misclassifications,
@@ -317,7 +333,7 @@ when running the homr engine.
 
 A tuplet read as a mix (3:2 with 6:4 and 5:4, a bracket starting on the third note, a 0.4-beat rest)
 leaves the bar the wrong length, and MuseScore spreads the damage to the next bar when it is edited.
-`[stages.tuplets]` (on by default; `musicocr/tuplets.py`; also `musicocr tuplets FILE...` on existing
+`[stages.tuplets]` (on by default; `musicocr/fixes/tuplets.py`; also `musicocr tuplets FILE...` on existing
 files) runs inside `extract` after the meter repair. In a bar that does not add up to its time
 signature it rebuilds the inconsistent tuplet runs with the ratio most of their notes carry,
 durations from the printed note values and whole bracket groups, and keeps the result only if the
@@ -327,7 +343,7 @@ with a "check: tuplet rebuilt" text (`flag`), since the fix is a guess from the 
 ### Whole-bar rests (any engine)
 
 A whole-bar rest that also holds cue-size notes (read as grace notes) comes out 4.5 or 7 beats long,
-so MuseScore shows an irregular bar. `musicocr/barrests.py` runs inside `extract` right after the
+so MuseScore shows an irregular bar. `musicocr/fixes/barrests.py` runs inside `extract` right after the
 meter repair (no config switch): a bar whose only sounding content is one rest longer than the time
 signature's bar is cut to the bar. Shorter rests (pickups) and bars with notes are not touched.
 
@@ -349,24 +365,37 @@ Film-score parts are a run of short *scenes* (cues) whose bar numbers restart in
     [--engine copisteria] [--only 1M1,4M30] [--detect] [--convert]
 ```
 
-It finds each scene in every part PDF (`musicocr/scenes.py`: the title block starting a page, and the
+It finds each scene in every part PDF (`musicocr/assemble/scenes.py`: the title block starting a page, and the
 "0:16 until 1M4" box ending it), combines the scenes one at a time (an upbeat before bar 1 is set
 aside during alignment and put back), and strings them into one `NAME_scenes.musicxml`: a rehearsal
 mark opens each scene on a new system and the box text closes it. `--convert` also writes the
-`.mscz` and adds a *section break* before each scene (`musicocr/mscz_sections.py`), because
+`.mscz` and adds a *section break* before each scene (`musicocr/assemble/mscz_sections.py`), because
 MuseScore's MusicXML import turns `new-system` into a plain line break and so never restarts the bar
 numbers at 1.
+
+## Collections of short pieces (`musicocr collection`)
+
+A collection is a set of part-books that each hold the same many short pieces, several to a page (hymn and
+quartet books). A spec file (`musicocr/collection/spec.py`; example `workflows/gb/collection.toml`) names the
+books and the table-of-contents pages, then:
+
+```bash
+python -m musicocr collection split   SPEC.toml   # one PDF per piece and book (TOC + OCR to find each piece)
+python -m musicocr collection batch   SPEC.toml   # write batches/<name>.toml: a part per piece and book
+python scripts/batch_run.py --batch batches/<name>.toml   # OMR every part
+python -m musicocr collection combine SPEC.toml [--pieces 1-3] [--redo]   # one score per piece + summary table
+```
 
 ## Ensemble books without bar numbers
 
 Quartet/ensemble books print no bar numbers (only circled rehearsal marks), so `combine` cannot align
 the parts by number. With `--no-bar-numbers` (or `bar_numbers = false` in the batch) each part is one
 run of bars, the total is the plurality of the parts' lengths, and a part of the wrong length is
-aligned to the others by the *rhythm* of its bars (`musicocr/unnumbered.py`); inserted rest bars are
+aligned to the others by the *rhythm* of its bars (`musicocr/assemble/unnumbered.py`); inserted rest bars are
 flagged "check". Pick one piece's parts with `--only`; `title` / `composer` on the batch parts name
 the combined score. Per-part options for such books: `old_bass_clef` (old-notation horn editions:
 octave-up bass clef, notes up an octave), `title`, `composer`, and a per-part `source_pdf` when each
-part is its own PDF (`musicocr/retouch.py`, `musicocr/batch.py`).
+part is its own PDF (`musicocr/scoreops/retouch.py`, `musicocr/batch.py`).
 
 ## Poor scans
 
@@ -486,22 +515,27 @@ A clean synthetic score should come back with few or no findings.
 
 ```
 musicocr/
-  cli.py               # `run` / `compare` / `doctor` / ...
-  compare.py           # engine comparison: metrics, measure diff, runner
-  config.py            # config.toml loader
-  pipeline.py          # stage protocol + ordered runner
-  report.py            # report.md / report.json
-  homr_fixes.py         # homr multi-rest generator-bug fix + dropped-multirest heuristic
-  measure_normalize.py  # measure-duration normalization (homr rhythm misreads)
-  tuplets.py / barrests.py  # generic tuplet rebuild; overlong whole-bar rest fix (inside extract)
-  combine.py / combine_cli.py  # align + merge parts by printed bar number (`musicocr combine`)
-  scenes.py / mscz_sections.py  # scene-structured scans; section breaks in a converted .mscz
-  page_text.py          # PDF-layer / OCR page text and multi-rest detection prep for Copisteria
-  text_words.py / text_classify.py / text_lexicon.toml / text_layer.py  # tempo/expression/technique words -> <direction>
-  transpose.py / instruments.py  # semitone transposition + shared instrument table
-  stages/               # ingest, omr (dispatches to omr_homr/omr_audiveris),
-                         # correct, extract, normalize, transpose, validate, convert, qa
-tests/                # pytest unit tests for homr_fixes / measure_normalize
+  cli.py  config.py  pipeline.py  state.py  artifacts.py  errors.py  report.py  util.py
+                       # the pipeline core: CLI, config.toml loader, stage runner, artifacts, reports
+  stages/              # ingest, omr (dispatches to engines/), correct, extract, normalize, retouch,
+                       # transpose, validate, convert, qa -- one `run(ctx)` each
+  engines/             # registry.py (which engines exist), raster.py (shared per-page loop),
+                       # audiveris.py, homr/, copisteria/, legato2/ -- each: stage.py (+ its own fixes,
+                       # helper scripts run in the engine's venv)
+  fixes/               # the Fix abstraction (base.py), the registry of every automatic repair
+                       # (registry.py) and the engine-agnostic repairs: timesig, barrests, tuplets,
+                       # multirest, measure_normalize
+  musicxml/            # shared MusicXML helpers (measure lengths, writing files, page merge)
+  scoreops/            # transpose, instruments, retouch, marks (dynamics/hairpin consistency)
+  text/                # page text and OCR, tempo/expression/technique words -> <direction>
+                       # (page_text, ocr_backends, words, classify, layer, lexicon.toml)
+  assemble/            # combine parts by printed bar number: combine, alignment/, unnumbered,
+                       # scenes, mscz_sections, text_system, text_tempo
+  collection/          # books of many short pieces: split by table of contents, batch spec, combine all
+  batch.py compare.py barcheck.py preprocess.py pages.py   # batch runs, engine comparison, bar-count
+                       # check, scan clean-up, page specs
+workflows/            # project-specific data and notes (workflows/README.md); nothing in musicocr/ imports them
+tests/                # pytest unit tests (one file per module; run with the command below)
 config.toml           # tool paths, OMR engine/profiles, output formats
 scripts/setup.sh      # environment bootstrap (main pipeline)
 scripts/make_sample.py
@@ -513,8 +547,9 @@ omr-eval/*.py         # standalone CLI wrappers for ad-hoc eval work, thin
                        # over the same musicocr modules the pipeline uses
 ```
 
-Run the test suite with:
+Run the test suite and the linter (config in `pyproject.toml`) with:
 
 ```bash
 .venv/bin/python -m pytest tests/
+.venv/bin/ruff check musicocr tests scripts workflows   # pip install -e '.[dev]' for ruff
 ```

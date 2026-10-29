@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Combine a batch of scene-structured parts (film-score cues) into one score; see musicocr/scenes.py.
+"""Combine a batch of scene-structured parts (film-score cues) into one score; see musicocr/assemble/scenes.py.
 
   .venv/bin/python scripts/combine_scenes.py --batch batches/httyd2.toml [--cues batches/httyd2.cues.json]
          [--engine copisteria] [--only 1M1,4M30] [--detect] [--convert]
@@ -15,12 +15,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from musicocr.alignment.build import write_score          # noqa: E402
+from musicocr.assemble.alignment.build import write_score          # noqa: E402
 from musicocr.batch import load_spec                       # noqa: E402
-from musicocr.combine import (PartInput, combine, printed_last_system_start, printed_max_bar,   # noqa: E402
+from musicocr.assemble.combine import (PartInput, combine, printed_last_system_start, printed_max_bar,   # noqa: E402
                               printed_multirest_spans, printed_page_starts, read_page)
-from musicocr.combine_cli import part_inputs               # noqa: E402
-from musicocr.scenes import (concat_scenes, detect_scenes, drop_pickup, load_scenes, pickup_of, prepend_pickup,   # noqa: E402
+from musicocr.assemble.combine_cli import part_inputs               # noqa: E402
+from musicocr.assemble.scenes import (concat_scenes, detect_scenes, drop_pickup, load_scenes, pickup_of, prepend_pickup,   # noqa: E402
                              save_scenes, slice_pdf)
 
 
@@ -131,7 +131,7 @@ def main() -> int:
         run_cmd_lenient([cfg["tools"]["musescore"], "-f", "-o", str(mscz), str(xml)], timeout=900, log=print)
         print(f"MuseScore: {mscz} ({'ok' if mscz.exists() else 'FAILED'})")
         if mscz.exists():
-            from musicocr.mscz_sections import add_section_breaks, section_ends
+            from musicocr.assemble.mscz_sections import add_section_breaks, section_ends
             print(f"{add_section_breaks(mscz, section_ends(xml))} section break(s): bar numbers restart at 1 in each scene")
     return 0
 

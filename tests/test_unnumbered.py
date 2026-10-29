@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from musicocr.unnumbered import align_by_rhythm, dissimilarity, onsets
+from musicocr.assemble.unnumbered import align_by_rhythm, dissimilarity, onsets
 
 F = frozenset
 
@@ -62,7 +62,7 @@ def _measure(pattern, div=2):
 
 def test_combine_without_bar_numbers_repairs_a_short_part(tmp_path):
     from pathlib import Path
-    from musicocr.combine import PartInput, combine
+    from musicocr.assemble.combine import PartInput, combine
 
     bars = [(0,), (0, 2), (0, 1, 2), (0, 3), (0, 1), (0, 2, 3), (0, 1, 3), (0, 2)]
     pages = {"a": [_measure(p) for p in bars], "b": [_measure(p) for p in bars],

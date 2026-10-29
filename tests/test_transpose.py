@@ -1,12 +1,12 @@
-"""Tests for musicocr.transpose and musicocr.instruments."""
+"""Tests for musicocr.scoreops.transpose and musicocr.scoreops.instruments."""
 from __future__ import annotations
 
 from xml.etree import ElementTree as ET
 
 import pytest
 
-from musicocr.instruments import semitones_for
-from musicocr.transpose import fifths_shift, transpose_score
+from musicocr.scoreops.instruments import semitones_for
+from musicocr.scoreops.transpose import fifths_shift, transpose_score
 
 
 def _score(name, notes, fifths=0, clef=("G", "2"), key=True, extra_measures=()):

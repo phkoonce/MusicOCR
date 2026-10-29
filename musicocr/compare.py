@@ -10,7 +10,7 @@ Layout (see README "Comparing engines")::
 Everything that reads scores is a pure function over MusicXML files / report
 dicts (ElementTree only, no music21), so it is unit-testable with synthetic
 input. Multi-rests are counted in the collapsed convention
-(``musicocr.multirest.collapsed_units``) so engines that emit them expanded and
+(``musicocr.fixes.multirest.collapsed_units``) so engines that emit them expanded and
 collapsed compare as equals. :func:`run_compare` is the thin runner.
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ from xml.etree import ElementTree as ET
 
 from musicocr.artifacts import Artifacts
 from musicocr.engines import ENGINES
-from musicocr.multirest import collapsed_units
+from musicocr.fixes.multirest import collapsed_units
 
 _PAGE_RE = re.compile(r"\.p(\d+)(?:\.\d+)?\.musicxml$")
 _NORMALIZED_RE = re.compile(r"^(\d+) measure")
@@ -392,7 +392,7 @@ def run_compare(ctx, engines: list[str], to_stage: str = "validate",
     """Ingest once into ``ctx.workdir`` (the book dir), then run each engine in
     ``<book>/engines/<engine>/``. Returns ``{"metrics", "diffs", "notes", "ok"}``
     and writes compare.md / compare.json. ``ctx`` is a normal PipelineContext."""
-    from musicocr.pipeline import PipelineContext, run_pipeline
+    from musicocr.pipeline import run_pipeline
     from musicocr.report import build_report, write_reports
 
     book_dir = ctx.workdir

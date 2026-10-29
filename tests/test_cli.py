@@ -265,7 +265,7 @@ def test_transpose_bad_xml_and_missing_file_exit_2(tmp_path, capsys):
 
 
 def test_instruments_lists_table(capsys):
-    from musicocr.instruments import TRANSPOSITIONS
+    from musicocr.scoreops.instruments import TRANSPOSITIONS
     assert cli.main(["instruments"]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) == len(TRANSPOSITIONS)

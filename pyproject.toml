@@ -17,15 +17,32 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=7"]
+dev = ["pytest>=7", "ruff>=0.5"]
 
 [project.scripts]
 musicocr = "musicocr.cli:main"
 
 [tool.setuptools]
-packages = ["musicocr", "musicocr.stages", "musicocr.alignment"]
+packages.find = { include = ["musicocr*"] }
 
 [tool.setuptools.package-data]
-musicocr = ["vision_ocr.swift", "text_lexicon.toml"]
+"musicocr.text" = ["vision_ocr.swift", "lexicon.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["omr-eval/*/repo", "omr-eval/*/.venv", "omr-eval/oemer", "output", "input", "experiments"]
+
+[tool.ruff.lint]
+# F: pyflakes (unused imports/variables, undefined names); E: pycodestyle errors; B: likely bugs;
+# BLE: blind `except Exception` must be justified with a noqa; SIM: needless complexity.
+select = ["E", "F", "B", "BLE", "SIM"]
+ignore = ["E501", "E731", "SIM108", "SIM105", "B905", "B007"]   # long lines, lambdas, ternary style, zip(strict=) and unused loop vars are taste calls
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011", "SIM117", "BLE001"]
+"scripts/*" = ["E402"]       # they extend sys.path before importing musicocr
+"omr-eval/*.py" = ["E402", "B904"]

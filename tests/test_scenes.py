@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from musicocr.combine import read_page
-from musicocr.scenes import Scene, concat_scenes, drop_pickup, pickup_of, prepend_pickup, read_until_box
+from musicocr.assemble.combine import read_page
+from musicocr.assemble.scenes import Scene, concat_scenes, drop_pickup, pickup_of, prepend_pickup, read_until_box
 
 ATTR = "<attributes><divisions>2</divisions><key><fifths>1</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time></attributes>"
 

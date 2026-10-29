@@ -1,4 +1,4 @@
-"""Command-line entry point: ``python -m musicocr <run|transpose|instruments|doctor>``."""
+"""MusicOCR command line: ``python -m musicocr <command>`` (run, compare, combine, fixes, ...)."""
 from __future__ import annotations
 
 import argparse
@@ -63,7 +63,9 @@ def apply_run_overrides(config: Config, args) -> Config:
     if g("composer"):
         rt = replace(rt, composer=g("composer"))
 
-    return replace(config, omr=omr, preprocess=pp,
+    fixes = config.fixes.with_overrides(enable=g("fix") or (), disable=g("no_fix") or ())
+
+    return replace(config, omr=omr, preprocess=pp, fixes=fixes,
                    stages=replace(config.stages, transpose=tr, retouch=rt))
 
 
@@ -74,8 +76,8 @@ def cmd_run(args) -> int:
         print(f"config error: {exc}", file=sys.stderr)
         return 2
 
-    config = apply_run_overrides(config, args)
     try:
+        config = apply_run_overrides(config, args)
         config.constants_for_profile()
     except ConfigError as exc:
         print(f"config error: {exc}", file=sys.stderr)
@@ -155,8 +157,9 @@ def cmd_compare(args) -> int:
 
 
 def cmd_combine(args) -> int:
-    from musicocr import batch, combine_cli
-    from musicocr.marks import MarksOptions
+    from musicocr import batch
+    from musicocr.assemble import combine_cli
+    from musicocr.scoreops.marks import MarksOptions
 
     try:
         config = load_config(args.config)
@@ -181,7 +184,7 @@ def cmd_combine(args) -> int:
 
 
 def cmd_tuplets(args) -> int:
-    from musicocr.tuplets import fix_tuplets_file
+    from musicocr.fixes.tuplets import fix_tuplets_file
     total = 0
     for f in args.files:
         path = Path(f).expanduser()
@@ -192,7 +195,7 @@ def cmd_tuplets(args) -> int:
 
 
 def cmd_marks(args) -> int:
-    from musicocr.marks import MarksOptions, normalize_file
+    from musicocr.scoreops.marks import MarksOptions, normalize_file
 
     try:
         opts = MarksOptions.parse(args.rules)
@@ -210,7 +213,7 @@ def cmd_marks(args) -> int:
 
 
 def cmd_transpose(args) -> int:
-    from musicocr.transpose import transpose_file
+    from musicocr.scoreops.transpose import transpose_file
 
     src = Path(args.input).expanduser().resolve()
     dst = Path(args.output).expanduser().resolve() if args.output \
@@ -226,13 +229,36 @@ def cmd_transpose(args) -> int:
 
 
 def cmd_instruments(args) -> int:
-    from musicocr.instruments import ALIASES, TRANSPOSITIONS
+    from musicocr.scoreops.instruments import ALIASES, TRANSPOSITIONS
 
     for name, spec in sorted(TRANSPOSITIONS.items()):
         shown = f"{spec:+d}" if isinstance(spec, int) else \
             ", ".join(f"{clef} {n:+d}" for clef, n in spec.items())
         aliases = sorted(a for a, c in ALIASES.items() if c == name)
         print(f"{name:16} {shown}" + (f"   (also: {', '.join(aliases)})" if aliases else ""))
+    return 0
+
+
+def cmd_fixes(args) -> int:
+    from musicocr.fixes import fix_enabled
+    from musicocr.fixes.registry import COPISTERIA_FIXES, HOMR_FIXES, PAGE_FIXES, SCORE_FIXES
+
+    try:
+        config = apply_run_overrides(load_config(args.config), args)
+    except ConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 2
+    engine = config.omr.engine
+    groups = (("any engine, per page (extract stage)", PAGE_FIXES),
+              ("any engine, merged score (normalize stage)", SCORE_FIXES),
+              ("homr", HOMR_FIXES), ("copisteria", COPISTERIA_FIXES))
+    print(f"automatic repairs (engine: {engine}; switch with [fixes] in config.toml or --fix/--no-fix)")
+    for title, group in groups:
+        print(f"\n{title}")
+        for f in group:
+            state = "on " if fix_enabled(f, config) else "off"
+            idle = "" if not f.engines or engine in f.engines else "  (not this engine)"
+            print(f"  [{state}] {f.name:16} {f.summary}{idle}")
     return 0
 
 
@@ -300,17 +326,13 @@ def cmd_doctor(args) -> int:
     return 0 if ok else 1
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="musicocr", description=__doc__)
-    p.add_argument("--config", help="path to config.toml (default: repo config.toml)")
-    sub = p.add_subparsers(dest="cmd", required=True)
-
+def _add_run_parser(sub) -> None:
     r = sub.add_parser("run", help="run the pipeline on a PDF")
     r.add_argument("input", help="input PDF")
     r.add_argument("--output", help="output root dir (default: ./output)")
     r.add_argument("--pages", help="page selection, e.g. '1,4-5' (Audiveris -sheets)")
     r.add_argument("--engine", choices=sorted(ENGINES),
-                   help="OMR engine (overrides config [omr] engine, default: homr)")
+                   help="OMR engine (overrides config [omr] engine)")
     r.add_argument("--profile", help="OMR profile from config.toml (Audiveris only)")
     r.add_argument("--constant", action="append", metavar="k=v",
                    help="extra Audiveris constant (repeatable, Audiveris only)")
@@ -347,12 +369,18 @@ def build_parser() -> argparse.ArgumentParser:
                    help="old-notation horn edition: make bass clefs octave-up and raise their notes an octave")
     r.add_argument("--title", metavar="TEXT", help="piece title for the score metadata (drops the misread printed title)")
     r.add_argument("--composer", metavar="TEXT", help="composer for the score metadata (drops the misread printed line)")
+    r.add_argument("--fix", action="append", metavar="NAME",
+                   help="force an automatic repair on (repeatable; `musicocr fixes` lists the names)")
+    r.add_argument("--no-fix", action="append", metavar="NAME",
+                   help="turn an automatic repair off (repeatable)")
     r.add_argument("--from", dest="from_stage", choices=STAGE_ORDER, help="start stage")
     r.add_argument("--to", dest="to_stage", choices=STAGE_ORDER, help="end stage (inclusive)")
     r.add_argument("--keep-going", action="store_true",
                    help="continue after a stage fails")
     r.set_defaults(func=cmd_run)
 
+
+def _add_compare_parser(sub) -> None:
     c = sub.add_parser(
         "compare", help="run several OMR engines on one PDF and compare them",
         description="Ingest (rasterise/deskew/crop) once, then run each engine through "
@@ -381,17 +409,19 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--transpose-semitones", type=int, metavar="N")
     c.set_defaults(func=cmd_compare)
 
+
+def _add_combine_parser(sub) -> None:
     cb = sub.add_parser(
         "combine", help="combine a batch's per-part results into one score aligned to the printed bars",
         description="Derives bar structure from the part PDFs' text layer and key/meter from the "
-                    "parts themselves (no hand-written spec); see musicocr/combine.py.")
+                    "parts themselves (no hand-written spec); see musicocr/assemble/combine.py.")
     cb.add_argument("--batch", required=True, help="batch TOML (parts, labels, instruments)")
     cb.add_argument("--engine", help="which engine's results to combine (default: the batch's first)")
     cb.add_argument("--output", help="directory for the combined score (default: <batch output>/_combined/<engine>)")
     cb.add_argument("--only", help="comma-separated part ids/keys to include")
     cb.add_argument("--convert", action="store_true", help="also write .mscz via MuseScore")
     cb.add_argument("--normalize-marks", nargs="?", const="dedupe,hairpins", metavar="RULES",
-                    help="make dynamics/hairpins consistent across parts (musicocr/marks.py); RULES is a "
+                    help="make dynamics/hairpins consistent across parts (musicocr/scoreops/marks.py); RULES is a "
                          "comma list of dedupe, hairpins, fill, or all (default when given bare: "
                          "dedupe,hairpins; fill is opt-in)")
     cb.add_argument("--no-bar-numbers", action="store_true",
@@ -399,6 +429,14 @@ def build_parser() -> argparse.ArgumentParser:
                          "(or set bar_numbers = false in the batch)")
     cb.set_defaults(func=cmd_combine)
 
+
+def _add_collection_parser(sub) -> None:
+    from musicocr.collection.cli import add_parser
+
+    add_parser(sub)
+
+
+def _add_marks_parser(sub) -> None:
     mk = sub.add_parser(
         "marks", help="dedupe dynamics / extend truncated hairpins / fill section dynamics in a MusicXML file",
         description="The optional marks pass of `combine`, run on an existing partwise MusicXML file.")
@@ -408,13 +446,17 @@ def build_parser() -> argparse.ArgumentParser:
     mk.add_argument("--no-colour", action="store_true", help="do not colour inserted marks")
     mk.set_defaults(func=cmd_marks)
 
+
+def _add_tuplets_parser(sub) -> None:
     tp = sub.add_parser(
         "tuplets", help="rebuild inconsistent tuplets (mixed ratios, misaligned brackets) in MusicXML files, in place",
-        description="The tuplet clean-up of the OMR stages (musicocr/tuplets.py), run on existing files.")
+        description="The tuplet clean-up of the OMR stages (musicocr/fixes/tuplets.py), run on existing files.")
     tp.add_argument("files", nargs="+", help="MusicXML files to rewrite in place")
     tp.add_argument("--no-flag", action="store_true", help="do not colour/annotate runs whose timing was guessed")
     tp.set_defaults(func=cmd_tuplets)
 
+
+def _add_transpose_parser(sub) -> None:
     t = sub.add_parser(
         "transpose",
         help="transpose a MusicXML file (written -> concert pitch), keys included",
@@ -425,16 +467,44 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("-o", "--output", help="output path (default: <input>.transposed.musicxml)")
     g = t.add_mutually_exclusive_group()
     g.add_argument("--semitones", type=int, help="shift every part by this many semitones")
-    g.add_argument("--instrument", help="look up the shift in musicocr/instruments.py")
+    g.add_argument("--instrument", help="look up the shift in musicocr/scoreops/instruments.py")
     t.add_argument("--clef", choices=["treble", "bass", "c"],
                    help="clef family for clef-dependent instruments (default: each part's first clef)")
     t.set_defaults(func=cmd_transpose)
 
+
+def _add_instruments_parser(sub) -> None:
     i = sub.add_parser("instruments", help="list the instrument transposition table")
     i.set_defaults(func=cmd_instruments)
 
+
+def _add_fixes_parser(sub) -> None:
+    fx = sub.add_parser("fixes", help="list the automatic repairs and whether each is on")
+    fx.add_argument("--engine", choices=sorted(ENGINES), help="show the state for this engine")
+    fx.add_argument("--fix", action="append", metavar="NAME", help=argparse.SUPPRESS)
+    fx.add_argument("--no-fix", action="append", metavar="NAME", help=argparse.SUPPRESS)
+    fx.set_defaults(func=cmd_fixes)
+
+
+def _add_doctor_parser(sub) -> None:
     d = sub.add_parser("doctor", help="check tools and dependencies")
     d.set_defaults(func=cmd_doctor)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="musicocr", description=__doc__)
+    p.add_argument("--config", help="path to config.toml (default: repo config.toml)")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    _add_run_parser(sub)
+    _add_compare_parser(sub)
+    _add_combine_parser(sub)
+    _add_collection_parser(sub)
+    _add_marks_parser(sub)
+    _add_tuplets_parser(sub)
+    _add_transpose_parser(sub)
+    _add_instruments_parser(sub)
+    _add_fixes_parser(sub)
+    _add_doctor_parser(sub)
     return p
 
 

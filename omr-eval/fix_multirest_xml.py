@@ -1,10 +1,10 @@
-"""CLI wrapper around ``musicocr.homr_fixes.fix_multirest_file``.
+"""CLI wrapper around ``musicocr.engines.homr.fixes.fix_multirest_file``.
 
 The fix itself now also runs automatically inside the main pipeline's homr
 stage (``[omr.homr] fix_multirest``, default on) -- see
-``musicocr/stages/omr_homr.py``. Kept here as a standalone entry point for
+``musicocr/engines/homr/stage.py``. Kept here as a standalone entry point for
 ad-hoc eval work against files outside a pipeline run (e.g. output from a
-homr version/config not yet wired into the pipeline). See musicocr/homr_fixes.py
+homr version/config not yet wired into the pipeline). See musicocr/engines/homr/fixes.py
 for the full explanation of the bug this works around, and omr-eval/README.md
 for the failure-mode writeup.
 
@@ -22,7 +22,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-from musicocr.homr_fixes import fix_multirest_file
+from musicocr.engines.homr.fixes import fix_multirest_file
 
 
 def fix_file(path: Path, suffix: bool) -> None:

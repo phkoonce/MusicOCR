@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from musicocr.marks import MarksOptions, _pairs, _scan, normalize_marks  # noqa: E402
+from musicocr.scoreops.marks import MarksOptions, _pairs, _scan, normalize_marks  # noqa: E402
 
 
 def load(path):

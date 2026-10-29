@@ -47,17 +47,17 @@ PDF -> pages(png) -> [page text: digits only] -> Copisteria detection (dets json
 ```
 
 Existing seams to reuse:
-- `musicocr/ocr_backends.py::ocr_words(png, backend)`: the single OCR seam (Vision, RapidOCR),
+- `musicocr/text/ocr_backends.py::ocr_words(png, backend)`: the single OCR seam (Vision, RapidOCR),
   boxes in image pixels, results cached.
-- `musicocr/page_text.py`: `write_texts_json` (PDF layer) and `write_ocr_texts_json` (OCR) write
+- `musicocr/text/page_text.py`: `write_texts_json` (PDF layer) and `write_ocr_texts_json` (OCR) write
   `<page>.texts.json` (digits only); `digit_boxes_from_words` is the filter to widen.
-- `musicocr/copisteria_run.py`: patches Copisteria's `_events(rd, staff, bar, clef, key, texts)`,
+- `musicocr/engines/copisteria/run.py`: patches Copisteria's `_events(rd, staff, bar, clef, key, texts)`,
   which already receives page text per staff/bar and returns `(events, dirs, marks)`. `dirs` is the
   direction list: the natural attachment point.
 - `musicocr/alignment/systems.py::_strip_tokens`: OCR of an upscaled strip beside/above/below a
   staff (needed because whole-page OCR misses small italics); `_staff_systems` finds staves.
-- `musicocr/combine.py::copy_marks`, `musicocr/marks.py`: carry directions into the combined score.
-- `musicocr/tuplets.py` pattern: a conservative default-on fixer that flags what it changed.
+- `musicocr/assemble/combine.py::copy_marks`, `musicocr/scoreops/marks.py`: carry directions into the combined score.
+- `musicocr/fixes/tuplets.py` pattern: a conservative default-on fixer that flags what it changed.
 
 ## 4. Requirements
 
@@ -151,7 +151,7 @@ and expression word: classified as expression when a metronome mark is not adjac
   transposition declaration) to avoid N copies; voted across parts also fixes single-part OCR misses.
 - Words printed above the same bar in 2+ parts ("Allegro", "a tempo", "rit.") are written once, in the
   first part, as system text (`<direction system="only-top">`, which MuseScore imports as System Text
-  instead of Staff Text); `musicocr/text_system.py`. Texts only one part prints stay staff text.
+  instead of Staff Text); `musicocr/assemble/text_system.py`. Texts only one part prints stay staff text.
 - Without printed bar numbers the same texts steer the rhythm alignment (`align_by_rhythm`): a bar
   carrying a text the other parts print over a slot is pulled to that slot.
 - Scene concatenation (`scenes.py`) already carries directions with bar content; no change.
@@ -183,7 +183,7 @@ passes; list what comes back for the known printed words ("marc.", "cantabile", 
 printed vs recognised, per backend.
 
 Phase 1: **words + phrases.**
-1. `musicocr/text_words.py`: `words_for_page(png, pdf, page, backend) -> list[Word]` with the two
+1. `musicocr/text/words.py`: `words_for_page(png, pdf, page, backend) -> list[Word]` with the two
    sources (5.1), caching under the existing OCR cache.
 2. `phrases(words, sp) -> list[Phrase]` (5.2). Unit tests on synthetic word boxes.
 

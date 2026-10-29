@@ -3,7 +3,7 @@ through the pipeline.
 
 A batch is described by a small TOML spec (see ``scripts/batch.example.toml``).
 Part outputs go to ``output/<name>/<key>/`` (mirroring ``input/<name>/``); state is kept in ``output/<name>/_state.json`` and a human-readable progress doc is
-written to ``docs/<name>-progress.md``, where ``<name>`` is the spec file's stem.
+written to ``batches/<name>-progress.md``, where ``<name>`` is the spec file's stem.
 Finished parts are skipped on re-run, so the batch is safe to stop and resume.
 """
 from __future__ import annotations
@@ -49,7 +49,7 @@ class Part:
     instrument: str = ""  # transposition-table name; empty = leave pitches as written
     score: bool = True    # include in `musicocr combine` (False for e.g. percussion)
     small_graces: bool = False  # copisteria: small noteheads are ruff/flam grace notes (timpani, drums)
-    old_bass_clef: bool = False  # old-notation horn edition (see musicocr.retouch)
+    old_bass_clef: bool = False  # old-notation horn edition (see musicocr.scoreops.retouch)
     title: str = ""
     composer: str = ""
     source_pdf: Optional[Path] = None  # this part's own PDF (a book per part); default: the batch's source_pdf
@@ -148,7 +148,7 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
         input_dir=rel("input_dir", f"input/{name}"),
         output_dir=output_dir,
         state_path=rel("state_file", f"output/{name}/_state.json"),
-        doc_path=rel("progress_doc", f"docs/{name}-progress.md"),
+        doc_path=rel("progress_doc", f"batches/{name}-progress.md"),
         root=root,
     )
 
@@ -281,7 +281,8 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
         else out_dir / key / f"{key}.musicxml"
     if produced.exists() and produced.stat().st_size > 0:
         minutes = (time.time() - started) / 60
-        return {"status": DONE, "note": f"{minutes:.1f} min, rc={rc}; see {_rel(out_dir / key, spec.root)}/{"compare.md" if spec.engines else "report.md"}"}
+        report = "compare.md" if spec.engines else "report.md"
+        return {"status": DONE, "note": f"{minutes:.1f} min, rc={rc}; see {_rel(out_dir / key, spec.root)}/{report}"}
     return {"status": FAILED, "note": f"rc={rc}; see {_rel(out_dir / (key + '.run.log'), spec.root)}"}
 
 

@@ -1,9 +1,9 @@
-"""Whole-bar rests take the bar's length (musicocr/barrests.py)."""
+"""Whole-bar rests take the bar's length (musicocr/fixes/barrests.py)."""
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from musicocr.barrests import fix_tree
+from musicocr.fixes.barrests import fix_tree
 
 GRACE = "<note><grace/><pitch><step>C</step><octave>6</octave></pitch><voice>1</voice><type>eighth</type></note>"
 
@@ -54,7 +54,7 @@ def test_cue_notes_over_whole_bar_rest_move_to_voice_two():
             WHOLE + _n("C", 6, "quarter") + _n("C", 3, "eighth") + _n("B", 3, "eighth") + _n("A", 6, "quarter")]
     root = _score34(*bars)
     assert fix_tree(root, log=lambda *_: None) == 3
-    from musicocr.alignment.build import measure_total
+    from musicocr.assemble.alignment.build import measure_total
     for m in root.findall("part/measure"):
         assert [c.tag for c in m if c.tag in ("backup",)] == ["backup"]
         assert m.find("backup/duration").text == "18"
@@ -89,20 +89,20 @@ def test_cue_rule_pickup_bar_untouched():
 
 
 def test_measure_total_of_two_voice_bar_is_longest_voice():
-    from musicocr.alignment.build import copy_notes, is_rest_only
+    from musicocr.assemble.alignment.build import copy_notes, is_rest_only
     root = _score34(WHOLE + _n("A", 6, "quarter") + _n("B", 6, "quarter") + _n("C", 6, "quarter"))
     fix_tree(root, log=lambda *_: None)
     m = root.find("part/measure")
     assert is_rest_only(m)                                # the sounding voice is a rest
     dst = ET.Element("measure")
     copy_notes(m, dst, 6)
-    from musicocr.alignment.build import DIV, measure_total
+    from musicocr.assemble.alignment.build import DIV, measure_total
     assert int(dst.find("backup/duration").text) == 18 * DIV // 6
     assert measure_total(dst) == 18 * DIV // 6
 
 
 def test_combine_keeps_cue_voice_and_flags_nothing(tmp_path):
-    from musicocr.combine import PartInput, combine
+    from musicocr.assemble.combine import PartInput, combine
     attrs = ("<attributes><divisions>6</divisions><key><fifths>0</fifths></key>"
              "<time><beats>3</beats><beat-type>4</beat-type></time></attributes>")
     parts = []
@@ -132,7 +132,7 @@ def test_voice_two_already_split_gets_cue_marks_and_one_bar_backup():
     m6 = WHOLE + "<backup><duration>18</duration></backup>" + _n("G", 18, "half").replace("<voice>1", "<voice>2")
     root = _score34(m5, m6)
     assert fix_tree(root, log=lambda *_: None) == 2
-    from musicocr.alignment.build import measure_total
+    from musicocr.assemble.alignment.build import measure_total
     a, b = root.findall("part/measure")
     assert measure_total(a) == 18 and a.find("backup/duration").text == "18" and len(a.findall("note")) == 3
     assert all(n.find("cue") is not None for n in a.findall("note") if n.findtext("voice") == "2")

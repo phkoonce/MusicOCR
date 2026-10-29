@@ -9,7 +9,8 @@ from musicocr.config import load_config
 from musicocr.errors import StageError
 from musicocr.pages import expand_pages, resolve_pages
 from musicocr.pipeline import PipelineContext
-from musicocr.stages import ingest, omr, omr_homr
+from musicocr.engines.homr import stage as omr_homr
+from musicocr.stages import ingest, omr
 from musicocr.util import LenientResult
 
 
@@ -264,7 +265,7 @@ def replace_engine(ctx, engine):
 
 
 def test_copisteria_runs_from_repo_root_and_adopts_output(tmp_path, monkeypatch):
-    from musicocr.stages import omr_copisteria
+    from musicocr.engines.copisteria import stage as omr_copisteria
     py = tmp_path / "py"
     py.write_text("")
     repo = tmp_path / "repo"

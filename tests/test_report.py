@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from pathlib import Path
 
 from musicocr.config import load_config
 from musicocr.errors import StageResult

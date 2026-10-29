@@ -1,14 +1,14 @@
-"""Placing, filtering and emitting phrases (musicocr/text_layer.py, copisteria_run.py text layer)."""
+"""Placing, filtering and emitting phrases (musicocr/text/layer.py, copisteria_run.py text layer)."""
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
 import numpy as np
 
-from musicocr.config import Config, CopisteriaConfig, TextLayerConfig, ConfigError
-from musicocr.copisteria_run import build_direction, place_items
-from musicocr.text_layer import TextLayerSettings, build_items, is_dotted_beat
-from musicocr.text_words import Staff, Word
+from musicocr.config import CopisteriaConfig, TextLayerConfig, ConfigError
+from musicocr.engines.copisteria.run import build_direction, place_items
+from musicocr.text.layer import TextLayerSettings, build_items, is_dotted_beat
+from musicocr.text.words import Staff, Word
 
 STAVES = [Staff(1000, 1104, 30), Staff(1400, 1504, 30), Staff(1800, 1904, 30)]   # sp = 26
 

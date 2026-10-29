@@ -1,4 +1,4 @@
-"""musicocr.alignment shared building blocks on tiny synthetic MusicXML."""
+"""musicocr.assemble.alignment shared building blocks on tiny synthetic MusicXML."""
 from __future__ import annotations
 
 import textwrap
@@ -7,11 +7,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from musicocr.alignment import AlignmentError
-from musicocr.alignment.build import (add_attributes, apply_marks, check_length, copy_notes,
+from musicocr.assemble.alignment import AlignmentError
+from musicocr.assemble.alignment.build import (add_attributes, apply_marks, check_length, copy_notes,
                                       direction, is_rest_only, measure_total, rest_measure)
-from musicocr.alignment.spec import DIV, bar_len, load_spec
-from musicocr.alignment.units import units
+from musicocr.assemble.alignment.spec import DIV, bar_len, load_spec
+from musicocr.assemble.alignment.units import units
 
 
 def _m(xml: str) -> ET.Element:

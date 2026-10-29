@@ -44,8 +44,5 @@ __pycache__/
 # scripts/batch.example.toml
 /batches/
 
-# Auto-generated batch progress docs (musicocr.batch) -- local state, not source
-/docs/*-progress.md
-
 # Claude Code agent worktrees
 /.claude/

@@ -1,9 +1,9 @@
-"""Section breaks for multi-piece scores (musicocr/mscz_sections.py)."""
+"""Section breaks for multi-piece scores (musicocr/assemble/mscz_sections.py)."""
 from __future__ import annotations
 
 import zipfile
 
-from musicocr.mscz_sections import add_section_breaks, patch_mscx, section_ends
+from musicocr.assemble.mscz_sections import add_section_breaks, patch_mscx, section_ends
 
 MSCX = """<museScore><Score>
     <Staff id="1">

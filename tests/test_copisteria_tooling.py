@@ -7,8 +7,8 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from musicocr import page_text
-from musicocr.copisteria_fixes import fill_empty_measures
+from musicocr.text import page_text
+from musicocr.engines.copisteria.fixes import fill_empty_measures
 from musicocr.preprocess import PageGeometry
 from musicocr.util import LenientResult
 
@@ -153,7 +153,7 @@ def test_digit_boxes_from_words_filters_noise():
 
 
 def test_write_ocr_texts_json(tmp_path, monkeypatch):
-    from musicocr import ocr_backends
+    from musicocr.text import ocr_backends
     png = tmp_path / "p001.png"
     seen = {}
 
@@ -170,7 +170,7 @@ def test_write_ocr_texts_json(tmp_path, monkeypatch):
 
 
 def test_ocr_words_backend_selection(tmp_path):
-    from musicocr import ocr_backends
+    from musicocr.text import ocr_backends
     ocr_backends.BACKENDS["fake"] = lambda p, log=None, **o: [{"text": "3", "xyxy": [0, 0, 1, 2]}]
     ocr_backends.BACKENDS["broken"] = lambda p, log=None, **o: 1 / 0
     try:
@@ -208,7 +208,7 @@ def test_pdf_has_text(monkeypatch):
 # ---- pickup + gap reveal ---------------------------------------------------
 
 def test_fix_opening_pickup(tmp_path):
-    from musicocr.copisteria_fixes import fix_opening_pickup
+    from musicocr.engines.copisteria.fixes import fix_opening_pickup
     xml = tmp_path / "p.musicxml"
     xml.write_text("""<score-partwise><part id="P1">
 <measure number="1"><attributes><time print-object="no"><beats>4</beats><beat-type>4</beat-type></time></attributes>
@@ -224,7 +224,7 @@ def test_fix_opening_pickup(tmp_path):
 
 
 def test_pickup_keeps_bar_with_nothing_real(tmp_path):
-    from musicocr.copisteria_fixes import fix_opening_pickup
+    from musicocr.engines.copisteria.fixes import fix_opening_pickup
     xml = tmp_path / "p.musicxml"
     xml.write_text("""<score-partwise><part id="P1"><measure number="1">
 <note print-object="no"><rest/><duration>16</duration></note></measure></part></score-partwise>""")
@@ -233,7 +233,7 @@ def test_pickup_keeps_bar_with_nothing_real(tmp_path):
 
 
 def test_reveal_gaps(tmp_path):
-    from musicocr.copisteria_fixes import GAP_COLOR, reveal_gaps
+    from musicocr.engines.copisteria.fixes import GAP_COLOR, reveal_gaps
     xml = tmp_path / "p.musicxml"
     xml.write_text("""<score-partwise><part id="P1">
 <measure number="1"><note><pitch><step>C</step><octave>4</octave></pitch><duration>6</duration><voice>1</voice></note>
@@ -271,7 +271,7 @@ GAP = "<forward><duration>4</duration></forward>"
 
 
 def test_merge_second_pass_replaces_only_filled_gap_bars(tmp_path):
-    from musicocr.copisteria_second_pass import gap_bars, merge_second_pass
+    from musicocr.engines.copisteria.second_pass import gap_bars, merge_second_pass
     first = _xml(tmp_path, "a.xml", [NOTE + NOTE, NOTE + GAP + NOTE, NOTE + GAP + NOTE])
     # bar 2 filled; bar 3 still has a gap; bar 1 differs but is not a gap bar (ignored)
     second = _xml(tmp_path, "b.xml", [NOTE, NOTE + NOTE + NOTE, NOTE + GAP + NOTE])
@@ -285,7 +285,7 @@ def test_merge_second_pass_replaces_only_filled_gap_bars(tmp_path):
 
 
 def test_merge_second_pass_guards(tmp_path):
-    from musicocr.copisteria_second_pass import merge_second_pass
+    from musicocr.engines.copisteria.second_pass import merge_second_pass
     out = tmp_path / "m.xml"
     first = _xml(tmp_path, "a.xml", [NOTE + GAP + NOTE, NOTE])
     assert merge_second_pass(first, _xml(tmp_path, "b.xml", [NOTE]), out)[0] == 0      # bar count
@@ -298,7 +298,7 @@ def test_merge_second_pass_guards(tmp_path):
 
 
 def test_union_dets_adds_only_nonoverlapping_notes_and_rests():
-    from musicocr.second_pass_detect import union_dets
+    from musicocr.engines.copisteria.detect import union_dets
     box = lambda x: [x, 0, x + 10, 10]  # noqa: E731
     base = [{"cls": "note_eighth", "xyxy": box(0)}]
     big = [{"cls": "note_eighth", "xyxy": box(1)},        # overlaps a base note: skipped
@@ -320,7 +320,7 @@ def _n(dur, tm=False, beam="", typ="eighth"):
 
 
 def test_fix_half_tuplets_completes_duplet_and_leaves_others(tmp_path):
-    from musicocr.copisteria_fixes import fix_half_tuplets
+    from musicocr.engines.copisteria.fixes import fix_half_tuplets
     attrs = ("<attributes><divisions>4</divisions><time><beats>6</beats><beat-type>8</beat-type>"
              "</time></attributes>")
     gap1 = "<note print-object=\"no\"><rest/><duration>1</duration></note>"
@@ -345,7 +345,7 @@ def _det(cls, x0, y0, x1, y1, conf=0.99, grace="<na>", acc=0.0):
 def test_mark_small_graces_sets_grace_on_clearly_small_notes(tmp_path):
     import json
 
-    from musicocr.page_text import mark_small_graces
+    from musicocr.text.page_text import mark_small_graces
     normal = [_det("note_quarter", 100 * i, 0, 100 * i + 34, 26) for i in range(8)]
     small = _det("note_eighth", 900, 0, 922, 17, acc=0.05)                  # 22x17: a grace the detector missed
     medium = _det("note_eighth", 1000, 0, 1033, 26)                         # ordinary
@@ -360,14 +360,14 @@ def test_mark_small_graces_sets_grace_on_clearly_small_notes(tmp_path):
 def test_mark_small_graces_needs_a_reference(tmp_path):
     import json
 
-    from musicocr.page_text import mark_small_graces
+    from musicocr.text.page_text import mark_small_graces
     p = tmp_path / "p001.dets_v7_1600.json"
     p.write_text(json.dumps([_det("note_eighth", 0, 0, 22, 17), _det("note_quarter", 50, 0, 84, 26)]))
     assert mark_small_graces(p) == 0
 
 
 def test_union_into_empty_only_fills_measure_boxes_that_hold_nothing():
-    from musicocr.second_pass_detect import empty_measures, union_into_empty
+    from musicocr.engines.copisteria.detect import empty_measures, union_into_empty
     box = lambda cls, x0, x1, conf=0.99: {"cls": cls, "conf": conf, "xyxy": [x0, 0, x1, 50]}  # noqa: E731
     base = [box("measure", 0, 100), box("note_quarter", 40, 60),            # a bar with a note
             box("measure", 100, 200),                                        # empty: its whole rest was missed
@@ -383,7 +383,7 @@ def test_union_into_empty_only_fills_measure_boxes_that_hold_nothing():
 
 def test_key_reset_skips_multirest_follower_bars(tmp_path):
     import json
-    from musicocr.copisteria_fixes import fix_missing_key_cancel
+    from musicocr.engines.copisteria.fixes import fix_missing_key_cancel
     rest = '<note><rest measure="yes"/><duration>12</duration></note>'
     xml = tmp_path / "p.musicxml"
     xml.write_text(f"""<score-partwise><part id="P1">
@@ -412,7 +412,7 @@ def _meas(*durs, attrs=""):
 
 
 def test_split_overlong_splits_at_bar_lines_only():
-    from musicocr.combine import split_overlong
+    from musicocr.assemble.combine import split_overlong
     two = _meas(6, 6, 6, 6, attrs="<attributes><key><fifths>1</fifths></key></attributes>")   # 2 bars of 6/8 at div 4: 12 each
     got = split_overlong(two, 4, (6, 8))
     assert got is not None and len(got) == 2
@@ -423,7 +423,7 @@ def test_split_overlong_splits_at_bar_lines_only():
 
 
 def test_align_to_target_uses_only_the_needed_indels():
-    from musicocr.combine import align_to_target
+    from musicocr.assemble.combine import align_to_target
     src = [0, 1, 1, 0, 1]
     slots = align_to_target(src, [0, 1, 0, 1])         # one bar too many -> exactly one deletion
     assert len([s for s in slots if s is not None]) == 4 and slots == sorted(slots)
@@ -433,7 +433,7 @@ def test_align_to_target_uses_only_the_needed_indels():
 
 
 def test_combine_cover_page_and_total_lower_bound(tmp_path):
-    from musicocr.combine import PartInput, combine
+    from musicocr.assemble.combine import PartInput, combine
     rest = '<note><rest measure="yes"/><duration>12</duration></note>'
     def page(n, first=False):
         attrs = ("<attributes><divisions>4</divisions><key><fifths>0</fifths></key>"
@@ -464,7 +464,7 @@ def test_combine_cover_page_and_total_lower_bound(tmp_path):
 
 
 def test_combine_shares_the_concert_key_across_transposing_parts(tmp_path):
-    from musicocr.combine import PartInput, combine
+    from musicocr.assemble.combine import PartInput, combine
     rest = '<note><rest measure="yes"/><duration>12</duration></note>'
     parts = []
     for pid, label, inst, fifths in (("h", "Horn", "horn in f", 2), ("t", "Tuba", "tuba", 1)):
@@ -484,7 +484,7 @@ def test_combine_shares_the_concert_key_across_transposing_parts(tmp_path):
 
 
 def test_combine_gives_unpitched_percussion_no_key_signature(tmp_path):
-    from musicocr.combine import PartInput, combine
+    from musicocr.assemble.combine import PartInput, combine
     rest = '<note><rest measure="yes"/><duration>12</duration></note>'
     parts = []
     for pid, label, inst, clef, fifths in (("h", "Horn", "horn in f", "G", 2), ("t", "Tuba", "tuba", "F", 2),
@@ -505,7 +505,7 @@ def test_combine_gives_unpitched_percussion_no_key_signature(tmp_path):
 
 def test_add_missing_multirest_dets_guards(tmp_path):
     import json
-    from musicocr.page_text import add_missing_multirest_dets
+    from musicocr.text.page_text import add_missing_multirest_dets
     meas = lambda x0, x1: {"cls": "measure", "conf": 0.99, "xyxy": [x0, 100, x1, 160]}  # noqa: E731
     base = [meas(0, 1000), meas(1000, 1400)] + [  # staff space ~12 px (from the 60 px measures)
         {"cls": "note_quarter", "conf": 0.99, "xyxy": [1100, 120, 1112, 140]}]          # bar 2 has a note
@@ -528,7 +528,7 @@ def test_add_missing_multirest_dets_guards(tmp_path):
 
 def test_low_confidence_breve_under_count_digit_becomes_multirest(tmp_path):
     import json
-    from musicocr.page_text import add_missing_multirest_dets
+    from musicocr.text.page_text import add_missing_multirest_dets
     dets = [{"cls": "measure", "conf": 0.99, "xyxy": [1190, 100, 1700, 202]},          # sp ~25
             {"cls": "clef_G2", "conf": 1.0, "xyxy": [50, 90, 120, 280]},
             {"cls": "meterSig_4_4", "conf": 0.99, "xyxy": [158, 100, 213, 200]},
@@ -549,7 +549,7 @@ def test_low_confidence_breve_under_count_digit_becomes_multirest(tmp_path):
 
 def test_lone_very_weak_breve_is_a_multirest_even_without_a_digit(tmp_path):
     import json
-    from musicocr.page_text import add_missing_multirest_dets
+    from musicocr.text.page_text import add_missing_multirest_dets
     dets = [{"cls": "measure", "conf": 0.99, "xyxy": [0, 100, 1000, 202]},
             {"cls": "barLine_single", "conf": 1.0, "xyxy": [995, 100, 1005, 202]},
             {"cls": "note_breve", "conf": 0.21, "xyxy": [450, 140, 510, 180]}]
@@ -568,7 +568,7 @@ def test_lone_very_weak_breve_is_a_multirest_even_without_a_digit(tmp_path):
 
 def test_repeat_marks_on_a_count_digit_are_dropped(tmp_path):
     import json
-    from musicocr.page_text import drop_digit_repeat_marks
+    from musicocr.text.page_text import drop_digit_repeat_marks
     dets = [{"cls": "measure", "conf": 0.99, "xyxy": [0, 100, 1000, 202]},                      # sp ~25
             {"cls": "repeatMark_segno", "conf": 0.43, "xyxy": [480, 0, 540, 90]},               # on the "5"
             {"cls": "repeatMark_segno", "conf": 0.95, "xyxy": [800, 0, 860, 90]}]               # a real one
@@ -580,13 +580,13 @@ def test_repeat_marks_on_a_count_digit_are_dropped(tmp_path):
 
 
 def test_printed_multirest_span_regex():
-    from musicocr.combine import _RANGE
+    from musicocr.assemble.combine import _RANGE
     assert _RANGE.fullmatch("58–60") and _RANGE.fullmatch("98 — 101")
     assert not _RANGE.fullmatch("1-4")          # hyphen: not a multi-rest label
 
 
 def test_align_inserts_after_the_first_bar_of_a_rest_run():
-    from musicocr.combine import align_to_target
+    from musicocr.assemble.combine import align_to_target
     # source: note bar, rest bar (carries the time-signature declaration); target: a 3-bar rest run
     slots = align_to_target([0, 1, 0], [0, 1, 1, 1, 0])
     assert slots[0] == 0 and slots[1] == 1 and slots[4] == 2      # the run keeps its first bar first
@@ -594,7 +594,7 @@ def test_align_inserts_after_the_first_bar_of_a_rest_run():
 
 
 def test_align_insertions_restricted_to_printed_spans():
-    from musicocr.combine import align_to_target
+    from musicocr.assemble.combine import align_to_target
     src = [0, 0, 1, 0]                         # note, note, rest(=multi-rest read as one bar), note
     ref = [0.5] * 6
     free = align_to_target(src, ref)           # no hint: insertion lands wherever it is cheapest
@@ -607,7 +607,7 @@ def test_align_insertions_restricted_to_printed_spans():
 
 def test_copy_marks_keeps_directions_and_drops_orphan_hairpins():
     import xml.etree.ElementTree as ET
-    from musicocr.combine import balance_wedges, copy_marks
+    from musicocr.assemble.combine import balance_wedges, copy_marks
     src = ET.fromstring(
         '<measure number="1"><direction><direction-type><dynamics><p/></dynamics></direction-type></direction>'
         '<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>'
@@ -622,7 +622,7 @@ def test_copy_marks_keeps_directions_and_drops_orphan_hairpins():
 
 def test_trailing_courtesy_clef_takes_effect_next_bar():
     import xml.etree.ElementTree as ET
-    from musicocr.combine import _clefs
+    from musicocr.assemble.combine import _clefs
     note = "<note><rest/><duration>4</duration></note>"
     bar = ET.fromstring(f'<measure>{note}<attributes><clef><sign>G</sign><line>2</line></clef></attributes></measure>')
     assert _clefs((bar, 4)) == (None, ("G", "2"))

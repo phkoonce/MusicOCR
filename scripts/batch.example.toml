@@ -3,7 +3,7 @@
 #   input/<name>/<key>.pdf          per-part PDFs
 #   output/<name>/<key>/            per-part pipeline outputs (+ <key>.run.log)
 #   output/<name>/_state.json       resume state
-#   docs/<name>-progress.md         progress table (text outside the batch markers is kept)
+#   batches/<name>-progress.md      progress table (text outside the batch markers is kept)
 
 title = "My Piece"                       # heading of the progress doc
 source_pdf = "~/Music/my-piece-score-and-parts.pdf"   # the combined PDF (~ is expanded)
@@ -17,7 +17,7 @@ key_prefix = "MyPiece_"                  # pipeline key = key_prefix + part id
 # input_dir    = "input/my-piece"
 # output_dir   = "output/my-piece"
 # state_file   = "output/my-piece_state.json"
-# progress_doc = "docs/my-piece-progress.md"
+# progress_doc = "batches/my-piece-progress.md"
 
 # One [[parts]] table per part; pages are 1-based and inclusive.
 [[parts]]

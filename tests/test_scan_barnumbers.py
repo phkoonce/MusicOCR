@@ -1,10 +1,10 @@
-"""Bar-number OCR fallback for scanned PDFs (musicocr.alignment.systems)."""
+"""Bar-number OCR fallback for scanned PDFs (musicocr.assemble.alignment.systems)."""
 from __future__ import annotations
 
 from PIL import Image, ImageDraw
 
-from musicocr.alignment import systems
-from musicocr.alignment.systems import _increasing_by_y, _staff_systems, pdf_words_or_ocr
+from musicocr.assemble.alignment import systems
+from musicocr.assemble.alignment.systems import _increasing_by_y, _staff_systems, pdf_words_or_ocr
 
 
 def _page(staves=((300, 20), (700, 20)), w=1000, h=1200) -> Image.Image:
@@ -44,7 +44,7 @@ def test_pdf_words_or_ocr_prefers_text_layer(monkeypatch):
 
 
 def test_pdf_words_or_ocr_scan_fallback_and_cache(monkeypatch, tmp_path):
-    import musicocr.ocr_backends as ob
+    import musicocr.text.ocr_backends as ob
     pdf = tmp_path / "scan.pdf"
     _page().convert("RGB").save(pdf, "PDF", resolution=150)
     monkeypatch.setattr(systems, "pdf_words", lambda *a, **k: [])
@@ -72,13 +72,13 @@ def test_pick_system_starts_skips_stray_digits():
 
 
 def test_range_token_tolerates_stray_marks_but_not_glued_numbers():
-    from musicocr.alignment.systems import _RANGE_TOKEN
+    from musicocr.assemble.alignment.systems import _RANGE_TOKEN
     assert _RANGE_TOKEN.fullmatch("130-133ł").groups() == ("130", "133")
     assert _RANGE_TOKEN.fullmatch("-3-") is None
 
 
 def test_align_never_puts_a_played_bar_on_a_printed_multirest_slot():
-    from musicocr.combine import align_to_target
+    from musicocr.assemble.combine import align_to_target
     # source: R R N N R N (rest/note); print: rests at slots 0,1 and 4..7 (multi-rest spans), 8 slots
     src = [1.0, 1.0, 0.0, 0.0, 1.0, 0.0]
     ref = [1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]          # a noisy reference that rests where this part plays
@@ -89,7 +89,7 @@ def test_align_never_puts_a_played_bar_on_a_printed_multirest_slot():
 
 
 def test_a_rest_bars_meter_change_pins_where_it_lands():
-    from musicocr.combine import align_to_target
+    from musicocr.assemble.combine import align_to_target
     # source: R(declares a change) N N N; the print has 6 slots with two lost rests before it. The other
     # parts change meter at slot 2, so the rest bar belongs there, not at slot 0.
     src = [1.0, 0.0, 0.0, 0.0]
@@ -100,7 +100,7 @@ def test_a_rest_bars_meter_change_pins_where_it_lands():
 
 
 def test_digits_far_below_the_staff_are_not_system_starts():
-    from musicocr.alignment.systems import _start_candidates
+    from musicocr.assemble.alignment.systems import _start_candidates
     top, bot = 100, 200                                  # staff space 25
     near = (14, 230, 30, 245, "104", None)               # 1.2 spaces under the staff: a bar number
     tempo = (14, 308, 30, 320, "104", None)              # 4.3 spaces under: "= 104" before the next system

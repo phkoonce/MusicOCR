@@ -1,9 +1,9 @@
-"""musicocr.musicxml_merge.merge_pages on tiny synthetic scores."""
+"""musicocr.musicxml.merge.merge_pages on tiny synthetic scores."""
 from __future__ import annotations
 
 from music21 import converter, note, stream
 
-from musicocr.musicxml_merge import merge_pages
+from musicocr.musicxml.merge import merge_pages
 
 
 def _page(path, pitches):
