@@ -38,6 +38,7 @@ from musicocr.alignment.spec import DIV, bar_len
 from musicocr.alignment.systems import page_text_layout, pdf_page_count, pdf_words_or_ocr
 from musicocr.marks import MarksOptions, normalize_marks
 from musicocr.text_tempo import unify_tempo
+from musicocr.unnumbered import align_by_rhythm, onsets
 from musicocr.instruments import INFO, canonical_name, semitones_for
 from musicocr.transpose import _CLEF_FAMILY, _declare_transpose, clef_family, fifths_shift
 
@@ -281,13 +282,15 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
 
 
 def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int, report: List[str],
-                  decl_ref: Optional[List[float]] = None) -> Tuple[List[Optional[Src]], Dict[int, str]]:
+                  decl_ref: Optional[List[float]] = None,
+                  rhythm_ref: Optional[List[List[Any]]] = None) -> Tuple[List[Optional[Src]], Dict[int, str]]:
     """One part's bars on 1..total: pages that read the printed bar count are taken as they are, the
     others are aligned to the printed structure (``align_to_target``); a short part is padded.
 
     ``ref[bar]`` is the share of the other parts resting at ``bar``; ``decl_ref`` (per bar: the share of
     the *other* parts that change meter there) lets a source bar's own meter change steer where it
-    lands. Returns ``(bars, flags)``, ``flags[bar]`` being the "check" text to put on that bar.
+    lands. ``rhythm_ref`` (parts without printed bar numbers: per bar, the other parts' onsets there)
+    aligns a part of the wrong length by rhythm instead (``musicocr.unnumbered``). Returns ``(bars, flags)``, ``flags[bar]`` being the "check" text to put on that bar.
     """
     seq: List[Optional[Src]] = []
     flags: Dict[int, str] = {}
@@ -302,18 +305,22 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
                           f"-> {len(pg)} measure(s) ignored")
             continue
         r = [1.0 if (a + j) in d["rests"] else ref.get(a + j) for j in range(t)]
-        if sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
+        by_rhythm = rhythm_ref is not None and len(rhythm_ref) == t
+        if by_rhythm or sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
             ins = [0.01 if (a + j) in d["rests"] else 2.0 for j in range(t)] if d["rests"] else None
-            slots = align_to_target([_rest_flag(s) for s in pg],
-                                    [0.5 if x is None else x for x in r], ins,
-                                    [(a + j) in d["rests"] for j in range(t)] if d["rests"] else None,
-                                    _src_changes(pg, prev_meter),
-                                    decl_ref[a - 1:a - 1 + t] if decl_ref else None)
+            if by_rhythm:
+                slots = align_by_rhythm([onsets(*s) for s in pg], rhythm_ref)
+            else:
+                slots = align_to_target([_rest_flag(s) for s in pg],
+                                        [0.5 if x is None else x for x in r], ins,
+                                        [(a + j) in d["rests"] for j in range(t)] if d["rests"] else None,
+                                        _src_changes(pg, prev_meter),
+                                        decl_ref[a - 1:a - 1 + t] if decl_ref else None)
             dropped = sorted(set(range(len(pg))) - {s for s in slots if s is not None})
             added = [a + j for j, s in enumerate(slots) if s is None]
             outside = [b for b in added if d["rests"] and b not in d["rests"]]
             report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
-                          f" -> aligned to the other parts' rest pattern; dropped source bar(s) "
+                          f" -> aligned to the other parts' {'rhythm' if by_rhythm else 'rest pattern'}; dropped source bar(s) "
                           f"{[a + k for k in dropped]}, inserted rest bar(s) at {added}"
                           + (f", {len(outside)} of them outside the printed multi-rests {outside}"
                              if outside else "") + " -- check")
@@ -499,7 +506,11 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             max_bar_of: Callable[[Path], Optional[int]] = None,
             marks: Optional["MarksOptions"] = None,
             tempo_vote: bool = True,
+            bar_numbers: bool = True,
             ) -> Tuple[ET.Element, List[str], Dict[str, Any]]:
+    if not bar_numbers:          # an ensemble book: nothing printed to read, whatever OCR may take for numbers
+        starts_of, last_start_of = (lambda pdf: []), (lambda pdf: None)
+        spans_of, max_bar_of = (lambda pdf: []), (lambda pdf: None)
     reads_pdfs = last_start_of is None       # callers that inject the print structure (tests) bring their own
     starts_of = starts_of or (lambda pdf: printed_page_starts(pdf, pdftotext))
     last_start_of = last_start_of or (lambda pdf: printed_last_system_start(pdf, pdftotext))
@@ -523,7 +534,9 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                     pg.append(src)
             pages.append(pg)
         starts = starts_of(p.pdf) if p.pdf and p.pdf.exists() else [None] * len(pages)
-        if len(starts) != len(pages):
+        if not bar_numbers:
+            starts = [None] * len(pages)
+        elif len(starts) != len(pages):
             report.append(f"{p.pid}: {len(pages)} page file(s) but {len(starts)} PDF page(s) "
                           f"-- structure not verified")
             starts = [None] * len(pages)
@@ -536,8 +549,8 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                 break
         if all(s is None for s in starts):       # scan / no text layer: the part is one "page"
             pages, starts = [[s for pg in pages for s in pg]], [1]
-            report.append(f"{p.pid}: no printed bar numbers (scan?) -> checked against the "
-                          f"other parts' total only")
+            report.append(f"{p.pid}: no printed bar numbers" + ("" if not bar_numbers else " (scan?)")
+                          + " -> checked against the other parts' total only")
         spans = spans_of(p.pdf) if p.pdf and p.pdf.exists() else []
         data[p.pid] = dict(p=p, pages=pages, starts=starts, spans=spans,
                            rests={b for a, e in spans for b in range(a, e + 1)})
@@ -588,22 +601,44 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
                     acc[1] += 1
     ref = {b: v[0] / v[1] for b, v in sums.items()}
 
-    def lay_out(report: List[str], decl_ref_by: Optional[Dict[str, List[float]]] = None):
+    def rhythm_refs(bars_by: Dict[str, List[Optional[Src]]], usable) -> Dict[str, List[List[Any]]]:
+        """Per part and bar: the onsets of the *other* usable parts there (no printed bar numbers)."""
+        on = {pid: [onsets(*s) if s is not None else None for s in seq] for pid, seq in bars_by.items()
+              if usable(pid, seq)}
+        return {pid: [[o[b] for q, o in on.items() if q != pid and b < len(o) and o[b] is not None]
+                      for b in range(total)] for pid in bars_by}
+
+    def lay_out(report: List[str], decl_ref_by: Optional[Dict[str, List[float]]] = None,
+                rhythm_by: Optional[Dict[str, List[List[Any]]]] = None):
         """Every part on bars 1..total (see ``_lay_out_part``)."""
         bars: Dict[str, List[Optional[Src]]] = {}
         flags: Dict[str, Dict[int, str]] = {}
         for pid, d in data.items():
-            bars[pid], fl = _lay_out_part(pid, d, ref, total, report, decl_ref_by[pid] if decl_ref_by else None)
+            bars[pid], fl = _lay_out_part(pid, d, ref, total, report, decl_ref_by[pid] if decl_ref_by else None,
+                                          rhythm_by[pid] if rhythm_by else None)
             if fl:
                 flags[pid] = fl
         return bars, flags
 
-    bars, flags = lay_out([])                                  # first look (report discarded)
-    if len(data) > 2:
-        # a part that lost bars may land them one off; the other parts' meter changes pin them
-        bars, flags = lay_out(report, _others_meter_change_share(bars, total))
+    if bar_numbers:
+        bars, flags = lay_out([])                              # first look (report discarded)
+        if len(data) > 2:
+            # a part that lost bars may land them one off; the other parts' meter changes pin them
+            bars, flags = lay_out(report, _others_meter_change_share(bars, total))
+        else:
+            bars, flags = lay_out(report)
     else:
-        bars, flags = lay_out(report)
+        # parts that already have the full length are the reference; the others are aligned to them by
+        # rhythm, then every part is aligned again to all the others
+        full = {pid: [s for pg in d["pages"] for s in pg] for pid, d in data.items()
+                if all(d["good"])}
+        bars, flags = lay_out([], rhythm_by=rhythm_refs({**{p: [None] * total for p in data}, **full},
+                                                        lambda pid, seq: pid in full))
+        if len(data) > 2:
+            bars, flags = lay_out(report, rhythm_by=rhythm_refs(bars, lambda pid, seq: True))
+        else:
+            bars, flags = lay_out(report, rhythm_by=rhythm_refs({**{p: [None] * total for p in data}, **full},
+                                                                lambda pid, seq: pid in full))
 
     # consensus key / meter per bar, and the pickup
     key_by: Dict[str, List[Optional[int]]] = {}

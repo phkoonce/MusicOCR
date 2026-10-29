@@ -174,6 +174,7 @@ def cmd_combine(args) -> int:
         print(f"combine error: {exc}", file=sys.stderr)
         return 2
     combine_cli.run(spec, engine, out_dir, only=only, marks=marks,
+                    bar_numbers=False if args.no_bar_numbers else None,
                     pdftotext=config.resolve_tool("pdftotext") or "pdftotext",
                     musescore=config.resolve_tool("musescore") if args.convert else None)
     return 0
@@ -393,6 +394,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="make dynamics/hairpins consistent across parts (musicocr/marks.py); RULES is a "
                          "comma list of dedupe, hairpins, fill, or all (default when given bare: "
                          "dedupe,hairpins; fill is opt-in)")
+    cb.add_argument("--no-bar-numbers", action="store_true",
+                    help="the parts print no bar numbers (ensemble books): align by rhythm, not by number "
+                         "(or set bar_numbers = false in the batch)")
     cb.set_defaults(func=cmd_combine)
 
     mk = sub.add_parser(

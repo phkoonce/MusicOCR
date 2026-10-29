@@ -357,6 +357,17 @@ mark opens each scene on a new system and the box text closes it. `--convert` al
 MuseScore's MusicXML import turns `new-system` into a plain line break and so never restarts the bar
 numbers at 1.
 
+## Ensemble books without bar numbers
+
+Quartet/ensemble books print no bar numbers (only circled rehearsal marks), so `combine` cannot align
+the parts by number. With `--no-bar-numbers` (or `bar_numbers = false` in the batch) each part is one
+run of bars, the total is the plurality of the parts' lengths, and a part of the wrong length is
+aligned to the others by the *rhythm* of its bars (`musicocr/unnumbered.py`); inserted rest bars are
+flagged "check". Pick one piece's parts with `--only`; `title` / `composer` on the batch parts name
+the combined score. Per-part options for such books: `old_bass_clef` (old-notation horn editions:
+octave-up bass clef, notes up an octave), `title`, `composer`, and a per-part `source_pdf` when each
+part is its own PDF (`musicocr/retouch.py`, `musicocr/batch.py`).
+
 ## Poor scans
 
 If `report.md` shows most of the page missing or garbled, check the scan

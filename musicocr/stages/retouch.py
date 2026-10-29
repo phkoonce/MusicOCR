@@ -21,10 +21,8 @@ def run(ctx: PipelineContext) -> StageResult:
         return disabled("retouch", "retouch")
 
     xml = require_musicxml(ctx)
-    targets = [xml]
-    pages = ctx.artifacts.musicxml_pages or []
-    if not ctx.artifacts.extract_merged and len(pages) > 1:
-        targets = list(pages)
+    # the merged score and the per-page files: `combine` builds from the pages
+    targets = [xml] + [p for p in (ctx.artifacts.musicxml_pages or []) if p != xml]
 
     stamps = ctx.artifacts.retouch_stamps
     backup_dir = ctx.workdir / "pre-retouch"

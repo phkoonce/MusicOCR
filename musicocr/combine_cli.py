@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from musicocr.alignment.build import write_score
@@ -27,14 +28,26 @@ def part_inputs(spec: BatchSpec, engine: str | None, only=None) -> list[PartInpu
     return out
 
 
-def run(spec: BatchSpec, engine: str | None, out_dir: Path, *, only=None, pdftotext: str = "pdftotext",
+def run(spec: BatchSpec, engine: str | None, out_dir: Path, *, only=None, bar_numbers: bool | None = None, pdftotext: str = "pdftotext",
         musescore: str | None = None, marks: MarksOptions | None = None, log=print) -> Path:
     parts = [p for p in part_inputs(spec, engine, only)]
     missing = [p.pid for p in parts if not p.pages]
     if missing:
         raise SystemExit(f"no per-page MusicXML for part(s) {missing} under {spec.output_dir} "
                          f"(engine {engine!r}); run the batch first")
-    score, report, summary = combine(parts, spec.title, pdftotext=pdftotext, marks=marks)
+    chosen = [p for p in spec.parts if p.id in {x.pid for x in parts}]
+    titles, composers = {p.title for p in chosen}, {p.composer for p in chosen}
+    title = titles.pop() if len(titles) == 1 and next(iter(titles), "") else spec.title
+    score, report, summary = combine(parts, title, pdftotext=pdftotext, marks=marks,
+                                     bar_numbers=spec.bar_numbers if bar_numbers is None else bar_numbers)
+    if len(composers) == 1 and next(iter(composers)):
+        ident = score.find("identification")
+        if ident is None:
+            ident = ET.Element("identification")
+            score.insert(list(score).index(score.find("part-list")), ident)
+        creator = ET.Element("creator", type="composer")
+        creator.text = composers.pop()
+        ident.insert(0, creator)
     xml = write_score(score, out_dir / f"{spec.name}_combined.musicxml")
     (out_dir / f"{spec.name}_combined.report.txt").write_text("\n".join(report) + "\n")
     log("\n".join(report))

@@ -66,6 +66,7 @@ class BatchSpec:
     parts: List[Part]
     engines: Tuple[str, ...]
     convert: bool
+    bar_numbers: bool
     input_dir: Path
     output_dir: Path
     state_path: Path
@@ -143,6 +144,7 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
         parts=parts,
         engines=tuple(engines),
         convert=convert,
+        bar_numbers=bool(data.get("bar_numbers", True)),
         input_dir=rel("input_dir", f"input/{name}"),
         output_dir=output_dir,
         state_path=rel("state_file", f"output/{name}/_state.json"),
