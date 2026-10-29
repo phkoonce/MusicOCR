@@ -415,6 +415,7 @@ def _plurality(values: Sequence[Any], default: Any) -> Any:
 def part_info(label: str, instrument: str) -> Dict[str, Any]:
     canon = canonical_name(instrument) if instrument else None
     canon = canon or canonical_name(label)
+    label = label.rsplit(" - ", 1)[-1].strip()  # batch labels may be "<piece> - Horn 1"
     num = re.search(r"(\d+)\s*$", label)
     suffix = f" {num.group(1)}" if num else ""
     if canon in INFO:
