@@ -33,6 +33,7 @@ class Artifacts:
     merge_skipped: List[str] = field(default_factory=list)
     extract_merged: bool = True
     transpose_stamps: Dict[str, int] = field(default_factory=dict)
+    retouch_stamps: Dict[str, int] = field(default_factory=dict)
 
     # validate
     validation: Dict[str, Any] = field(default_factory=dict)

@@ -55,8 +55,16 @@ def apply_run_overrides(config: Config, args) -> Config:
     if g("transpose") is not None:
         tr = replace(tr, enabled=g("transpose"))
 
+    rt = config.stages.retouch
+    if g("old_bass_clef") is not None:
+        rt = replace(rt, old_bass_clef=g("old_bass_clef"))
+    if g("title"):
+        rt = replace(rt, title=g("title"))
+    if g("composer"):
+        rt = replace(rt, composer=g("composer"))
+
     return replace(config, omr=omr, preprocess=pp,
-                   stages=replace(config.stages, transpose=tr))
+                   stages=replace(config.stages, transpose=tr, retouch=rt))
 
 
 def cmd_run(args) -> int:
@@ -334,6 +342,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="copisteria: treat small noteheads as grace notes (timpani/drum ruffs and "
                         "flams; overrides [omr.copisteria] small_graces)")
     r.add_argument("--no-small-graces", dest="small_graces", action="store_false")
+    r.add_argument("--old-bass-clef", dest="old_bass_clef", action="store_true", default=None,
+                   help="old-notation horn edition: make bass clefs octave-up and raise their notes an octave")
+    r.add_argument("--title", metavar="TEXT", help="piece title for the score metadata (drops the misread printed title)")
+    r.add_argument("--composer", metavar="TEXT", help="composer for the score metadata (drops the misread printed line)")
     r.add_argument("--from", dest="from_stage", choices=STAGE_ORDER, help="start stage")
     r.add_argument("--to", dest="to_stage", choices=STAGE_ORDER, help="end stage (inclusive)")
     r.add_argument("--keep-going", action="store_true",

@@ -240,12 +240,29 @@ class OutputConfig:
 
 
 @dataclass
+class RetouchConfig:
+    old_bass_clef: bool = False   # old-notation horn editions: bass clefs become octave-up, notes up an octave
+    title: str = ""
+    composer: str = ""
+
+    @property
+    def active(self) -> bool:
+        return self.old_bass_clef or bool(self.title or self.composer)
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "RetouchConfig":
+        return cls(old_bass_clef=bool(d.get("old_bass_clef", False)),
+                   title=str(d.get("title", "")), composer=str(d.get("composer", "")))
+
+
+@dataclass
 class StagesConfig:
     correct_enabled: bool = False
     normalize_enabled: bool = True
     tuplets_enabled: bool = True   # rebuild inconsistent tuplets in bars that do not add up (musicocr/tuplets.py)
     tuplets_flag: bool = True      # colour / annotate the rebuilt runs
     transpose: TransposeConfig = field(default_factory=TransposeConfig)
+    retouch: RetouchConfig = field(default_factory=RetouchConfig)
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "StagesConfig":
@@ -255,6 +272,7 @@ class StagesConfig:
             tuplets_enabled=bool((d.get("tuplets", {}) or {}).get("enabled", True)),
             tuplets_flag=bool((d.get("tuplets", {}) or {}).get("flag", True)),
             transpose=TransposeConfig.from_dict(dict(d.get("transpose", {}) or {})),
+            retouch=RetouchConfig.from_dict(dict(d.get("retouch", {}) or {})),
         )
 
 

@@ -11,10 +11,12 @@ from typing import Callable
 # project feeds the rest of the pipeline unchanged. `normalize` sits between
 # extract and validate so it works on the merged score and its fixes show up
 # in the same validate pass that would otherwise just flag them.
+# `retouch` (optional, off by default) fixes edition-specific things (old bass clefs, title/composer)
+# on the cleaned score before transpose declares the instrument.
 # `transpose` (optional, off by default) follows normalize so it shifts the
 # already-cleaned score, and precedes validate/convert so the deliverables carry
 # the new pitch.
-STAGE_ORDER = ["ingest", "omr", "correct", "extract", "normalize", "transpose",
+STAGE_ORDER = ["ingest", "omr", "correct", "extract", "normalize", "retouch", "transpose",
                "validate", "convert", "qa"]
 
 

@@ -27,6 +27,7 @@ def _full() -> Artifacts:
         merge_skipped=["/w/skip.mxl"],
         extract_merged=False,
         transpose_stamps={"/w/book.musicxml": 123456789},
+        retouch_stamps={"/w/book.musicxml": 987654321},
         validation={"findings": [{"sev": "warn"}], "counts": {"warn": 1}},
         outputs={"pdf": Path("/w/book.pdf"), "mxl": [Path("/w/b.1.mxl"), Path("/w/b.2.mxl")]},
         render_pdf=Path("/w/render.pdf"),
