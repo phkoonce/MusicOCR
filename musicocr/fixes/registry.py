@@ -32,6 +32,11 @@ def _tuplets(ctx: FixContext) -> int:
     return fix_tuplets_file(ctx.path, flag=ctx.config.stages.tuplets_flag, log=ctx.log)
 
 
+def _slur_ties(ctx: FixContext) -> int:
+    from musicocr.fixes.slurs import fix_file
+    return fix_file(ctx.path, log=ctx.log)
+
+
 PAGE_FIXES = (
     Fix("time_signatures", _time_signatures, scope="all",
         summary="recompute time-signature numerators from the bars they govern (homr guesses them from page medians)"),
@@ -41,6 +46,9 @@ PAGE_FIXES = (
     Fix("tuplets", _tuplets, after=("time_signatures",), legacy=lambda c: c.stages.tuplets_enabled,
         summary="rebuild inconsistent tuplet runs in bars that do not add up (flagged purple)",
         message="rebuilt {n} bar(s) with inconsistent tuplets"),
+    Fix("slur_ties", _slur_ties,
+        summary="a slur from one note to the same pitch right after it is a tie (OMR reads ties as slurs)",
+        message="{n} same-pitch slur(s) turned into ties"),
 )
 
 # ---- engine-agnostic: merged score, in `normalize` ----------------------------------------------
