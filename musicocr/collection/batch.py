@@ -43,7 +43,9 @@ def batch_toml(spec: CollectionSpec, table: Dict[str, Any],
         if composer.startswith("Komponist:") or composer.isdigit():     # a column heading or a page number
             composer = ""
         for book in spec.books:
-            pdf = table["pdfs"][book.id][str(e["num"])]
+            pdf = table["pdfs"][book.id].get(str(e["num"]))
+            if pdf is None:                  # split could not find this piece's heading in this book
+                continue
             num = e["num"]
             label = f"{num}. {title} - {spec.part_name} {book.id}"
             out += ["[[parts]]", f"id = {_value(spec.part_id(num, book))}", f"label = {_value(label)}"]
