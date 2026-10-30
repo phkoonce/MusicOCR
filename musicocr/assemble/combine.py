@@ -313,7 +313,7 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
                                         [0.5 if x is None else x for x in r], ins,
                                         [(a + j) in d["rests"] for j in range(t)] if d["rests"] else None,
                                         _src_changes(pg, prev_meter),
-                                        decl_ref[a - 1:a - 1 + t] if decl_ref else None)
+                                        decl_ref[a - 1:a - 1 + t] if decl_ref and len(decl_ref) >= a - 1 + t else None)
             dropped = sorted(set(range(len(pg))) - {s for s in slots if s is not None})
             added = [a + j for j, s in enumerate(slots) if s is None]
             outside = [b for b in added if d["rests"] and b not in d["rests"]]

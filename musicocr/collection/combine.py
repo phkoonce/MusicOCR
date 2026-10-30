@@ -37,7 +37,7 @@ def piece_row(spec: CollectionSpec, num: int, redo: bool = False,
         cmd = [sys.executable, "-m", "musicocr", "combine", "--batch", str(spec.batch_path),
                "--only", only, "--output", str(d), "--convert"]
         if not spec.bar_numbers:
-            cmd.insert(5, "--no-bar-numbers")
+            cmd.append("--no-bar-numbers")
         r = (run or (lambda c: subprocess.run(c, capture_output=True, text=True)))(cmd)
         if d.exists():
             (d / "combine.log").write_text(r.stdout + r.stderr)
