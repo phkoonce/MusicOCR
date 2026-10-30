@@ -85,6 +85,7 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
             lines.append([int(y)])
     ys = [sum(g) // len(g) for g in lines]
     out: List[Tuple[int, int, int]] = []
+    starts: List[List[int]] = []                  # per staff: where runs of staff-line columns >= 8 px wide begin
     i = 0
     while i + 4 < len(ys):
         gaps = [ys[i + j + 1] - ys[i + j] for j in range(4)]
@@ -93,15 +94,33 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
             hit = np.mean([a[max(y - 1, 0):y + 2, :int(w * .5)].any(axis=0) for y in ys[i:i + 5]], axis=0) >= 0.6
             run = np.convolve(hit, np.ones(12), mode="valid") >= 10        # first dense run of staff lines (a clef may hide some)
             xs = np.flatnonzero(run)
+            reach = int(w * .25)                  # the staff's own lines carry on for a good way; a spiral binding's blobs do not
+            real = [x for x in xs if hit[x:x + reach].mean() >= .8]
+            xs = real or xs
             out.append((top, bot, int(xs[0]) if len(xs) else int(w * .15)))
+            starts.append([int(x) for x in np.flatnonzero(hit[1:] & ~hit[:-1]) + 1
+                           if x > .04 * w and hit[x:x + 8].all()])
             i += 5
         else:
             i += 1
-    return out
+    common = _common_left(starts, w)
+    return [(t, b, common if common is not None else left) for t, b, left in out]
+
+
+def _common_left(starts: List[List[int]], width: int) -> Optional[int]:
+    """The column where most staves of a page start (their start barline), else None.
+
+    A camera scan of a bound book is warped: the left end found from each staff's own lines is unreliable
+    (a spiral binding's blobs, lines fading near the margin), but the systems all begin at one x.
+    """
+    if len(starts) < 3:
+        return None
+    best = max((sum(1 for st in starts if any(abs(x - c) <= 12 for x in st)), -c, c) for st in starts for c in st)
+    return best[2] if best[0] >= max(3, 0.4 * len(starts)) else None
 
 
 _RANGE_TOKEN = re.compile(r"\D{0,2}(\d{1,3})\s*[-\u2013\u2014_]\s*(\d{1,3})\D{0,2}")   # OCR adds stray marks ("130-133\u0142")
-_OCR_CACHE_VERSION = "v10"   # bump when the strip geometry / token handling changes: cached OCR words are stale
+_OCR_CACHE_VERSION = "v15"   # bump when the strip geometry / token handling changes: cached OCR words are stale
 _START_MAX_DY_SP = 3.0   # a system's first bar number sits right under its staff; digits lower down are tempo marks etc.
 _MAX_RANGE = 60       # longest multi-rest read as a range; "1-123" is two numbers glued together
 
@@ -143,10 +162,54 @@ def _ocr_tokens(crop, path, x0, y0, resample, ranges):
     return toks
 
 
+def _tight_number(img, path, box) -> List[tuple]:
+    """The bar number in a strip when whole-strip OCR found none: the topmost blob of ink at the strip's left
+    (the number is printed above everything else there) cut out on its own and read at a few scales.
+
+    On low-resolution scans a lone small italic "5" or "11" is not read from the strip as a whole: the top of
+    the clef and the ends of slurs that reach into it throw Vision off.
+    """
+    import numpy as np
+    from PIL import Image, ImageOps
+    from musicocr.text.ocr_backends import ocr_words
+    x0, y0, x1, y1 = box
+    crop = img.crop((x0, y0, x1, y1))
+    ink = np.asarray(crop) < 150
+    rows = np.flatnonzero(ink[:, :max(int(crop.width * 0.6), 1)].any(axis=1))
+    if not len(rows):
+        return []
+    top = rows[0]
+    end = top
+    for r in rows:                              # the first run of ink rows, allowing a 2-row gap
+        if r - end > 2:
+            break
+        end = r
+    if end - top < 5 or end - top > 0.45 * crop.height:
+        return []
+    cols = np.flatnonzero(ink[top:end + 1].any(axis=0))
+    if not len(cols):
+        return []
+    c0, c1 = cols[0], cols[0]
+    for c in cols:                              # one run of columns: the digits, not a slur further right
+        if c - c1 > max(3, (end - top) // 2):
+            break
+        c1 = c
+    band = crop.crop((max(c0 - 4, 0), max(top - 3, 0), c1 + 5, end + 4))
+    for scale, resample in ((5, Image.LANCZOS), (8, Image.LANCZOS), (3, Image.BICUBIC)):
+        big = ImageOps.expand(band.resize((band.width * scale, band.height * scale), resample), border=60, fill=255)
+        big.save(path)
+        for w in ocr_words(path, "vision"):
+            t = w["text"].strip()
+            if t.isdigit() and len(t) <= 3:
+                return [(x0 + c0, y0 + top, x0 + c1 + 1, y0 + end + 1, t, None)]
+    return []
+
+
 def _strip_numbers(img, path, box, left: int, k: float) -> List[Word]:
     """Digit words from a strip above a staff, in PDF points, x shifted so the staff's left end is at ``_LEFT_REF_PT``."""
+    toks = [t for t in _strip_tokens(img, path, box) if t[4].isdigit()] or _tight_number(img, path, box)
     return [((x0 - left) * k + _LEFT_REF_PT, y0 * k, (x1 - left) * k + _LEFT_REF_PT, y1 * k, t)
-            for x0, y0, x1, y1, t, _ in _strip_tokens(img, path, box) if t.isdigit()]
+            for x0, y0, x1, y1, t, _ in toks]
 
 
 def _start_candidates(toks: List[tuple], top: float, bot: float) -> List[tuple]:
@@ -218,7 +281,7 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
             lower: List[List[tuple]] = []
             for n, (top, bot, left) in enumerate(staves):
                 space = max((bot - top) / 4, 4)
-                x0, x1 = max(left - 10, 0), left + int(_NUM_ZONE_PT / k)
+                x0, x1 = max(left - 40, 0), left + int(_NUM_ZONE_PT / k)
                 y0, y1 = max(int(top - 7 * space), 0), max(int(top - 0.3 * space), 1)
                 above += _strip_numbers(img, Path(tmp) / f"a{n}.png", (x0, y0, x1, y1), left, k)
                 nxt = staves[n + 1][0] - space if n + 1 < len(staves) else img.height

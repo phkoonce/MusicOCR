@@ -106,3 +106,11 @@ def test_digits_far_below_the_staff_are_not_system_starts():
     tempo = (14, 308, 30, 320, "104", None)              # 4.3 spaces under: "= 104" before the next system
     rng = (300, 330, 330, 345, "116-123", object())      # a range label is kept wherever it sits
     assert _start_candidates([tempo, near, rng], top, bot) == [near, rng]
+
+
+def test_common_left_is_where_most_staves_start_and_ignores_a_binding():
+    from musicocr.assemble.alignment.systems import _common_left
+    starts = [[20, 150], [60, 155], [152], [140], [300], [149, 400]]      # blobs of a spiral binding at 20 / 60
+    assert 145 <= _common_left(starts, 1200) <= 155
+    assert _common_left([[20], [300], [700], [90]], 1200) is None          # no agreement: keep the per-staff reading
+    assert _common_left([[150], [152]], 1200) is None                      # too few staves to trust
