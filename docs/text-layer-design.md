@@ -152,6 +152,9 @@ and expression word: classified as expression when a metronome mark is not adjac
 - Words printed above the same bar in 2+ parts ("Allegro", "a tempo", "rit.") are written once, in the
   first part, as system text (`<direction system="only-top">`, which MuseScore imports as System Text
   instead of Staff Text); `musicocr/assemble/text_system.py`. Texts only one part prints stay staff text.
+  Copies up to one beat apart count as the same text and are written at the beat most parts agree on.
+  Flagged `check:` unknown readings that 3+ parts agree on (alone or with correctly classified copies) are
+  trusted: the flag is dropped and they become system text too.
 - Without printed bar numbers the same texts steer the rhythm alignment (`align_by_rhythm`): a bar
   carrying a text the other parts print over a slot is pulled to that slot.
 - Scene concatenation (`scenes.py`) already carries directions with bar content; no change.
