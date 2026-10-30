@@ -1,6 +1,6 @@
 """The collection spec: which part-books make up a collection and how its pieces are named.
 
-A TOML file, kept next to the material it describes (``workflows/<collection>/collection.toml``)::
+A TOML file, kept in the collection's project directory ``workflows/<collection>/`` (see workflows/README.md)::
 
     name = "my-collection"            # batch spec batches/<name>.toml, results output/<name>/
     title = "Pieces for horn quartet"
@@ -10,8 +10,9 @@ A TOML file, kept next to the material it describes (``workflows/<collection>/co
     part_id_prefix = "h"              # part ids pNN_h1, pNN_h2, ...
     bar_numbers = false               # the books print no bar numbers (align by rhythm)
     toc_pages = "5-11"                # where the table of contents is, in every book
+    headings = false                  # no table of contents scanned: read the "NN. Title" headings off the music pages
     first_page = 12                   # first page with music
-    input_dir = "input/my-collection" # per-piece PDFs and pieces.json are written here
+    input_dir = "input/my-collection" # per-piece PDFs are written here
 
     [[books]]                         # one per part-book
     id = "1"
@@ -55,12 +56,19 @@ class CollectionSpec:
     bar_numbers: bool = True
     toc_pages: Tuple[int, int] = (1, 1)
     first_page: int = 1
+    headings: bool = False
     input_dir: Path = REPO_ROOT / "input"
     overrides: Dict[int, Dict[str, str]] = field(default_factory=dict)
 
     @property
+    def cache_dir(self) -> Path:
+        """Derived, reusable results of the project, next to its spec and git-ignored: the page OCR
+        (``ocr/``) and the piece table ``split`` found (``pieces.json``). Delete it to redo them."""
+        return self.path.parent / "cache"
+
+    @property
     def pieces_json(self) -> Path:
-        return self.input_dir / "pieces.json"
+        return self.cache_dir / "pieces.json"
 
     @property
     def batch_path(self) -> Path:
@@ -101,6 +109,7 @@ def parse_spec(data: Dict[str, Any], path: Path) -> CollectionSpec:
         part_name=data.get("part_name", "Part"), part_id_prefix=data.get("part_id_prefix", "b"),
         bar_numbers=bool(data.get("bar_numbers", True)),
         toc_pages=_pages(data.get("toc_pages", "1")), first_page=int(data.get("first_page", 1)),
+        headings=bool(data.get("headings", False)),
         overrides={int(k): dict(v) for k, v in (data.get("overrides") or {}).items()})
     if "input_dir" in data:
         spec.input_dir = REPO_ROOT / Path(data["input_dir"]).expanduser()

@@ -72,18 +72,36 @@ def ocr_lines(png: Path, tol: float = 0.45) -> List[dict]:
     return lines
 
 
+def page_lines(pdf: Path, page: int, dpi: int, tmp: Path, cache: Optional[Path] = None) -> Tuple[List[dict], int, int]:
+    """OCR lines and ``(width, height)`` of one page. Vision is slow (~1 s a page), so with ``cache`` the
+    result is kept per book (named by file size and mtime, so a replaced scan is read again) and page."""
+    path = None
+    if cache:
+        st = pdf.stat()
+        path = cache / "ocr" / f"{pdf.stem}-{st.st_size}-{int(st.st_mtime)}" / f"p{page}-{dpi}.json"
+        if path.exists():
+            d = json.loads(path.read_text())
+            return d["lines"], d["w"], d["h"]
+    png = render(pdf, page, dpi, tmp / f"ocr{page}.png")
+    w, h = Image.open(png).size
+    lines = ocr_lines(png)
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"w": w, "h": h, "lines": lines}, ensure_ascii=False))
+    return lines, w, h
+
+
 def _norm(s: str) -> str:
     return re.sub(r"[^a-zäöüß0-9]", "", s.lower())
 
 
-def toc_entries(pdf: Path, pages: Sequence[int], tmp: Path) -> List[Entry]:
+def toc_entries(pdf: Path, pages: Sequence[int], tmp: Path, cache: Optional[Path] = None) -> List[Entry]:
     """The numbered entries of the table of contents: number, title (dot leaders and page number dropped)
     and composer (the last line of the entry)."""
     entries: List[List] = []
     for pg in pages:
-        png = render(pdf, pg, OCR_DPI, tmp / f"toc{pg}.png")
-        width = Image.open(png).width
-        for ln in ocr_lines(png):
+        lines, width, _ = page_lines(pdf, pg, OCR_DPI, tmp, cache)
+        for ln in lines:
             ws = [w for w in ln["words"] if not _DOTS.match(w["text"]) and w["xyxy"][0] < 0.8 * width]
             if not ws:
                 continue
@@ -99,6 +117,27 @@ def toc_entries(pdf: Path, pages: Sequence[int], tmp: Path) -> List[Entry]:
     return out
 
 
+_HEADING = re.compile(r"^(\d{1,3})\.\s+([^\d\s].*)$")
+
+
+def heading_entries(pdf: Path, first_page: int, last_page: int, tmp: Path,
+                    cache: Optional[Path] = None) -> List[Entry]:
+    """Entries for a book with no scanned table of contents: the "NN. Title" headings on the music pages,
+    taken in order (the number may run ahead of the last one by a few, a heading the OCR missed). The
+    composer is printed on the same line and stays part of the title; ``consensus`` over the books smooths
+    out misreads."""
+    entries: List[Entry] = []
+    last = 0
+    for pg in range(first_page, last_page + 1):
+        lines, width, _ = page_lines(pdf, pg, OCR_DPI, tmp, cache)
+        for ln in lines:
+            m = _HEADING.match(ln["text"].strip())
+            if m and last < int(m.group(1)) <= last + 3 and 0.1 * width < ln["x0"] < 0.7 * width:
+                last = int(m.group(1))
+                entries.append(Entry(last, m.group(2).strip(), ""))
+    return entries
+
+
 def consensus(tables: Sequence[List[Entry]]) -> List[Entry]:
     """One table from the same TOC read in several books: per number, the most common spelling."""
     nums = sorted({e.num for t in tables for e in t})
@@ -110,15 +149,20 @@ def consensus(tables: Sequence[List[Entry]]) -> List[Entry]:
     return out
 
 
-def _heading(lines: List[dict], i: int, e: Entry, width: int) -> Optional[int]:
-    """Index of the line (from ``i``) that opens entry ``e``: its printed number alone on a centred line,
-    else a line that starts with its title."""
+_NUM_TITLE = re.compile(r"^(\d{1,3})\.\s+\S")
+
+
+def _heading(lines: List[dict], i: int, e: Entry, width: int, by_title: bool = True) -> Optional[int]:
+    """Index of the line (from ``i``) that opens entry ``e``: its printed number alone on a centred line
+    or in front of the title, else (``by_title``) a line that starts with its title."""
     want = _norm(e.title)
     for idx in range(i, len(lines)):
         t = lines[idx]["text"].strip()
-        m = _NUM.match(t)
-        if m and int(m.group(1)) == e.num and 0.2 * width < lines[idx]["x0"] < 0.65 * width:
+        m = _NUM.match(t) or _NUM_TITLE.match(t)
+        if m and int(m.group(1)) == e.num and 0.1 * width < lines[idx]["x0"] < 0.7 * width:
             return idx
+    if not by_title:
+        return None
     for idx in range(i, len(lines)):
         for c in (lines[idx]["text"], lines[idx]["text"] + (lines[idx + 1]["text"] if idx + 1 < len(lines) else "")):
             n = _norm(c)
@@ -128,7 +172,7 @@ def _heading(lines: List[dict], i: int, e: Entry, width: int) -> Optional[int]:
 
 
 def find_pieces(pdf: Path, entries: Sequence[Entry], first_page: int, last_page: int, tmp: Path,
-                log=print) -> List[Found]:
+                log=print, cache: Optional[Path] = None) -> List[Found]:
     """Find each entry's heading on the music pages, in order (an entry that cannot be found is logged
     and skipped, its music then belongs to the piece before it)."""
     found: List[Found] = []
@@ -137,15 +181,13 @@ def find_pieces(pdf: Path, entries: Sequence[Entry], first_page: int, last_page:
         if k >= len(entries):
             break
         for dpi in (OCR_DPI, 250):          # Vision now and then reads nothing on a clean page: retry sharper
-            png = render(pdf, pg, dpi, tmp / f"pg{pg}.png")
-            w, h = Image.open(png).size
-            lines = ocr_lines(png)
+            lines, w, h = page_lines(pdf, pg, dpi, tmp, cache)
             i, got = 0, False
             while k < len(entries):
                 hit, skip = None, 0
                 for skip in range(0, 3):          # the expected heading, else the one after it (a misread)
                     if k + skip < len(entries):
-                        hit = _heading(lines, i, entries[k + skip], w)
+                        hit = _heading(lines, i, entries[k + skip], w, by_title=skip == 0)
                     if hit is not None:
                         break
                 if hit is None:
@@ -228,6 +270,8 @@ def build_piece_pdfs(pdf: Path, found: Sequence[Found], last_page: int, out_dir:
                 if bottom <= (cuts[(i, p)] if p == f.page else 0) + 0.1 * OUT_DPI:
                     continue                   # the next heading sits at the top: nothing of this piece here
             images.append(im.crop((0, top, im.width, bottom)))
+        if not images:                         # its heading and the next share a spot: keep a strip, not nothing
+            images = [page(f.page).crop((0, cuts[(i, f.page)], page(f.page).width, page(f.page).height))]
         path = out_dir / f"{prefix}_p{f.num:02d}.pdf"
         images[0].save(path, "PDF", resolution=OUT_DPI, save_all=True, append_images=images[1:])
         result[f.num] = path
@@ -245,7 +289,10 @@ def split_collection(spec: CollectionSpec, toc_pages: Optional[Tuple[int, int]] 
     first = first_page or spec.first_page
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
-        tables = [toc_entries(book.pdf, range(a, b + 1), tmp) for book in spec.books]
+        if spec.headings:
+            tables = [heading_entries(book.pdf, first, pdf_page_count(str(book.pdf)), tmp, spec.cache_dir) for book in spec.books]
+        else:
+            tables = [toc_entries(book.pdf, range(a, b + 1), tmp, spec.cache_dir) for book in spec.books]
         for book, tab in zip(spec.books, tables):
             log(f"book {book.id}: {len(tab)} TOC entries")
         entries = consensus(tables)
@@ -253,7 +300,8 @@ def split_collection(spec: CollectionSpec, toc_pages: Optional[Tuple[int, int]] 
         table = {"entries": [asdict(e) for e in entries], "found": {}, "pdfs": {}}
         for book in spec.books:
             n = pdf_page_count(str(book.pdf))
-            found = find_pieces(book.pdf, entries, first, n, tmp, log=lambda s, i=book.id: log(f"book {i}{s}"))
+            found = find_pieces(book.pdf, entries, first, n, tmp, log=lambda s, i=book.id: log(f"book {i}{s}"),
+                                cache=spec.cache_dir)
             log(f"book {book.id}: found {len(found)}/{len(entries)}")
             table["found"][book.id] = [asdict(f) for f in found]
             pieces = build_piece_pdfs(book.pdf, found, n, spec.book_dir(book), spec.book_prefix(book), tmp)

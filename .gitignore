@@ -46,3 +46,6 @@ __pycache__/
 
 # Claude Code agent worktrees
 /.claude/
+
+# Per-project caches (collection page OCR); the rest of workflows/<name>/ is committed
+/workflows/*/cache/

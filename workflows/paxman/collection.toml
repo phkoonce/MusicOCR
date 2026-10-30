@@ -1,0 +1,31 @@
+# "The Paxman Horn Quartet Gig Book" (edition ebenos 207031): four horn books, ~89 numbered pieces, several to a
+# page, printed bar numbers. The scans (~140 ppi colour photos of a spiral-bound book) have no table of contents,
+# so the pieces come from the "NN. Title" headings on the music pages. Spec for `musicocr collection`.
+#
+#   .venv/bin/python -m musicocr collection split   workflows/paxman/collection.toml
+#   .venv/bin/python -m musicocr collection batch   workflows/paxman/collection.toml
+#   .venv/bin/python scripts/batch_run.py --batch batches/paxman-all.toml --only ...
+#   .venv/bin/python -m musicocr collection combine workflows/paxman/collection.toml --pieces 1-3
+name = "paxman-all"
+title = "The Paxman Horn Quartet Gig Book - Horns 1-4"
+key_prefix = "PX_"
+instrument = "horn in f"
+part_name = "Horn"
+part_id_prefix = "h"
+bar_numbers = true
+headings = true
+first_page = 1
+input_dir = "input/paxman"
+
+[[books]]
+id = "1"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/Paxman 4tet/Paxman 4tet H1.pdf"
+[[books]]
+id = "2"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/Paxman 4tet/Paxman 4tet H2.pdf"
+[[books]]
+id = "3"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/Paxman 4tet/Paxman 4tet H3.pdf"
+[[books]]
+id = "4"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/Paxman 4tet/Paxman 4tet H4.pdf"
