@@ -97,3 +97,19 @@ def test_text_one_beat_off_still_agrees_and_lands_on_the_majority_beat():
 def test_text_two_beats_apart_is_not_merged():
     parts = {1: [timed(("rit.", 0))], 2: [timed(("rit.", 3))]}
     assert unify_system_text(parts) == []
+
+
+def test_check_text_split_across_a_barline_is_merged_at_the_start_of_the_next_bar():
+    w = "check: sehr ruhig"
+    parts = {1: [timed((w, 3)), timed()], 2: [timed(), timed((w, 0))],
+             3: [timed((w, 3)), timed()], 4: [timed(), timed((w, 0))]}
+    unify_system_text(parts)
+    texts = [(n, b) for n in parts for b, m in enumerate(parts[n]) for d in m.findall("direction")]
+    assert texts == [(1, 1)]
+    d = parts[1][1].find("direction")
+    assert d.get("system") == "only-top" and d.find("direction-type/words").text == "sehr ruhig"
+
+
+def test_text_more_than_a_beat_from_the_barline_is_not_merged_across_it():
+    parts = {1: [timed(("rit.", 2)), timed()], 2: [timed(), timed(("rit.", 0))]}
+    assert unify_system_text(parts) == []

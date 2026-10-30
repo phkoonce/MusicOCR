@@ -59,19 +59,21 @@ def text_keys(measure: ET.Element) -> FrozenSet[str]:
     return frozenset(k for d in measure.findall("direction") if (k := text_key(d)))
 
 
-def position(measure: ET.Element, el: ET.Element) -> int:
-    """Ticks from the start of the bar to where direction ``el`` sits (its place among the notes plus its offset)."""
-    t = 0
+def position(measure: ET.Element, el: Optional[ET.Element]) -> int:
+    """Ticks from the start of the bar to where direction ``el`` sits (its place among the notes plus its offset);
+    for ``None``, the length of the bar."""
+    t = end = 0
     for e in measure:
         if e is el:
             return t + int(float(el.findtext("offset") or 0))
         if e.tag == "note" and e.find("chord") is None:
-            t += int(e.findtext("duration") or 0)
+            t += int(float(e.findtext("duration") or 0))
         elif e.tag == "backup":
-            t -= int(e.findtext("duration") or 0)
+            t -= int(float(e.findtext("duration") or 0))
         elif e.tag == "forward":
-            t += int(e.findtext("duration") or 0)
-    return t
+            t += int(float(e.findtext("duration") or 0))
+        end = max(end, t)
+    return end if el is None else t
 
 
 def insert_at(measure: ET.Element, el: ET.Element, ticks: int) -> None:
@@ -95,49 +97,69 @@ def insert_at(measure: ET.Element, el: ET.Element, ticks: int) -> None:
     measure.insert(idx, el)
 
 
+def _gap(a: tuple, b: tuple) -> float:
+    """Ticks between two copies (part, bar, measure, direction, position, bar length) of a text: within a bar
+    the difference of their positions, across a barline from the earlier copy to the end of its bar plus the later
+    copy's position; copies more than a bar apart are infinitely far."""
+    if a[1] == b[1]:
+        return abs(a[4] - b[4])
+    if abs(a[1] - b[1]) == 1:
+        lo, hi = (a, b) if a[1] < b[1] else (b, a)
+        return max(lo[5] - lo[4], 0) + hi[4]
+    return float("inf")
+
+
 def _majority(hits: List[tuple], tol: int) -> tuple:
-    """The position most copies agree on within ``tol`` ticks, and the copies that agree there (ties: the
-    most exact matches, then the earliest position)."""
+    """The copy most others agree with within ``tol`` ticks (even across a barline), and the copies that
+    agree there, at most one per part (ties: the most exact matches, then one that is not at the very end
+    of its bar -- a word printed on the barline belongs to the bar after it -- then the earliest)."""
     best = None
-    for p in sorted({h[3] for h in hits}):
-        near = [h for h in hits if abs(h[3] - p) <= tol]
-        rank = (len(near), sum(1 for h in near if h[3] == p), -p)
+    for c in hits:
+        near = {}
+        for h in sorted(hits, key=lambda h: _gap(c, h)):
+            if _gap(c, h) <= tol and h[0] not in near:
+                near[h[0]] = h
+        near = list(near.values())
+        at_end = c[5] - c[4] <= tol and c[4] > 0
+        rank = (len(near), sum(1 for h in near if _gap(c, h) == 0), not at_end, -c[1], -c[4])
         if best is None or rank > best[0]:
-            best = (rank, p, near)
+            best = (rank, c, near)
     return best[1], best[2]
 
 
 def unify_system_text(parts: Dict[int, List[ET.Element]]) -> List[str]:
-    """Per bar, make the texts that ``MIN_PARTS`` or more parts print into one system text in the first
-    part. Copies up to ``BEAT_TOLERANCE`` beats apart count as one text, written at the beat most copies
-    agree on; flagged "check:" readings need ``CHECK_MIN_PARTS`` agreeing parts and lose their flag.
+    """Make the texts that ``MIN_PARTS`` or more parts print over the same place into one system text in
+    the first part. Copies up to ``BEAT_TOLERANCE`` beats apart count as one text -- also across a barline, as
+    OCR attaches a word printed there to the last note before it or the first after it -- written where the
+    most copies agree; flagged "check:" readings need ``CHECK_MIN_PARTS`` agreeing parts and lose their flag.
     Returns report lines."""
     order = sorted(parts)
     if len(order) < MIN_PARTS:
         return []
     tol = BEAT_TOLERANCE * DIV
     moved = removed = upgraded = 0
-    for b in range(max(len(parts[n]) for n in order)):
-        found: Dict[str, List[tuple]] = {}
-        for n in order:
-            if b >= len(parts[n]):
-                continue
+    found: Dict[str, List[tuple]] = {}
+    for n in order:
+        for b, m in enumerate(parts[n]):
             seen = set()
-            for d in parts[n][b].findall("direction"):
+            for d in m.findall("direction"):
                 k = text_key(d) or check_key(d)
-                if k and k not in seen:                # one copy per part and text
+                if k and k not in seen:                    # one copy per part, bar and text
                     seen.add(k)
-                    found.setdefault(k, []).append((n, parts[n][b], d, position(parts[n][b], d)))
-        for k, all_hits in found.items():
-            at, hits = _majority(all_hits, tol)
-            plain = [h for h in hits if text_key(h[2])]
+                    found.setdefault(k, []).append((n, b, m, d, position(m, d), position(m, None)))
+    for k, pool_all in found.items():
+        while pool_all:
+            centre, hits = _majority(pool_all, tol)
+            pool_all = [h for h in pool_all if h not in hits]
+            plain = [h for h in hits if text_key(h[3])]
             need = MIN_PARTS if plain else min(CHECK_MIN_PARTS, len(order))
             if len(hits) < need:
                 continue
+            at, bar = centre[4], centre[1]
             pool = plain or hits
             first = next((h for h in pool if h[0] == order[0]), pool[0])
-            keep = first[2]
-            if not plain:                              # agreed unknown text: trust it, drop the flag
+            keep = first[3]
+            if not plain:                                  # agreed unknown text: trust it, drop the flag
                 for w in keep.iter("words"):
                     w.text = w.text.strip()[6:].strip()
                     w.attrib.pop("color", None)
@@ -145,20 +167,20 @@ def unify_system_text(parts: Dict[int, List[ET.Element]]) -> List[str]:
             keep.set("system", "only-top")
             for st in keep.findall("staff"):
                 keep.remove(st)
-            for n, m, d, _ in hits:
+            for _, _, m, d, _, _ in hits:
                 if d is not keep:
                     m.remove(d)
                     removed += 1
-            m0 = parts[order[0]][b]
-            if first[1] is not m0 or first[3] != at:   # not in the first part, or not at the agreed beat: move it
-                first[1].remove(keep)
+            m0 = parts[order[0]][bar]
+            if first[2] is not m0 or first[4] != at:       # not in the first part, or not at the agreed place: move it
+                first[2].remove(keep)
                 for off in keep.findall("offset"):
                     keep.remove(off)
                 insert_at(m0, keep, at)
             moved += 1
     if not moved:
         return []
-    lines = [f"text: {moved} text(s) printed over the same bar in {MIN_PARTS}+ parts are system text, "
+    lines = [f"text: {moved} text(s) printed over the same place in {MIN_PARTS}+ parts are system text, "
              f"written once ({removed} per-part copies merged)"]
     if upgraded:
         lines.append(f"text: {upgraded} of them were flagged 'check:' readings that {CHECK_MIN_PARTS}+ parts agree on")
