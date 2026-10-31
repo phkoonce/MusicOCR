@@ -35,7 +35,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from musicocr.assemble.alignment.build import (add_attributes, build_score, check_length,
                                       is_rest_only, measure_total, rest_measure)
 from musicocr.assemble.alignment.spec import DIV, bar_len
-from musicocr.assemble.alignment.systems import page_text_layout, pdf_page_count, pdf_words_or_ocr
+from musicocr.assemble.alignment.systems import (ocr_page_systems, page_text_layout, pdf_page_count,
+                                                 pdf_words_or_ocr)
+from musicocr.assemble import voltas as vt
 from musicocr.musicxml import check_direction, multirest_count
 from musicocr.scoreops.marks import MarksOptions, normalize_marks
 from musicocr.assemble.text_system import text_keys, unify_system_text
@@ -102,12 +104,24 @@ def _take_tail(m: ET.Element) -> List[ET.Element]:
     return tail
 
 
+def printed_page_systems(pdf: Path, pdftotext: str = "pdftotext") -> List[Optional[Tuple[int, Dict[int, int]]]]:
+    """Per page of a scanned PDF: (number of staves, {staff index: bar number printed at its start}),
+    None for a page with a text layer."""
+    return [ocr_page_systems(str(pdf), pg, pdftotext) for pg in range(1, pdf_page_count(str(pdf)) + 1)]
+
+
 def printed_page_starts(pdf: Path, pdftotext: str = "pdftotext") -> List[Optional[int]]:
-    """Bar number at the start of the first system of each page (None = unreadable)."""
+    """Bar number at the start of the first system of each page (None = unreadable).
+
+    On a scan the number must be the first *staff's*: a page whose first system's number was not read
+    would otherwise start at its second system's."""
     out: List[Optional[int]] = []
     for pg in range(1, pdf_page_count(str(pdf)) + 1):
         starts, _ = page_text_layout(pdf_words_or_ocr(str(pdf), pg, pdftotext))
         n = starts[0][1] if starts else None
+        info = ocr_page_systems(str(pdf), pg, pdftotext)
+        if info is not None and n is not None and 0 not in info[1] and pg > 1:
+            n = None
         out.append(1 if pg == 1 and (n is None or n > 3) else n)
     return out
 
@@ -193,6 +207,7 @@ MUST_REST_COST = 3.0      # a played bar on a slot the print shows as a multi-re
 METER_CHANGE_COST = 1.5   # a source bar that changes meter landing where the other parts do not (or the reverse)
 INDEL_BASE_COST = 0.2     # dropping a source bar / inserting a slot; the other 0.8 depends on rest vs. played
 INSERT_TIEBREAK = 1e-4    # prefers inserting later in the page (see align_to_target)
+EXTEND_REST_DISCOUNT = 0.3  # an inserted bar after a rest-only source bar: a multi-rest read one short (see align_to_target)
 
 
 def _src_changes(pg: Sequence[Src], prev: Optional[Tuple[int, int]]) -> List[Optional[bool]]:
@@ -215,7 +230,8 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
                     ins_cost: Optional[Sequence[float]] = None,
                     must_rest: Optional[Sequence[bool]] = None,
                     src_change: Optional[Sequence[Optional[bool]]] = None,
-                    ref_change: Optional[Sequence[float]] = None) -> List[Optional[int]]:
+                    ref_change: Optional[Sequence[float]] = None,
+                    extend_rests: bool = False) -> List[Optional[int]]:
     """Map each of ``len(ref)`` target slots to a source bar index (None = synthesise a rest).
 
     Needleman-Wunsch over the rest-only pattern: matching costs the disagreement with the
@@ -231,6 +247,8 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
     ``src_change[i]`` says rest bar i changes meter (None for a bar with notes: its declaration may
     really belong to a lost multi-rest bar before it, the system's first bar) and ``ref_change[j]``
     is the share of the other parts that change meter at slot j; a mismatch costs ``METER_CHANGE_COST``.
+    ``extend_rests``: a bar lost to a short page is most likely the rest of a multi-rest read as one bar, so a
+    slot inserted right after a rest-only source bar costs ``EXTEND_REST_DISCOUNT`` of the usual.
     """
     n, m = len(rest_src), len(ref)
     allow_del, allow_ins = n >= m, n <= m
@@ -258,6 +276,8 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
                 # a hair cheaper later in the page: a lost bar is inserted *after* its run's
                 # first bar, so a key/meter declaration stays on the first bar of the run
                 base = ins_cost[j] if ins_cost is not None else INDEL_BASE_COST + (1 - INDEL_BASE_COST) * (1 - ref[j])
+                if extend_rests and i > 0 and rest_src[i - 1] >= 1.0:
+                    base *= EXTEND_REST_DISCOUNT
                 c = d + base + INSERT_TIEBREAK * (m - j) / max(m, 1)
                 if c < D[i][j + 1]:
                     D[i][j + 1], B[i][j + 1] = c, "i"
@@ -291,7 +311,7 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
     seq: List[Optional[Src]] = []
     flags: Dict[int, str] = {}
     meter_before = None
-    for pg, a, t, ok in zip(d["pages"], d["start"], d["target"], d["good"]):
+    for pi, (pg, a, t, ok) in enumerate(zip(d["pages"], d["start"], d["target"], d["good"])):
         prev_meter, meter_before = meter_before, _last_meter(pg, meter_before)
         if ok:
             seq.extend(pg)
@@ -300,6 +320,12 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
             report.append(f"  {pid} page starting bar {a}: no printed bars (cover/text page?) "
                           f"-> {len(pg)} measure(s) ignored")
             continue
+        info = d["sysinfo"][pi] if d.get("sysinfo") else None
+        if info and info.get("slots"):
+            cuts = vt.segments(len(pg), a, t, info["breaks"], info["slots"])
+            if len(cuts) > 1:
+                _lay_out_segments(pid, d, ref, pg, a, t, cuts, prev_meter, seq, flags, report, decl_ref)
+                continue
         r = [1.0 if (a + j) in d["rests"] else ref.get(a + j) for j in range(t)]
         by_rhythm = rhythm_ref is not None and len(rhythm_ref) == t
         if by_rhythm or sum(x is not None for x in r) >= max(t // 4, 1) or d["rests"]:     # printed multi-rest spans alone can steer it
@@ -338,6 +364,41 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
         seq += [None] * (total - len(seq))
         report.append(f"  {pid}: ends {total - len([s for s in seq if s is not None])} bar(s) early -> padded")
     return seq[:total], flags
+
+
+def _lay_out_segments(pid: str, d: Dict[str, Any], ref: Dict[int, float], pg: List[Src], a: int, t: int,
+                      cuts: List[Tuple[int, int, int, int]], prev_meter, seq: List[Optional[Src]],
+                      flags: Dict[int, str], report: List[str], decl_ref: Optional[List[float]]) -> None:
+    """A page cut at the systems whose first bar number was read: each stretch between two of them is
+    aligned on its own, so a bar read too many (or lost) moves nothing outside its own system(s)."""
+    meter = prev_meter
+    for lo, hi, s0, s1 in cuts:
+        part, n = pg[lo:hi], s1 - s0
+        if len(part) == n:
+            seq.extend(part)
+            meter = _last_meter(part, meter)
+            continue
+        r = [1.0 if (s0 + j) in d["rests"] else ref.get(s0 + j) for j in range(n)]
+        ins = [0.01 if (s0 + j) in d["rests"] else 2.0 for j in range(n)] if d["rests"] else None
+        slots = align_to_target([_rest_flag(s) for s in part], [0.5 if x is None else x for x in r], ins,
+                                [(s0 + j) in d["rests"] for j in range(n)] if d["rests"] else None,
+                                _src_changes(part, meter),
+                                decl_ref[s0 - 1:s0 - 1 + n] if decl_ref and len(decl_ref) >= s0 - 1 + n else None,
+                                extend_rests=True)
+        meter = _last_meter(part, meter)
+        dropped = sorted(set(range(len(part))) - {s for s in slots if s is not None})
+        added = [s0 + j for j, s in enumerate(slots) if s is None]
+        report.append(f"  {pid} bars {s0}-{s1 - 1} (page starting bar {a}): {len(part)} bars read for {n} printed"
+                      f" -> aligned within its systems; dropped source bar(s) {[s0 + k for k in dropped]}, "
+                      f"inserted rest bar(s) at {added} -- check")
+        seq.extend(None if s is None else part[s] for s in slots)
+        for b in added:
+            if b not in d["rests"]:
+                flags[b] = "check: bar inserted (the system read one bar short)"
+        for k in dropped:
+            nxt_slot = next((j for j, s in enumerate(slots) if s is not None and s > k), None)
+            if nxt_slot is not None:
+                flags.setdefault(s0 + nxt_slot, "check: a source bar was dropped just before here")
 
 
 def _others_meter_change_share(bars: Dict[str, List[Optional[Src]]], total: int) -> Dict[str, List[float]]:
@@ -499,7 +560,7 @@ def _flag_bar(m: ET.Element, text: str) -> None:
 # keyed by part id) and appends to ``report``.
 
 def _read_parts(parts: Sequence[PartInput], read_pages, starts_of, spans_of, bar_numbers: bool,
-                report: List[str]) -> Dict[str, Dict[str, Any]]:
+                report: List[str], systems_of=None) -> Dict[str, Dict[str, Any]]:
     """Read every part's pages and the print structure (page start bars, multi-rest spans)."""
     data: Dict[str, Dict[str, Any]] = {}
     for p in parts:
@@ -537,21 +598,74 @@ def _read_parts(parts: Sequence[PartInput], read_pages, starts_of, spans_of, bar
                           + " -> checked against the other parts' total only")
         spans = spans_of(p.pdf) if p.pdf and p.pdf.exists() else []
         data[p.pid] = dict(p=p, pages=pages, starts=starts, spans=spans,
-                           rests={b for a, e in spans for b in range(a, e + 1)})
+                           rests={b for a, e in spans for b in range(a, e + 1)},
+                           sysinfo=_system_info(p, pages, starts, systems_of, bar_numbers))
     return data
 
 
-def _score_total(data: Dict[str, Dict[str, Any]], last_start_of, max_bar_of, report: List[str]) -> int:
+def _system_info(p: PartInput, pages, starts, systems_of, bar_numbers: bool) -> List[Optional[Dict[str, Any]]]:
+    """Per page: its systems' first measures (``breaks``) and the bar numbers printed at them (``anchors``),
+    when the OMR marked its systems and as many staves were found on the printed page; else None."""
+    none: List[Optional[Dict[str, Any]]] = [None] * len(pages)
+    if not (systems_of and bar_numbers and p.pdf and p.pdf.exists()):
+        return none
+    info = systems_of(p.pdf)
+    if len(info) != len(pages):
+        return none
+    out: List[Optional[Dict[str, Any]]] = []
+    for pg, inf in zip(pages, info):
+        breaks = vt.system_breaks(pg)
+        ok = inf is not None and breaks is not None and inf[0] == len(breaks)
+        out.append(dict(breaks=breaks, anchors=dict(inf[1])) if ok else None)
+    return out
+
+
+def _find_voltas(data: Dict[str, Dict[str, Any]], report: List[str]) -> "vt.Grid":
+    """Number every part's measures from the printed system starts, take the first/second endings the parts
+    agree on, and put every page's start (and the multi-rest spans) on the slots of the notated bars."""
+    if not any(i for d in data.values() for i in d["sysinfo"]):
+        return vt.Grid()                      # no scanned page with marked systems: the numbers are the slots
+    walks = []
+    for pid, d in data.items():
+        d["roles"] = vt.roles(d["pages"])
+        sysinfo = [i or dict(breaks=None, anchors={}) for i in d["sysinfo"]]
+        d["walk"] = vt.walk(d["pages"], d["roles"], [i["breaks"] for i in sysinfo],
+                            [i["anchors"] for i in sysinfo], d["starts"])
+        walks.append(d["walk"])
+    grid = vt.Grid(vt.consensus(walks))
+    if grid:
+        report.append("score: first/second endings at bars " + ", ".join(
+            f"{n}" + (f" ({a}+{b} bars)" if a != 1 or b != 1 else "") for n, a, b in grid.voltas)
+            + f" -> laid out on {len(grid.voltas)} extra notated bar(s)")
+    for pid, d in data.items():
+        d["numbers_starts"] = list(d["starts"])
+        d["starts"] = [None if s is None else grid.slot(s, d["roles"][i][0] if d["roles"][i] else 0)
+                       for i, s in enumerate(d["starts"])]
+        d["spans"] = [(grid.slot(a), grid.slot(e)) for a, e in d["spans"]]
+        d["rests"] = {b for a, e in d["spans"] for b in range(a, e + 1)}
+        for i, inf in enumerate(d["sysinfo"]):
+            if inf is not None:
+                inf["slots"] = {k: grid.slot(n, d["roles"][i][inf["breaks"][k]]) for k, n in inf["anchors"].items()}
+    return grid
+
+
+def _score_total(data: Dict[str, Dict[str, Any]], last_start_of, max_bar_of, report: List[str],
+                 grid: Optional["vt.Grid"] = None) -> int:
     """The score's bar count: the consensus of the parts' last-page totals, bounded below by the print."""
     # score-wide total: start of a part's last page + the bars it found there
-    totals = [d["starts"][-1] - 1 + len(d["pages"][-1]) for d in data.values()
-              if d["starts"] and d["starts"][-1] is not None]
+    totals = []
+    for d in data.values():
+        known = [i for i, s in enumerate(d["starts"]) if s is not None]
+        if known:                     # from the last page whose start was read (pages after it hold what they hold)
+            totals.append(d["starts"][known[-1]] - 1 + sum(len(pg) for pg in d["pages"][known[-1]:]))
     if not totals:
         raise ValueError("no part has a readable printed bar number; cannot derive the structure")
     # the last printed system starts at bar L, so the piece has at least L bars
     lasts = [last_start_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
     lasts += [max_bar_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
     lasts = [x for x in lasts if x and (not totals or x <= 1.5 * max(totals) + 5)]     # a misread number (811) must not set the length
+    if grid:
+        lasts = [grid.slot(x) for x in lasts]
     ends = [e for d in data.values() for _, e in d["spans"]]
     lower = max([x for x in lasts if x] + ends + [0])
     cand = [t for t in totals if t >= lower]
@@ -767,6 +881,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
             last_start_of: Callable[[Path], Optional[int]] = None,
             spans_of: Callable[[Path], List[Tuple[int, int]]] = None,
             max_bar_of: Callable[[Path], Optional[int]] = None,
+            systems_of: Callable[[Path], List[Optional[Tuple[int, Dict[int, int]]]]] = None,
             marks: Optional["MarksOptions"] = None,
             tempo_vote: bool = True,
             bar_numbers: bool = True,
@@ -779,9 +894,11 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
     last_start_of = last_start_of or (lambda pdf: printed_last_system_start(pdf, pdftotext))
     spans_of = spans_of or (lambda pdf: printed_multirest_spans(pdf, pdftotext))
     max_bar_of = max_bar_of or ((lambda pdf: printed_max_bar(pdf, pdftotext)) if reads_pdfs else (lambda pdf: None))
+    systems_of = systems_of or ((lambda pdf: printed_page_systems(pdf, pdftotext)) if reads_pdfs else None)
     report: List[str] = []
-    data = _read_parts(parts, read_pages, starts_of, spans_of, bar_numbers, report)
-    total = _score_total(data, last_start_of, max_bar_of, report)
+    data = _read_parts(parts, read_pages, starts_of, spans_of, bar_numbers, report, systems_of)
+    grid = _find_voltas(data, report)
+    total = _score_total(data, last_start_of, max_bar_of, report, grid)
     ref = _plan_pages(data, total)
     bars, flags = _lay_out_all(data, ref, total, bar_numbers, report)
     spec, shifts, unpitched, changes = _consensus(bars, data, total, title, report)

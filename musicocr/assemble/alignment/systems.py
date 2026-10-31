@@ -145,7 +145,7 @@ def _common_left(starts: List[List[int]], width: int) -> Optional[int]:
 
 
 _RANGE_TOKEN = re.compile(r"\D{0,2}(\d{1,3})\s*[-\u2013\u2014_]\s*(\d{1,3})\D{0,2}")   # OCR adds stray marks ("130-133\u0142")
-_OCR_CACHE_VERSION = "v18"   # bump when the strip geometry / token handling changes: cached OCR words are stale
+_OCR_CACHE_VERSION = "v19"   # bump when the strip geometry / token handling changes: cached OCR words are stale
 _START_MAX_DY_SP = 3.0   # a system's first bar number sits right under its staff; digits lower down are tempo marks etc.
 _MAX_RANGE = 60       # longest multi-rest read as a range; "1-123" is two numbers glued together
 
@@ -294,10 +294,11 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
     key = hashlib.sha1(f"{_OCR_CACHE_VERSION}|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
     cache = _CACHE / "pdf-ocr" / f"{key}.json"
     if cache.exists():
-        return _below_header([tuple(w) for w in json.loads(cache.read_text())])
+        return _below_header([tuple(w) for w in json.loads(cache.read_text())["words"]])
     k = 72.0 / _OCR_DPI
-    above: List[Word] = []
+    above: List[Tuple[Word, int]] = []
     below: List[Word] = []
+    below_n: List[Tuple[Word, int]] = []
     with tempfile.TemporaryDirectory() as tmp:
         stem = Path(tmp) / "pg"
         subprocess.run(["pdftoppm", "-r", str(_OCR_DPI), "-f", str(page), "-l", str(page), "-gray", "-png",
@@ -310,12 +311,12 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
                 space = max((bot - top) / 4, 4)
                 x0, x1 = max(left - 40, 0), left + int(_NUM_ZONE_PT / k)
                 y0, y1 = max(int(top - 7 * space), 0), max(int(top - 0.3 * space), 1)
-                above += _strip_numbers(img, Path(tmp) / f"a{n}.png", (x0, y0, x1, y1), left, k)
+                above += [(w, n) for w in _strip_numbers(img, Path(tmp) / f"a{n}.png", (x0, y0, x1, y1), left, k)]
                 nxt = staves[n + 1][0] - space if n + 1 < len(staves) else img.height
                 y0, y1 = int(bot + 0.8 * space), int(min(bot + 6 * space, nxt))
                 lower.append(_strip_tokens(img, Path(tmp) / f"b{n}.png", (x0, y0, int(img.width * .97), y1), ranges=True))
             near = [_start_candidates(toks, top, bot) for (top, bot, _), toks in zip(staves, lower)]
-            for (top, bot, left), toks, pick in zip(staves, lower, _pick_system_starts(near)):
+            for n, ((top, bot, left), toks, pick) in enumerate(zip(staves, lower, _pick_system_starts(near))):
                 for t in toks:
                     if t[5]:                                 # a printed multi-rest range, at its own place
                         below.append((t[0] * k, t[1] * k, t[2] * k, t[3] * k, f"{t[5].group(1)}\u2013{t[5].group(2)}"))
@@ -325,12 +326,40 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
                 if pick is not None:                         # the system's first bar number, in the left margin
                     first = pick[5].group(1) if pick[5] else pick[4]
                     below.append((_LEFT_REF_PT, pick[1] * k, _LEFT_REF_PT + (pick[2] - pick[0]) * k, pick[3] * k, first))
-    ab = _increasing_by_y(above)
+                    below_n.append((below[-1], n))
+    ab = _increasing_by_y([w for w, _ in above])
     n_starts = lambda ws: sum(1 for w in ws if w[4].isdigit())
     out = below if n_starts(below) > n_starts(ab) else ab
+    staff_of = {w: n for w, n in (above if out is ab else below_n)}
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps(out))
+    cache.write_text(json.dumps({"words": out, "staves": len(staves),
+                                 "staff": [staff_of.get(tuple(w), -1) for w in out]}))
     return _below_header(out)
+
+
+def ocr_page_systems(pdf: str, page: int, pdftotext: str = "pdftotext") -> Optional[Tuple[int, Dict[int, int]]]:
+    """(number of staves on a scanned page, {staff index: the bar number printed at its start}), or None
+    for a page with a text layer (no staves were looked for)."""
+    import hashlib
+    import json
+    from pathlib import Path
+    from musicocr.text.ocr_backends import _CACHE
+    if pdf_words(pdf, page, pdftotext):
+        return None
+    pdf_words_or_ocr(pdf, page, pdftotext)
+    st = Path(pdf).stat()
+    key = hashlib.sha1(f"{_OCR_CACHE_VERSION}|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
+    f = _CACHE / "pdf-ocr" / f"{key}.json"
+    if not f.exists():
+        return None
+    c = json.loads(f.read_text())
+    words = _below_header([tuple(w) for w in c["words"]])
+    starts, _ = page_text_layout(words)
+    out: Dict[int, int] = {}
+    for w, n in zip(words, c["staff"]):
+        if n >= 0 and w[4].isdigit() and any(abs(y - w[1]) < 1e-6 and num == int(w[4]) for y, num in starts):
+            out[n] = int(w[4])
+    return c["staves"], out
 
 
 def _below_header(words: List[Word]) -> List[Word]:
