@@ -119,6 +119,7 @@ fill_empty_bars = true
 # Small "2"/"3" digits in the PDF text layer mark duplets/triplets that Copisteria's
 # reader leaves unmarked (the bar then shows a gap): run it via copisteria_run.py, which
 # tags the heads under the digit (and ignores small digits as multi-rest counts).
+single_staff = "auto"   # "yes" | "no" | "auto": a part (its batch names an instrument) has one staff per system, nothing joins staves
 text_tuplets = true
 # (see [omr.copisteria.text_layer] below for tempo / expression / technique words)
 # Fallback: synthesise a multiRest detection when a tall count digit (page text) sits over an

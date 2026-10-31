@@ -83,8 +83,77 @@ def _install() -> None:
         return orig_near(texts, box, sp)
 
     w._texts_near = _texts_near
+    _mark_systems(w)
+    _no_binding_systems()
     if "--no-text-tuplets" not in sys.argv:
         w._events = _events
+
+
+def _no_binding_systems() -> None:  # also: a staff found twice is one
+    """Two staves are one system only if bar lines (or a brace) join them, not the ink at their left alone.
+
+    On a bound book photographed on a desk the spiral binding and the page's shadow run down the left edge
+    and cross every gap between staves: copisteria then joins the staves of a page into a few systems and
+    reads only the first staff of each (4 staves in 1 system: 5 of 22 bars read). A real system has bar
+    lines through its staves, so a left-edge run counts only when they are there too.
+    """
+    from copisteria import front
+    orig = front._ink_links
+
+    def ink_links(gray, syms, a, b, page_left):
+        left, bars = orig(gray, syms, a, b, page_left)
+        return (left if bars >= 0.2 else min(left, front.INK_LINK - 0.01)), bars
+
+    front._ink_links = ink_links
+
+    systems = front._systems
+
+    def one_staff_each(syms, staves, gray=None, ink=False):
+        """A warped page's staff found twice (same lines, a few pixels apart) is one staff: the copy would
+        be a staff of its own whose bars are read again (a bar too many on the page)."""
+        keep = []
+        for st in staves:
+            if keep:
+                prev = keep[-1]
+                overlap = min(prev.y1, st.y1) - max(prev.y0, st.y0)
+                if overlap > 0.5 * min(prev.y1 - prev.y0, st.y1 - st.y0):
+                    if len(st.bars) > len(prev.bars):
+                        keep[-1] = st
+                    continue
+            keep.append(st)
+        staves[:] = keep
+        return systems(syms, staves, gray, ink)
+
+    front._systems = one_staff_each
+
+
+def _single_staff() -> None:
+    """A part has one staff per system: nothing joins two staves (not the model, a look-alike bar layout,
+    a brace the detector imagined or the ink at the page's left edge)."""
+    from copisteria import front, links
+    links.load = lambda *a, **k: None
+    front._aligned = lambda *a, **k: False
+    front._braced = lambda *a, **k: False
+    front._ink_links = lambda *a, **k: (0.0, 0.0)
+
+
+def _mark_systems(w) -> None:
+    """Make the writer put ``<print new-system="yes"/>`` on the first bar of every system.
+
+    The page's MusicXML is one run of bars; which of them open a system is what lets ``combine`` line a
+    page up with the bar numbers printed at the systems' starts. The writer builds its bars system by
+    system (``columns``), so it is re-compiled from its own source with the system noted on each bar.
+    """
+    import inspect
+    src = inspect.getsource(w.write)
+    a = 'm = {"staves": [], "time": None, "key": None}'
+    b = 'meas = _sub(part, "measure", number=number)\n'
+    if src.count(a) != 1 or src.count(b) != 1:      # the library changed: leave the output as it was
+        return
+    src = src.replace(a, 'm = {"staves": [], "time": None, "key": None, "sys": s_i}')
+    src = src.replace(b, b + '            if m_i == 0 or m.get("sys") != measures[m_i - 1].get("sys"):\n'
+                      '                _sub(meas, "print", **{"new-system": "yes"})\n')
+    exec(compile(src, w.__file__, "exec"), w.__dict__)
 
 
 # --- text layer ------------------------------------------------------------------------------
@@ -212,7 +281,9 @@ def main() -> None:
     page = next((Path(a) for a in sys.argv[1:] if a.lower().endswith(".png")), None)
     if page is not None and "--no-text-layer" not in sys.argv:
         _install_text_layer(page)
-    argv = [a for a in sys.argv[1:] if a not in ("--no-text-tuplets", "--no-text-layer")]
+    if "--single-staff" in sys.argv:
+        _single_staff()
+    argv = [a for a in sys.argv[1:] if a not in ("--no-text-tuplets", "--no-text-layer", "--single-staff")]
     from copisteria.pipeline import main as pipeline_main
     pipeline_main(argv)
 

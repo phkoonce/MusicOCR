@@ -147,6 +147,9 @@ def run(ctx: PipelineContext) -> StageResult:
         cmd = [py, str(run_script), str(img), "--out", str(pdir)]
         if not ctx.config.omr.copisteria.text_tuplets:
             cmd.append("--no-text-tuplets")
+        single = ctx.config.omr.copisteria.single_staff
+        if single == "yes" or (single == "auto" and ctx.config.stages.transpose.instrument):
+            cmd.append("--single-staff")      # a part: its staves are separate systems, however they look
         return cmd
 
     def _second_pass_at(cmd, img: Path, scale: float, first: bool, **kw) -> bool:

@@ -90,6 +90,7 @@ class CopisteriaConfig:
     second_pass_extra_scales: tuple = (1.75,)   # more input sizes unioned in (blind spots depend on the size)
     fix_half_tuplets: bool = True   # finish a duplet/triplet the model gave to only some of its notes
     fill_empty_bars: bool = True   # bars the detector read nothing in: re-detect one size up, add what is found there
+    single_staff: str = "auto"   # "yes": every staff is a system of its own (a part); "auto": when the part names its instrument
     text_tuplets: bool = True   # small "2"/"3" digits from the text layer mark duplets/triplets (copisteria_run.py)
     synth_multirest: bool = True   # synthesise a multiRest where a tall, centred, non-stacked count digit sits over an empty bar
     small_graces: bool = False   # before reading: small noteheads the detector called "not grace" become grace notes
@@ -116,6 +117,9 @@ class CopisteriaConfig:
         ocr_backend = str(d.get("ocr_backend", base.ocr_backend))
         if ocr_backend not in ("auto", "rapidocr", "vision"):
             raise ConfigError("[omr.copisteria] ocr_backend must be 'auto', 'rapidocr' or 'vision'")
+        single = str(d.get("single_staff", base.single_staff))
+        if single not in ("auto", "yes", "no"):
+            raise ConfigError("[omr.copisteria] single_staff must be 'auto', 'yes' or 'no'")
         form = str(d.get("multirest_form", base.multirest_form))
         if form not in ("collapse", "expand", "keep"):
             raise ConfigError("[omr.copisteria] multirest_form must be 'collapse', 'expand' or 'keep'")
@@ -130,7 +134,7 @@ class CopisteriaConfig:
                    second_pass_extra_scales=tuple(float(x) for x in d.get("second_pass_extra_scales", base.second_pass_extra_scales)),
                    fix_half_tuplets=bool(d.get("fix_half_tuplets", True)),
                    fill_empty_bars=bool(d.get("fill_empty_bars", True)),
-                   text_tuplets=bool(d.get("text_tuplets", True)),
+                   text_tuplets=bool(d.get("text_tuplets", True)), single_staff=single,
                    synth_multirest=bool(d.get("synth_multirest", True)),
                    small_graces=bool(d.get("small_graces", False)),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),
