@@ -208,6 +208,54 @@ def find_pieces(pdf: Path, entries: Sequence[Entry], first_page: int, last_page:
     return found
 
 
+def fill_from_peers(found: Dict[str, List[Found]], log=print) -> Dict[str, List[Found]]:
+    """A heading one book's OCR could not read, placed where the other books have it.
+
+    The books of a collection are the same pieces on (mostly) the same pages, so a piece that at least two
+    other books put on one page is taken to start there, at their median height, when that fits between this
+    book's own neighbouring headings. Without it the piece's pages stay glued to the one before.
+    """
+    nums = sorted({f.num for fs in found.values() for f in fs})
+    out = {b: sorted(fs, key=lambda f: f.num) for b, fs in found.items()}
+    for n in nums:
+        for book, fs in out.items():
+            if any(f.num == n for f in fs):
+                continue
+            peers = [f for b, other in found.items() if b != book for f in other if f.num == n]
+            by_page: Dict[int, List[float]] = {}
+            for f in peers:
+                by_page.setdefault(f.page, []).append(f.y)
+            page, ys = max(by_page.items(), key=lambda kv: len(kv[1]), default=(None, []))
+            if len(ys) < 2:
+                continue
+            y = sorted(ys)[len(ys) // 2]
+            before = [f for f in fs if f.num < n]
+            after = [f for f in fs if f.num > n]
+            if before and (before[-1].page, before[-1].y) >= (page, y):
+                continue
+            if after and (after[0].page, after[0].y) <= (page, y):
+                continue
+            fs.append(Found(n, page, y))
+            fs.sort(key=lambda f: f.num)
+            log(f"book {book}: piece {n} heading not read -> placed on page {page} like the other books")
+    for book, fs in out.items():          # a heading found far from where three other books agree it is
+        for f in list(fs):
+            peers = [g for b, other in out.items() if b != book for g in other if g.num == f.num]
+            pages = Counter(g.page for g in peers)
+            page, votes = pages.most_common(1)[0] if pages else (None, 0)
+            if votes < 3 or abs(page - f.page) < 2:
+                continue
+            y = sorted(g.y for g in peers if g.page == page)[votes // 2]
+            before = [g for g in fs if g.num < f.num]
+            after = [g for g in fs if g.num > f.num]
+            if (before and (before[-1].page, before[-1].y) >= (page, y)) or \
+                    (after and (after[0].page, after[0].y) <= (page, y)):
+                continue
+            log(f"book {book}: piece {f.num} heading on page {f.page} -> page {page} like all the other books")
+            fs[fs.index(f)] = Found(f.num, page, y)
+    return out
+
+
 def _cut(gray: Image.Image, y: int, dpi: int) -> int:
     """Row to cut at just above a heading at row ``y``: in the white band above it, or above a lone
     piece number printed over the title ("7.") when there is one."""
@@ -298,10 +346,15 @@ def split_collection(spec: CollectionSpec, toc_pages: Optional[Tuple[int, int]] 
         entries = consensus(tables)
         log(f"{len(entries)} pieces in the consensus table")
         table = {"entries": [asdict(e) for e in entries], "found": {}, "pdfs": {}}
+        all_found = {}
         for book in spec.books:
             n = pdf_page_count(str(book.pdf))
-            found = find_pieces(book.pdf, entries, first, n, tmp, log=lambda s, i=book.id: log(f"book {i}{s}"),
-                                cache=spec.cache_dir)
+            all_found[book.id] = find_pieces(book.pdf, entries, first, n, tmp,
+                                             log=lambda s, i=book.id: log(f"book {i}{s}"), cache=spec.cache_dir)
+        all_found = fill_from_peers(all_found, log)
+        for book in spec.books:
+            n = pdf_page_count(str(book.pdf))
+            found = all_found[book.id]
             log(f"book {book.id}: found {len(found)}/{len(entries)}")
             table["found"][book.id] = [asdict(f) for f in found]
             pieces = build_piece_pdfs(book.pdf, found, n, spec.book_dir(book), spec.book_prefix(book), tmp)
