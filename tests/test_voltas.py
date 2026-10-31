@@ -47,3 +47,17 @@ def test_a_page_is_cut_at_its_anchored_systems_and_a_wrong_anchor_is_ignored():
     # the third's says 3 (before the second): dropped
     assert vt.segments(12, 1, 12, [0, 4, 8], {1: 5}) == [(0, 4, 1, 5), (4, 12, 5, 13)]
     assert vt.segments(12, 1, 12, [0, 4, 8], {1: 5, 2: 5}) == [(0, 4, 1, 5), (4, 12, 5, 13)]
+
+
+def test_an_unnumbered_upbeat_bar_pushes_every_number_one_slot_on():
+    g = vt.Grid([(12, 1, 1)], pickup=1)
+    assert [g.slot(n) for n in (1, 11, 13)] == [2, 12, 15]
+
+
+def test_bar_numbers_only_grow_from_page_to_page():
+    from musicocr.assemble.combine import _increasing
+    starts = [1, 33, 68, 13]
+    info = [None, None, None, dict(anchors={0: 13, 1: 106})]
+    report = []
+    _increasing("p", starts, info, report)
+    assert starts == [1, 33, 68, None] and info[3]["anchors"] == {1: 106} and report

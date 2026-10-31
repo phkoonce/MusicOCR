@@ -118,8 +118,9 @@ def consensus(walks: Sequence[Walk]) -> List[Volta]:
 class Grid:
     """Printed bar numbers <-> slots (one per notated bar)."""
 
-    def __init__(self, voltas: Sequence[Volta] = ()):
+    def __init__(self, voltas: Sequence[Volta] = (), pickup: int = 0):
         self.voltas = sorted(voltas)
+        self.pickup = pickup                  # unnumbered bars before bar 1 (an upbeat): slot 1 is the first of them
 
     def _before(self, n: int) -> int:
         return sum(a for v, a, b in self.voltas if v + b <= n)
@@ -128,11 +129,11 @@ class Grid:
         """The slot of the bar printed ``number``; ``role`` 1/2 marks a bar of a first/second ending."""
         for v, a, b in self.voltas:
             if v <= number < v + max(a, b):
-                return number + self._before(v) + (a if role == 2 else 0)
-        return number + self._before(number)
+                return number + self.pickup + self._before(v) + (a if role == 2 else 0)
+        return number + self.pickup + self._before(number)
 
     def __bool__(self) -> bool:
-        return bool(self.voltas)
+        return bool(self.voltas) or bool(self.pickup)
 
 
 def segments(n_src: int, first: int, length: int, breaks: Sequence[int],

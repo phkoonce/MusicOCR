@@ -597,10 +597,31 @@ def _read_parts(parts: Sequence[PartInput], read_pages, starts_of, spans_of, bar
             report.append(f"{p.pid}: no printed bar numbers" + ("" if not bar_numbers else " (scan?)")
                           + " -> checked against the other parts' total only")
         spans = spans_of(p.pdf) if p.pdf and p.pdf.exists() else []
+        sysinfo = _system_info(p, pages, starts, systems_of, bar_numbers)
+        _increasing(p.pid, starts, sysinfo, report)
         data[p.pid] = dict(p=p, pages=pages, starts=starts, spans=spans,
-                           rests={b for a, e in spans for b in range(a, e + 1)},
-                           sysinfo=_system_info(p, pages, starts, systems_of, bar_numbers))
+                           rests={b for a, e in spans for b in range(a, e + 1)}, sysinfo=sysinfo)
     return data
+
+
+def _increasing(pid: str, starts: List[Optional[int]], sysinfo: List[Optional[Dict[str, Any]]],
+                report: List[str]) -> None:
+    """Bar numbers only grow from page to page: a page start (or system number) not above everything
+    before it is a misread ("103" read as "13") and is dropped; the page then follows on from the one before."""
+    top = 0
+    for i, s in enumerate(starts):
+        if s is not None and s <= top and i:
+            report.append(f"  {pid}: page {i + 1} starts at bar {s}, not above bar {top} -> start ignored")
+            starts[i] = None
+        elif s is not None:
+            top = max(top, s)
+        info = sysinfo[i]
+        if info is not None:
+            for k in sorted(info["anchors"]):
+                if info["anchors"][k] <= top and not (k == 0 and info["anchors"][k] == starts[i]):
+                    del info["anchors"][k]
+                else:
+                    top = max(top, info["anchors"][k])
 
 
 def _system_info(p: PartInput, pages, starts, systems_of, bar_numbers: bool) -> List[Optional[Dict[str, Any]]]:
@@ -620,6 +641,21 @@ def _system_info(p: PartInput, pages, starts, systems_of, bar_numbers: bool) -> 
     return out
 
 
+def _pickup_vote(d: Dict[str, Any]) -> Optional[bool]:
+    """Does this part's first system hold one bar more than its printed numbers span, the extra one a short
+    opening bar (an upbeat the engraver leaves unnumbered)? None when the first system cannot tell."""
+    info = d["sysinfo"][0] if d["sysinfo"] else None
+    pg = d["pages"][0] if d["pages"] else None
+    if not info or not pg or len(info["breaks"]) < 2 or 1 not in info["anchors"] or d["starts"][0] != 1:
+        return None
+    m, div = pg[0]
+    _, meter = _declared(m)
+    if not meter or div * 4 * meter[0] % meter[1]:
+        return None
+    short = 0 < measure_total(m) < div * 4 * meter[0] // meter[1]
+    return short and info["breaks"][1] == info["anchors"][1]          # numbers 1..a-1 are a-1 bars, one more read
+
+
 def _find_voltas(data: Dict[str, Dict[str, Any]], report: List[str]) -> "vt.Grid":
     """Number every part's measures from the printed system starts, take the first/second endings the parts
     agree on, and put every page's start (and the multi-rest spans) on the slots of the notated bars."""
@@ -632,14 +668,19 @@ def _find_voltas(data: Dict[str, Dict[str, Any]], report: List[str]) -> "vt.Grid
         d["walk"] = vt.walk(d["pages"], d["roles"], [i["breaks"] for i in sysinfo],
                             [i["anchors"] for i in sysinfo], d["starts"])
         walks.append(d["walk"])
-    grid = vt.Grid(vt.consensus(walks))
-    if grid:
+    pickups = [_pickup_vote(d) for d in data.values()]
+    pickup = int(sum(v is True for v in pickups) >= max((sum(v is not None for v in pickups) + 1) // 2, 1))
+    grid = vt.Grid(vt.consensus(walks), pickup)
+    if pickup:
+        report.append("score: an unnumbered upbeat bar opens the piece -> bar 1 is its second bar")
+    if grid.voltas:
         report.append("score: first/second endings at bars " + ", ".join(
             f"{n}" + (f" ({a}+{b} bars)" if a != 1 or b != 1 else "") for n, a, b in grid.voltas)
             + f" -> laid out on {len(grid.voltas)} extra notated bar(s)")
     for pid, d in data.items():
         d["numbers_starts"] = list(d["starts"])
-        d["starts"] = [None if s is None else grid.slot(s, d["roles"][i][0] if d["roles"][i] else 0)
+        d["starts"] = [None if s is None else (1 if pickup and i == 0 and s == 1
+                                              else grid.slot(s, d["roles"][i][0] if d["roles"][i] else 0))
                        for i, s in enumerate(d["starts"])]
         d["spans"] = [(grid.slot(a), grid.slot(e)) for a, e in d["spans"]]
         d["rests"] = {b for a, e in d["spans"] for b in range(a, e + 1)}
@@ -669,15 +710,38 @@ def _score_total(data: Dict[str, Dict[str, Any]], last_start_of, max_bar_of, rep
     ends = [e for d in data.values() for _, e in d["spans"]]
     lower = max([x for x in lasts if x] + ends + [0])
     cand = [t for t in totals if t >= lower]
+    # a part whose last page's systems are anchored by printed numbers counts its bars from the last anchored
+    # system, which no bar lost earlier on the page can shift; a bar lost makes a total too short (and drops
+    # real music), a bar read too many only pads, so the largest of them is taken
+    anchored = [t for t in (_anchored_total(d) for d in data.values()) if t]
     if cand:
         top = Counter(cand).most_common()
         total = max(t for t, c in top if c == top[0][1])     # a tie goes to the larger total
     else:                        # every part is short (lost multi-rests): the print's own lower bound
         total = lower
         report.append(f"score: no part reaches the printed lower bound ({lower}); using it")
+    note = ""
+    more = max(anchored, default=0)
+    if total < more <= total + max(4, total // 10):       # a few bars more: the plurality lost them (not a misread number)
+        note = f"; {more} by the printed system starts of a part's last page, taken"
+        total = more
     report.append(f"score: {len(data)} parts, {total} bars "
-                  f"(last-page totals {dict(Counter(totals))})")
+                  f"(last-page totals {dict(Counter(totals))}{note})")
     return total
+
+
+def _anchored_total(d: Dict[str, Any]) -> Optional[int]:
+    """The score's bar count as one part's last page shows it: its last system whose start bar was read, and
+    the bars the OMR found from there on."""
+    for pi in range(len(d["pages"]) - 1, -1, -1):
+        info = d["sysinfo"][pi]
+        if info and info.get("slots"):
+            k = max(info["slots"])
+            return info["slots"][k] + len(d["pages"][pi]) - info["breaks"][k] - 1 + sum(
+                len(pg) for pg in d["pages"][pi + 1:])
+        if d["starts"][pi] is not None:
+            return None
+    return None
 
 
 def _plan_pages(data: Dict[str, Dict[str, Any]], total: int) -> Dict[int, float]:
