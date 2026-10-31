@@ -99,12 +99,37 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
             xs = real or xs
             out.append((top, bot, int(xs[0]) if len(xs) else int(w * .15)))
             starts.append([int(x) for x in np.flatnonzero(hit[1:] & ~hit[:-1]) + 1
-                           if x > .04 * w and hit[x:x + 8].all()])
+                           if x > .06 * w and hit[x:x + 8].all()])
             i += 5
         else:
             i += 1
     common = _common_left(starts, w)
     return [(t, b, common if common is not None else left) for t, b, left in out]
+
+
+def _levelled(img):
+    """(page image, its staves): the page as scanned or rotated by an estimated skew, whichever yields more staves.
+
+    A camera scan's staves slope, which smears the row projection ``_staff_systems`` relies on and loses
+    whole systems (often the first on a page, so the page's start bar goes unread). Rotating by the page's
+    skew -- measured with and without the binding's margin, which skews the estimate -- finds them; but on a
+    warped page it can also lose some, so every candidate is tried and the one with the most staves wins.
+    """
+    from PIL import Image
+    from musicocr.preprocess import _estimate_skew
+    best = (img, _staff_systems(img))
+    w = img.width
+    for src in (img, img.crop((int(w * .12), 0, w, img.height))):
+        try:
+            angle = _estimate_skew(src, 5.0)
+        except Exception:  # noqa: BLE001
+            continue
+        if abs(angle) >= 0.2:
+            rot = img.rotate(angle, resample=Image.BICUBIC, expand=False, fillcolor=255)
+            staves = _staff_systems(rot)
+            if len(staves) > len(best[1]):
+                best = (rot, staves)
+    return best
 
 
 def _common_left(starts: List[List[int]], width: int) -> Optional[int]:
@@ -120,7 +145,7 @@ def _common_left(starts: List[List[int]], width: int) -> Optional[int]:
 
 
 _RANGE_TOKEN = re.compile(r"\D{0,2}(\d{1,3})\s*[-\u2013\u2014_]\s*(\d{1,3})\D{0,2}")   # OCR adds stray marks ("130-133\u0142")
-_OCR_CACHE_VERSION = "v15"   # bump when the strip geometry / token handling changes: cached OCR words are stale
+_OCR_CACHE_VERSION = "v18"   # bump when the strip geometry / token handling changes: cached OCR words are stale
 _START_MAX_DY_SP = 3.0   # a system's first bar number sits right under its staff; digits lower down are tempo marks etc.
 _MAX_RANGE = 60       # longest multi-rest read as a range; "1-123" is two numbers glued together
 
@@ -207,7 +232,10 @@ def _tight_number(img, path, box) -> List[tuple]:
 
 def _strip_numbers(img, path, box, left: int, k: float) -> List[Word]:
     """Digit words from a strip above a staff, in PDF points, x shifted so the staff's left end is at ``_LEFT_REF_PT``."""
-    toks = [t for t in _strip_tokens(img, path, box) if t[4].isdigit()] or _tight_number(img, path, box)
+    toks = [t for t in _strip_tokens(img, path, box) if t[4].isdigit()]
+    tight = _tight_number(img, path, box)
+    if len(toks) <= 1:          # a lone number is read two ways; _increasing_by_y keeps the one the page's sequence allows ("68" read as "89")
+        toks += [t for t in tight if not any(o[4] == t[4] for o in toks)]
     return [((x0 - left) * k + _LEFT_REF_PT, y0 * k, (x1 - left) * k + _LEFT_REF_PT, y1 * k, t)
             for x0, y0, x1, y1, t, _ in toks]
 
@@ -266,7 +294,7 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
     key = hashlib.sha1(f"{_OCR_CACHE_VERSION}|{Path(pdf).resolve()}|{st.st_size}|{st.st_mtime_ns}|{page}|{_OCR_DPI}".encode()).hexdigest()[:16]
     cache = _CACHE / "pdf-ocr" / f"{key}.json"
     if cache.exists():
-        return [tuple(w) for w in json.loads(cache.read_text())]
+        return _below_header([tuple(w) for w in json.loads(cache.read_text())])
     k = 72.0 / _OCR_DPI
     above: List[Word] = []
     below: List[Word] = []
@@ -276,8 +304,7 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
                         "-singlefile", pdf, str(stem)], capture_output=True)
         png = stem.with_suffix(".png")
         if png.exists():
-            img = Image.open(png).convert("L")
-            staves = _staff_systems(img)
+            img, staves = _levelled(Image.open(png).convert("L"))
             lower: List[List[tuple]] = []
             for n, (top, bot, left) in enumerate(staves):
                 space = max((bot - top) / 4, 4)
@@ -303,6 +330,18 @@ def pdf_words_or_ocr(pdf: str, page: int, pdftotext: str = "pdftotext") -> List[
     out = below if n_starts(below) > n_starts(ab) else ab
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(out))
+    return _below_header(out)
+
+
+def _below_header(words: List[Word]) -> List[Word]:
+    """OCR'd bar numbers only come from strips beside a staff, never from a running header, so a
+    number high on the page is a first system's: move it just under the text layer's header cut-off
+    (``page_text_layout`` drops digits above ``_TOP_Y``, the page number of a born-digital PDF)."""
+    out = []
+    for x0, y0, x1, y1, w in words:
+        if w.isdigit() and y0 <= _TOP_Y:
+            y0, y1 = _TOP_Y + 1, _TOP_Y + 1 + (y1 - y0)
+        out.append((x0, y0, x1, y1, w))
     return out
 
 

@@ -114,3 +114,11 @@ def test_common_left_is_where_most_staves_start_and_ignores_a_binding():
     assert 145 <= _common_left(starts, 1200) <= 155
     assert _common_left([[20], [300], [700], [90]], 1200) is None          # no agreement: keep the per-staff reading
     assert _common_left([[150], [152]], 1200) is None                      # too few staves to trust
+
+
+def test_a_first_system_number_high_on_the_page_is_not_taken_for_the_header():
+    from musicocr.assemble.alignment.systems import _below_header, page_text_layout
+    words = [(50.0, 45.0, 62.0, 55.0, "30"), (50.0, 118.0, 62.0, 128.0, "34"),
+             (90.0, 30.0, 110.0, 40.0, "07")]
+    starts, _ = page_text_layout(_below_header(words))
+    assert [n for _, n in starts] == [30, 34]       # the header's "07" sits right of the margin: not a start
