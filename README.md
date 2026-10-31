@@ -358,6 +358,15 @@ per PDF page. The multi-rest ranges and the highest printed bar number (`printed
 down bars a part lost: `align_to_target` never puts a played bar in a printed multi-rest and lets
 the other parts' meter changes steer where a lost bar lands.
 
+With Copisteria the OMR marks the first bar of each system (`<print new-system="yes"/>`), and the number read
+at each staff's start anchors that system (`ocr_page_systems`), so a page is aligned system by system
+(`musicocr/assemble/voltas.py`, `_lay_out_segments`): a bar read too many or lost moves nothing outside its
+own system. Printed numbers count a first and a second ending as one bar while the OMR reads both, so the
+endings that most parts read at the same number give a *grid* with one slot per notated bar (`Grid`); every
+page start, multi-rest span and printed total is converted onto it. Scans of a bound book: the ink at the page's
+left edge no longer joins staves into systems, and `[omr.copisteria] single_staff` (auto for a part with an
+instrument) keeps every staff a system of its own.
+
 Film-score parts are a run of short *scenes* (cues) whose bar numbers restart in each one:
 
 ```bash

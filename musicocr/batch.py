@@ -234,8 +234,9 @@ def split_pdf(spec: BatchSpec, part: Part) -> Path:
     """Extract the part's pages from the source PDF (poppler); reuses an existing file."""
     key = spec.key(part)
     pdf = spec.input_dir / f"{key}.pdf"
-    if pdf.exists():
-        return pdf
+    source = Path(part.source_pdf or spec.source_pdf).expanduser()
+    if pdf.exists() and not (source.exists() and source.stat().st_mtime > pdf.stat().st_mtime):
+        return pdf                              # (a source split again since is read again)
     spec.input_dir.mkdir(parents=True, exist_ok=True)
     template = spec.input_dir / f"_{key}-%d.pdf"
     subprocess.run(
