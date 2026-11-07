@@ -1,6 +1,7 @@
 """``musicocr combine``: build one aligned score from a batch's per-part results."""
 from __future__ import annotations
 
+import json
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -9,6 +10,16 @@ from musicocr.assemble.alignment.build import write_score
 from musicocr.batch import BatchSpec
 from musicocr.assemble.combine import PartInput, combine
 from musicocr.scoreops.marks import MarksOptions
+
+
+def _pages_of_last_run(d: Path, pages: list[Path]) -> list[Path]:
+    """Only the page files the part's last run wrote (its report.json): a longer earlier run (the part's
+    PDF was re-cut shorter) leaves higher-numbered page files behind that must not be merged in."""
+    try:
+        wrote = {Path(f).name for f in json.loads((d / "report.json").read_text())["page_files"]}
+    except (OSError, ValueError, KeyError, TypeError):
+        return pages
+    return [p for p in pages if p.name in wrote] or pages
 
 
 def part_inputs(spec: BatchSpec, engine: str | None, only=None) -> list[PartInput]:
@@ -23,6 +34,7 @@ def part_inputs(spec: BatchSpec, engine: str | None, only=None) -> list[PartInpu
             d = d / "engines" / (engine or spec.engines[0])
         pages = sorted((p for p in d.glob(f"{key}.p[0-9][0-9][0-9].musicxml")),
                        key=lambda p: int(re.search(r"\.p(\d{3})\.musicxml$", p.name).group(1)))
+        pages = _pages_of_last_run(d, pages)
         pdf = spec.input_dir / f"{key}.pdf"
         out.append(PartInput(part.id, part.label, part.instrument, pdf if pdf.exists() else None, pages))
     return out

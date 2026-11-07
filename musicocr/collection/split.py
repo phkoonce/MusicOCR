@@ -215,13 +215,32 @@ def fill_from_peers(found: Dict[str, List[Found]], log=print) -> Dict[str, List[
     other books put on one page is taken to start there, at their median height, when that fits between this
     book's own neighbouring headings. Without it the piece's pages stay glued to the one before.
     """
-    nums = sorted({f.num for fs in found.values() for f in fs})
     out = {b: sorted(fs, key=lambda f: f.num) for b, fs in found.items()}
+    # Misplaced headings are moved first: a look-alike found too early (piece 6 on page 17) would otherwise
+    # block the missing pieces before it (4 and 5) from fitting between their neighbours.
+    def relocate() -> None:
+        for book, fs in out.items():          # a heading found far from where three other books agree it is
+            for f in list(fs):
+                peers = [g for b, other in out.items() if b != book for g in other if g.num == f.num]
+                pages = Counter(g.page for g in peers)
+                page, votes = pages.most_common(1)[0] if pages else (None, 0)
+                if votes < 3 or abs(page - f.page) < 2:
+                    continue
+                y = sorted(g.y for g in peers if g.page == page)[votes // 2]
+                before = [g for g in fs if g.num < f.num]
+                after = [g for g in fs if g.num > f.num]
+                if (before and (before[-1].page, before[-1].y) >= (page, y)) or \
+                        (after and (after[0].page, after[0].y) <= (page, y)):
+                    continue
+                log(f"book {book}: piece {f.num} heading on page {f.page} -> page {page} like all the other books")
+                fs[fs.index(f)] = Found(f.num, page, y)
+    relocate()
+    nums = sorted({f.num for fs in found.values() for f in fs})
     for n in nums:
         for book, fs in out.items():
             if any(f.num == n for f in fs):
                 continue
-            peers = [f for b, other in found.items() if b != book for f in other if f.num == n]
+            peers = [f for b, other in out.items() if b != book for f in other if f.num == n]
             by_page: Dict[int, List[float]] = {}
             for f in peers:
                 by_page.setdefault(f.page, []).append(f.y)
@@ -238,21 +257,7 @@ def fill_from_peers(found: Dict[str, List[Found]], log=print) -> Dict[str, List[
             fs.append(Found(n, page, y))
             fs.sort(key=lambda f: f.num)
             log(f"book {book}: piece {n} heading not read -> placed on page {page} like the other books")
-    for book, fs in out.items():          # a heading found far from where three other books agree it is
-        for f in list(fs):
-            peers = [g for b, other in out.items() if b != book for g in other if g.num == f.num]
-            pages = Counter(g.page for g in peers)
-            page, votes = pages.most_common(1)[0] if pages else (None, 0)
-            if votes < 3 or abs(page - f.page) < 2:
-                continue
-            y = sorted(g.y for g in peers if g.page == page)[votes // 2]
-            before = [g for g in fs if g.num < f.num]
-            after = [g for g in fs if g.num > f.num]
-            if (before and (before[-1].page, before[-1].y) >= (page, y)) or \
-                    (after and (after[0].page, after[0].y) <= (page, y)):
-                continue
-            log(f"book {book}: piece {f.num} heading on page {f.page} -> page {page} like all the other books")
-            fs[fs.index(f)] = Found(f.num, page, y)
+    relocate()           # again: a book's own filled-in headings now count as votes
     return out
 
 
