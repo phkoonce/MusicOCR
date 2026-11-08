@@ -178,3 +178,24 @@ def test_music_font_beat_glyph_gives_unit_and_dot_from_the_pdf_text():
     assert (res.items[0]["beat_unit"], res.items[0]["dotted"], res.items[0]["bpm"]) == ("quarter", True, 54)
     res = build_items([W("e=120", 300, 1340, source="pdf")], STAVES)
     assert res.items[0]["beat_unit"] == "eighth" and "dotted" not in res.items[0]
+
+
+def test_a_ring_at_the_left_margin_between_systems_goes_over_the_system_below():
+    ring = lambda t, x, y: {"text": t, "kind": "rehearsal", "circle": True, "xyxy": [x, y, x + 108, y + 108]}
+    close = [{"y0": 1000, "y1": 1104, "sp": 26, "bars": [(40, 900), (900, 1800)]},
+             {"y0": 1260, "y1": 1364, "sp": 26, "bars": [(40, 1000), (1000, 1800)]}]
+    # centre 1182: 78 px under staff 0, 78 over staff 1 -- a tie that the margin position settles
+    placed = place_items([ring("m", 30, 1128), ring("mid", 500, 1128)], close)
+    flat = {p[0]["text"]: (k, p[1]) for k, v in placed.items() for p in v}
+    assert flat["m"] == ((1, 0), False)
+    assert flat["mid"] == ((0, 0), True)          # mid-system: under the staff it is nearest to
+
+
+def test_ring_sits_on_a_barline_and_marks_the_bar_after_it():
+    ring = lambda t, x, y: {"text": t, "kind": "rehearsal", "circle": True, "xyxy": [x, y, x + 108, y + 108]}
+    geo = _geometry()
+    # staff 0 bars start at 40 / 900 and end at 1800: a ring centred on 900 is bar 1; one centred near the end of the
+    # system (1760) is the first bar of the next system; one far from any barline is the bar it is over
+    placed = place_items([ring("a", 846, 880), ring("end", 1706, 880), ring("mid", 400, 880)], geo)
+    flat = {p[0]["text"]: k for k, v in placed.items() for p in v}
+    assert flat == {"a": (0, 1), "end": (1, 0), "mid": (0, 0)}

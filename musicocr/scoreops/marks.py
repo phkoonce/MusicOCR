@@ -10,6 +10,14 @@ the other parts as evidence. Every rule is separate and every change is reported
   (1) where the same hairpin ends in the other parts, if some are longer; else (2) the next
   dynamic of this part when that lies within ``ahead_bars`` of the bar's end; else (3) the end
   of its bar. Never past the part's next hairpin.
+* ``reach``    -- a hairpin that stops ``reach_min``..``reach_max`` beats short of the next dynamic of its
+  part runs on to that dynamic (measured on GB pieces 1-3 against hand corrections: OMR ends a hairpin on
+  the last note it covers instead of after it, so the line stops a note or two before the dynamic it leads to).
+* ``lines``    -- "cresc." / "dim." printed as plain text becomes a text line with dashes (MuseScore text line, shown
+  as ``cresc. - - -``) that runs to the part's next dynamic, at most ``lines_bars`` bars on; MusicXML cannot ask
+  for MuseScore's playing cresc. hairpin line, only for this text line.
+* ``placement`` -- every dynamic and hairpin sits on the side the part mostly puts them (instrument parts: below).
+  OMR places a few by pixel position, above the staff, though a part is consistent.
 * ``fill``     -- a bar where at least ``quorum`` of a section's playing parts (and at least
   ``min_voters``) carry a dynamic gets it in the parts of that section that play but carry none.
   Off by default: a missing mark is sometimes missing in the print too.
@@ -29,6 +37,8 @@ from fractions import Fraction as F
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
+_LINE_WORDS = re.compile(r"^(cresc|cres|crescendo|dim|dimin|diminuendo|decresc|decrescendo|decr)\.?$", re.I)
+
 Loc = Tuple[int, F]             # (1-based bar, position in quarter notes from the bar start)
 
 
@@ -36,8 +46,14 @@ Loc = Tuple[int, F]             # (1-based bar, position in quarter notes from t
 class MarksOptions:
     dedupe: bool = True
     hairpins: bool = True
+    reach: bool = True
+    placement: bool = True
+    lines: bool = True
     fill: bool = False
     short_beats: float = 2.0    # a hairpin this short (quarter notes) counts as truncated
+    reach_min: float = 2.0      # a hairpin ending this many beats ... (quarter notes)
+    reach_max: float = 4.0      # ... to this many beats before the next dynamic runs on to it
+    lines_bars: int = 3         # a cresc./dim. text line may run this many bars to reach its dynamic
     ahead_bars: int = 1         # how far past its bar a hairpin may run to reach the next dynamic
     quorum: float = 0.5         # share of a section's playing parts that must carry a dynamic
     min_voters: int = 4         # ... and how many parts must be playing for the vote to count
@@ -48,18 +64,19 @@ class MarksOptions:
         """``all`` or a comma list of rule names (``dedupe,hairpins,fill``); ``all`` = every rule."""
         names = {s.strip() for s in spec.split(",") if s.strip()}
         if "all" in names:
-            names = {"dedupe", "hairpins", "fill"}
-        bad = names - {"dedupe", "hairpins", "fill"}
+            names = {"dedupe", "hairpins", "reach", "placement", "lines", "fill"}
+        bad = names - {"dedupe", "hairpins", "reach", "placement", "lines", "fill"}
         if bad:
-            raise ValueError(f"unknown mark rule(s) {sorted(bad)}; known: dedupe, hairpins, fill, all")
-        return cls(dedupe="dedupe" in names, hairpins="hairpins" in names, fill="fill" in names)
+            raise ValueError(f"unknown mark rule(s) {sorted(bad)}; known: dedupe, hairpins, reach, placement, lines, fill, all")
+        return cls(dedupe="dedupe" in names, hairpins="hairpins" in names, reach="reach" in names,
+                   placement="placement" in names, lines="lines" in names, fill="fill" in names)
 
 
 @dataclass
 class Mark:
     bar: int
     pos: F
-    kind: str                   # "dyn" | "wedge"
+    kind: str                   # "dyn" | "wedge" | "text" (cresc./dim. words)
     value: str                  # dynamic name, or crescendo / diminuendo / stop
     m: ET.Element               # its measure
     d: ET.Element               # its <direction>
@@ -123,6 +140,8 @@ def _scan(name: str, measures: List[ET.Element]) -> PartScan:
                         marks.append(Mark(b, at, "dyn", v, m, e, dt))
                     elif w is not None:
                         marks.append(Mark(b, at, "wedge", w.get("type", ""), m, e, dt))
+                    elif dt.find("words") is not None and _LINE_WORDS.match("".join(dt.find("words").itertext()).strip()):
+                        marks.append(Mark(b, at, "text", "".join(dt.find("words").itertext()).strip(), m, e, dt))
             end = max(end, pos)
         lens.append(end)
         plays.append(sounds)
@@ -299,12 +318,85 @@ def fill_dynamics(scans: Sequence[PartScan], opts: MarksOptions, report: List[st
     return n
 
 
+def reach_dynamics(scans: Sequence[PartScan], opts: MarksOptions, report: List[str]) -> int:
+    """Run a hairpin on to the next dynamic when it stops ``reach_min``..``reach_max`` beats before it."""
+    lo, hi = F(opts.reach_min).limit_denominator(64), F(opts.reach_max).limit_denominator(64)
+    moved = 0
+    for p in scans:
+        pairs = _pairs(p)
+        starts = [p.abs((a.bar, a.pos)) for a, _ in pairs]
+        for i, (a, z) in enumerate(pairs):
+            s, e = p.abs((a.bar, a.pos)), p.abs((z.bar, z.pos))
+            nxt = [p.abs((d.bar, d.pos)) for d in p.marks if d.kind == "dyn" and p.abs((d.bar, d.pos)) > s + 1]
+            if not nxt:
+                continue
+            target = min(nxt)
+            if not lo <= target - e <= hi or (i + 1 < len(pairs) and starts[i + 1] < target):
+                continue
+            bar, pos = p.loc(target)
+            if z.d.findall("direction-type") == [z.dt]:
+                d = z.d
+                z.m.remove(d)
+            else:
+                d = ET.Element("direction", {k: v for k, v in z.d.attrib.items() if k == "placement"})
+                ET.SubElement(d, "direction-type").extend(list(z.dt))
+                _remove(z)
+            if opts.mark:
+                for w in d.iter("wedge"):
+                    w.set("color", opts.mark)
+            _insert(p.measures[bar - 1], d, pos, p.div[bar - 1], first=True)
+            moved += 1
+            report.append(f"  {p.name}: {a.value} from bar {a.bar} ended in bar {z.bar} -> bar {bar} (on to the next dynamic)")
+    return moved
+
+
+def text_lines(scans: Sequence[PartScan], opts: MarksOptions, report: List[str]) -> int:
+    """Give "cresc." / "dim." text a dashed line that runs to the part's next dynamic."""
+    made = 0
+    for p in scans:
+        for mk in [m for m in p.marks if m.kind == "text"]:
+            s = p.abs((mk.bar, mk.pos))
+            nxt = [p.abs((d.bar, d.pos)) for d in p.marks
+                   if d.kind == "dyn" or (d.kind == "wedge" and d.value in ("crescendo", "diminuendo"))]
+            nxt = [t for t in nxt if t > s]
+            if not nxt or min(nxt) - s > opts.lines_bars * p.lens[mk.bar - 1]:
+                continue
+            bar, pos = p.loc(min(nxt))
+            ET.SubElement(mk.d, "direction-type").append(ET.Element("dashes", type="start", number="9"))
+            stop = ET.Element("direction", {k: v for k, v in mk.d.attrib.items() if k == "placement"})
+            ET.SubElement(ET.SubElement(stop, "direction-type"), "dashes", type="stop", number="9")
+            _insert(p.measures[bar - 1], stop, pos, p.div[bar - 1], first=True)
+            made += 1
+            report.append(f"  {p.name} bar {mk.bar}: '{mk.value}' runs to bar {bar}")
+    return made
+
+
+def unify_placement(scans: Sequence[PartScan], report: List[str]) -> int:
+    """Put every dynamic and hairpin on the side most of them are on (``below`` when they tie)."""
+    seen: Dict[int, ET.Element] = {}
+    for p in scans:
+        for mk in p.marks:
+            seen[id(mk.d)] = mk.d
+    votes = Counter(d.get("placement") for d in seen.values() if d.get("placement") in ("above", "below"))
+    if not votes:
+        return 0
+    side = "below" if votes["below"] >= votes["above"] else "above"
+    changed = 0
+    for d in seen.values():
+        if d.get("placement") != side:
+            d.set("placement", side)
+            changed += 1
+    if changed:
+        report.append(f"  placement: {changed} dynamic/hairpin direction(s) moved {side} like the other {votes[side]}")
+    return changed
+
+
 def normalize_marks(parts: Sequence[Tuple[str, List[ET.Element]]], opts: Optional[MarksOptions] = None
                     ) -> Tuple[Dict[str, int], List[str]]:
     """Apply the enabled rules to ``(name, measures)`` parts in place; returns counts and report."""
     opts = opts or MarksOptions()
     report: List[str] = []
-    stats = dict(deduped=0, filled=0, extended=0)
+    stats = dict(deduped=0, filled=0, extended=0, reached=0, replaced=0, lines=0)
     scans = [_scan(n, ms) for n, ms in parts]
     if opts.dedupe:
         stats["deduped"] = sum(dedupe(p, report) for p in scans)
@@ -312,10 +404,21 @@ def normalize_marks(parts: Sequence[Tuple[str, List[ET.Element]]], opts: Optiona
     if opts.fill:
         stats["filled"] = fill_dynamics(scans, opts, report)
         scans = [_scan(n, ms) for n, ms in parts]
+    if opts.reach:
+        stats["reached"] = reach_dynamics(scans, opts, report)
+        scans = [_scan(n, ms) for n, ms in parts]
     if opts.hairpins:
         stats["extended"] = extend_hairpins(scans, opts, report)
+        scans = [_scan(n, ms) for n, ms in parts]
+    if opts.lines:
+        stats["lines"] = text_lines(scans, opts, report)
+        scans = [_scan(n, ms) for n, ms in parts]
+    if opts.placement:
+        stats["replaced"] = unify_placement(scans, report)
     report.insert(0, f"marks: {stats['deduped']} duplicate dynamic(s) dropped, {stats['filled']} "
-                     f"dynamic(s) filled, {stats['extended']} hairpin(s) extended")
+                     f"dynamic(s) filled, {stats['reached']} hairpin(s) run on to the next dynamic, "
+                     f"{stats['extended']} hairpin(s) extended, {stats['replaced']} placement(s) unified, "
+                     f"{stats['lines']} cresc./dim. text line(s)")
     return stats, report
 
 

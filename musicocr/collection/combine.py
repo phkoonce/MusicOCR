@@ -35,7 +35,8 @@ def piece_row(spec: CollectionSpec, num: int, redo: bool = False,
     if redo or not mscz.exists():
         only = ",".join(spec.part_id(num, b) for b in spec.books)
         cmd = [sys.executable, "-m", "musicocr", "combine", "--batch", str(spec.batch_path),
-               "--only", only, "--output", str(d), "--convert"]
+               "--only", only, "--output", str(d), "--convert",
+               "--normalize-marks", "dedupe,reach,placement,lines"]
         if not spec.bar_numbers:
             cmd.append("--no-bar-numbers")
         r = (run or (lambda c: subprocess.run(c, capture_output=True, text=True)))(cmd)

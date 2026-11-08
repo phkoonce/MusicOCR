@@ -73,3 +73,41 @@ def test_rules_parse():
         pass
     else:
         raise AssertionError("unknown rule accepted")
+
+
+def test_reach_runs_a_hairpin_on_to_the_next_dynamic_two_to_four_beats_away():
+    # crescendo over beats 0-1 of bar 1 (stop before note 2); f on the downbeat of bar 2: 2 beats past its end
+    ms = [bar(1, (0, ("wedge", "crescendo")), (2, ("wedge", "stop"))), bar(2, (0, ("dyn", "f")))]
+    stats, _ = normalize_marks([("Horn", ms)], MarksOptions(dedupe=False, hairpins=False, placement=False, mark=None))
+    assert stats["reached"] == 1
+    a, z = _pairs(_scan("Horn", ms))[0]
+    assert (z.bar, z.pos) == (1, 4)      # the end of bar 1 = the downbeat of bar 2, where the f is
+
+    near = [bar(1, (0, ("wedge", "crescendo")), (3, ("wedge", "stop"))), bar(2, (0, ("dyn", "f")))]   # only 1 beat short
+    assert normalize_marks([("Horn", near)], MarksOptions(dedupe=False, hairpins=False, placement=False))[0]["reached"] == 0
+    far = [bar(1, (0, ("wedge", "crescendo")), (1, ("wedge", "stop"))), bar(2), bar(3, (0, ("dyn", "f")))]
+    assert normalize_marks([("Horn", far)], MarksOptions(dedupe=False, hairpins=False, placement=False))[0]["reached"] == 0
+
+
+def test_placement_follows_the_majority_of_the_dynamics():
+    ms = [bar(1, (0, ("dyn", "p")), (1, ("dyn", "f")), (2, ("dyn", "mf")))]
+    ms[0].findall("direction")[1].set("placement", "above")
+    stats, _ = normalize_marks([("Horn", ms)], MarksOptions(dedupe=False, hairpins=False, reach=False))
+    assert stats["replaced"] == 1
+    assert {d.get("placement") for d in ms[0].findall("direction")} == {"below"}
+
+
+def test_cresc_text_becomes_a_dashed_line_to_the_next_dynamic():
+    def words_bar(n, text):
+        m = bar(n, notes=4)
+        d = ET.fromstring(f'<direction placement="below"><direction-type><words>{text}</words></direction-type></direction>')
+        m.insert(1 if n == 1 else 0, d)
+        return m
+    ms = [words_bar(1, "cresc."), bar(2), bar(3, (0, ("dyn", "f")))]
+    stats, _ = normalize_marks([("Horn", ms)], MarksOptions(dedupe=False, hairpins=False, reach=False, placement=False))
+    assert stats["lines"] == 1
+    starts = [e.get("type") for m in ms for e in m.iter("dashes")]
+    assert starts == ["start", "stop"]
+    assert [m.find("direction/direction-type/dashes") is not None for m in ms] == [True, True, False]   # the stop sits at the end of bar 2 = where the f lands
+    lone = [words_bar(1, "dim."), bar(2)]
+    assert normalize_marks([("Horn", lone)], MarksOptions(dedupe=False, hairpins=False, reach=False, placement=False))[0]["lines"] == 0

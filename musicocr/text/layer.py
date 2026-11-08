@@ -180,6 +180,27 @@ def build_items(words: Sequence[Word], staves: Sequence[Staff], lex: Optional[Le
     return res
 
 
+CIRCLE_TEXT = "#"        # the number is not read: the marks are numbered in order once the parts are combined
+
+
+def circled_marks(img, staves: Sequence[Staff], cfg: Optional[TextLayerSettings] = None) -> List[dict]:
+    """Rehearsal marks drawn as a ring around a number, found by shape (``musicocr.text.circles``). Above a staff
+    like any rehearsal mark, or below it (printed under the bar when other text sits above)."""
+    from musicocr.text.circles import DEFAULT_SP, find_circles
+    cfg = cfg or TextLayerSettings()
+    if cfg.mode == "off":
+        return []
+    sp = sorted(s.sp for s in staves)[len(staves) // 2] if staves else DEFAULT_SP
+    out = []
+    for c in find_circles(img, sp):
+        si, d, above = _zone(c.box, staves) if staves else (0, 1.0, True)      # no staves read here: the engine places it
+        if d <= 0.3 or d > (cfg.above_sp if above else cfg.below_sp):      # inside a staff or far from every staff
+            continue
+        out.append({"text": CIRCLE_TEXT, "kind": "rehearsal", "staff": si, "xyxy": [round(v, 1) for v in c.box],
+                    "style": "", "source": "shape", "flag": False, "circle": True})
+    return out
+
+
 def _dedupe(items: List[dict]) -> List[dict]:
     out: List[dict] = []
     for it in items:
@@ -233,7 +254,12 @@ def write_textlayer_json(png: Path, cfg: TextLayerSettings, log=None, **kw) -> i
     if cfg.mode == "off":
         dst.unlink(missing_ok=True)
         return 0
-    words, staves = page_words(png, cfg, log=log, **kw)
+    try:
+        words, staves = page_words(png, cfg, log=log, **kw)
+    except ValueError as exc:      # the staves could not be found (e.g. a stamp over them): shape marks still work
+        if log:
+            log(f"  {png.stem}: staves not found for the text layer ({exc}); circled marks only")
+        words, staves = [], []
     dets = None
     found = sorted(png.parent.glob(f"{png.stem}.dets_*.json"))
     if len(found) == 1:
@@ -242,7 +268,9 @@ def write_textlayer_json(png: Path, cfg: TextLayerSettings, log=None, **kw) -> i
         except (OSError, ValueError):
             dets = None
     from PIL import Image
-    res = build_items(words, staves, cfg=cfg, dets=dets, img=Image.open(png).convert("L"))
+    img = Image.open(png).convert("L")
+    res = build_items(words, staves, cfg=cfg, dets=dets, img=img)
+    res.items += circled_marks(img, staves, cfg)
     dropped.write_text(json.dumps(res.dropped, indent=0))
     if not res.items:
         dst.unlink(missing_ok=True)

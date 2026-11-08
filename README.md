@@ -126,11 +126,15 @@ python -m musicocr run INPUT.pdf \
 
 `musicocr combine --normalize-marks [RULES]` runs a post-pass (`musicocr/scoreops/marks.py`) that uses the
 other parts as evidence to tidy dynamics and hairpins. `RULES` is a comma list; bare means
-`dedupe,hairpins`.
+everything but `fill`. `musicocr collection combine` runs `dedupe,reach,placement,lines`.
 
 - `dedupe` -- the same dynamic twice in one bar (e.g. above and below the staff): keep one.
 - `hairpins` -- a hairpin that stops on the note it starts on is extended: to where the other parts
   end it, else to the next dynamic if that is within a bar of the bar's end, else to the end of the bar.
+- `reach` -- a hairpin that stops 2-4 beats short of the part's next dynamic runs on to it (measured on GB
+  pieces 1-3 against hand corrections: OMR ends the line on the last note it covers instead of after it).
+- `placement` -- every dynamic and hairpin goes on the side most of them are on (parts: below).
+- `lines` -- "cresc." / "dim." printed as text becomes a dashed text line that runs to the next dynamic.
 - `fill` (opt-in, or `all`) -- a dynamic that at least half of a section's playing parts carry
   (min. 4 parts) is added to the section's parts that play but carry none.
 
@@ -405,6 +409,18 @@ flagged "check". Pick one piece's parts with `--only`; `title` / `composer` on t
 the combined score. Per-part options for such books: `old_bass_clef` (old-notation horn editions:
 octave-up bass clef, notes up an octave), `title`, `composer`, and a per-part `source_pdf` when each
 part is its own PDF (`musicocr/scoreops/retouch.py`, `musicocr/batch.py`).
+
+What `combine` also does for such a book, by voting over the parts (the same marks are printed in every part):
+
+- **Rehearsal marks.** The circled numbers are found by shape on the page image (`musicocr/text/circles.py`; OCR
+  never reads them), placed above their bar (or under the staff), and numbered A, B, C ... in order, written once
+  (`musicocr/assemble/rehearsal.py`; needs two parts to agree).
+- **Repeats and 1st/2nd endings** that two or more parts read are written to every part
+  (`musicocr/assemble/repeats.py`).
+- **Key changes** a part hung on a system's first bar move to the bar another part reads the glyph on
+  (`slide_key_changes` in `combine.py`).
+- **Opening tempo word** ("Allegro", "Adagio", "Presto" ...) becomes a tempo mark at MuseScore's palette speed
+  (`musicocr/assemble/text_tempo.py`); `rit.` / `a tempo` stay text.
 
 ## Poor scans
 

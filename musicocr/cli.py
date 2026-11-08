@@ -420,10 +420,10 @@ def _add_combine_parser(sub) -> None:
     cb.add_argument("--output", help="directory for the combined score (default: <batch output>/_combined/<engine>)")
     cb.add_argument("--only", help="comma-separated part ids/keys to include")
     cb.add_argument("--convert", action="store_true", help="also write .mscz via MuseScore")
-    cb.add_argument("--normalize-marks", nargs="?", const="dedupe,hairpins", metavar="RULES",
+    cb.add_argument("--normalize-marks", nargs="?", const="dedupe,hairpins,reach,placement,lines", metavar="RULES",
                     help="make dynamics/hairpins consistent across parts (musicocr/scoreops/marks.py); RULES is a "
-                         "comma list of dedupe, hairpins, fill, or all (default when given bare: "
-                         "dedupe,hairpins; fill is opt-in)")
+                         "comma list of dedupe, hairpins, reach, placement, lines, fill, or all (default when given bare: "
+                         "everything but fill, which is opt-in)")
     cb.add_argument("--no-bar-numbers", action="store_true",
                     help="the parts print no bar numbers (ensemble books): align by rhythm, not by number "
                          "(or set bar_numbers = false in the batch)")

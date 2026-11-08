@@ -162,6 +162,24 @@ CHECK_COLOR = "#7B1FA2"          # same colour the other "check this" marks use
 ABOVE_SP, BELOW_SP = 9.0, 7.0     # a phrase more than this far from every staff is not attached
 
 
+def ring_bar(staves: list, si: int, x0: float, x1: float) -> tuple:
+    """``(staff, bar)`` of a ring drawn over staff ``si``: it marks the start of the bar whose left barline it sits on
+    (the nearest barline within three quarters of its width), also when it sits just left of that line -- at the
+    end of a system that is the first bar of the next one. Away from every barline: the bar it is over."""
+    st = staves[si]
+    c, w = (x0 + x1) / 2, x1 - x0
+    bounds = [b[0] for b in st["bars"]] + [st["bars"][-1][1]]
+    k = min(range(len(bounds)), key=lambda i: abs(c - bounds[i]))
+    if abs(c - bounds[k]) <= 0.75 * w:
+        if k < len(st["bars"]):
+            return si, k
+        if si + 1 < len(staves) and staves[si + 1]["bars"]:
+            return si + 1, 0
+        return si, len(st["bars"]) - 1
+    over = [j for j, b in enumerate(st["bars"]) if b[0] <= c]
+    return si, over[-1] if over else 0
+
+
 def place_items(items: list, staves: list) -> dict:
     """Assign classified phrases to ``(staff, bar)``.
 
@@ -176,6 +194,12 @@ def place_items(items: list, staves: list) -> dict:
         x0, y0, x1, y1 = it["xyxy"]
         cy = (y0 + y1) / 2
         best = None
+        if it.get("circle"):
+            # a ring between two systems at the left margin sits above the system below it (its first bar)
+            nxt = next((i for i, st in enumerate(staves) if st["y0"] > cy), None)
+            if nxt is not None and staves[nxt]["bars"] and staves[nxt]["y0"] - cy <= 4 * staves[nxt]["sp"] \
+                    and x0 <= staves[nxt]["bars"][0][0] + 0.5 * staves[nxt]["sp"]:
+                best = (0.0, nxt, False)
         for si, st in enumerate(staves):
             if it.get("above") and cy > st["y0"]:      # tempo marks sit above their staff: not under the previous one
                 continue
@@ -196,6 +220,8 @@ def place_items(items: list, staves: list) -> dict:
         for j, (bx0, _bx1) in enumerate(st["bars"]):
             if bx0 - st["sp"] <= x0:
                 bar = j
+        if it.get("circle"):
+            si, bar = ring_bar(staves, si, x0, x1)
         out.setdefault((si, bar), []).append((it, below))
     for v in out.values():
         v.sort(key=lambda p: p[0]["xyxy"][0])

@@ -56,3 +56,34 @@ def test_single_part_is_a_no_op():
     parts = {1: [bar(1, 100)]}
     assert unify_tempo(parts) == []
     assert tempos(parts[1][0]) == [("quarter", False, 100)]
+
+
+def test_opening_word_becomes_one_tempo_mark_in_the_first_part():
+    from musicocr.assemble.text_tempo import opening_tempo
+
+    def bar(*words):
+        m = ET.Element("measure")
+        for w in words:
+            d = ET.SubElement(m, "direction", placement="above", system="only-top")
+            ET.SubElement(ET.SubElement(d, "direction-type"), "words").text = w
+        ET.SubElement(m, "note")
+        return m
+    parts = {1: [bar()], 2: [bar("Allegro")], 3: [bar("Allegro", "Solo")]}
+    lines = opening_tempo(parts)
+    assert lines and "144" in lines[0]
+    d = parts[1][0].find("direction")
+    assert d.find("sound").get("tempo") == "144" and d.get("system") is None
+    assert parts[2][0].find("direction") is None
+    assert [e.findtext("direction-type/words") for e in parts[3][0].findall("direction")] == ["Solo"]
+    assert opening_tempo({1: [bar("Solo")]}) == []
+
+
+def test_a_flagged_reading_of_a_tempo_word_is_accepted_without_its_flag():
+    from musicocr.assemble.text_tempo import opening_tempo
+    m = ET.Element("measure")
+    d = ET.SubElement(m, "direction", placement="above")
+    w = ET.SubElement(ET.SubElement(d, "direction-type"), "words", color="#7B1FA2")
+    w.text = "check: Marsch"
+    ET.SubElement(m, "note")
+    assert opening_tempo({1: [m]}) and w.text == "Marsch" and w.get("color") is None
+    assert d.find("sound").get("tempo") == "120"

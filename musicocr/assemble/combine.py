@@ -41,7 +41,9 @@ from musicocr.assemble import voltas as vt
 from musicocr.musicxml import check_direction, multirest_count
 from musicocr.scoreops.marks import MarksOptions, normalize_marks
 from musicocr.assemble.text_system import text_keys, unify_system_text
-from musicocr.assemble.text_tempo import unify_tempo
+from musicocr.assemble.rehearsal import unify_rehearsal
+from musicocr.assemble.repeats import unify_repeats
+from musicocr.assemble.text_tempo import opening_tempo, unify_tempo
 from musicocr.assemble.unnumbered import align_by_rhythm, onsets
 from musicocr.scoreops.instruments import INFO, canonical_name, semitones_for
 from musicocr.scoreops.transpose import _CLEF_FAMILY, _declare_transpose, clef_family, fifths_shift
@@ -823,6 +825,44 @@ def _lay_out_all(data, ref, total: int, bar_numbers: bool, report: List[str]):
                     text_by=_text_refs(ref_full, only_full, total))
 
 
+MAX_KEY_SLIDE = 12      # bars a system-start key change may be moved later to where another part prints it
+
+
+def _new_system(src: Optional[Src]) -> bool:
+    return src is not None and src[0].find("print[@new-system='yes']") is not None
+
+
+def slide_key_changes(key_by: Dict[str, List[Optional[int]]], bars: Dict[str, Sequence[Optional[Src]]]) -> int:
+    """Move a key change a part put on the first bar of a system to the bar where another part prints the same
+    change in mid-system, earlier or later. The OMR engine hangs a key it saw anywhere in a system on the system's
+    first bar in some parts and finds the glyph after the double bar in others; a mid-system placement is a reading
+    of the glyph, a system-start one the engine's fallback. Returns how many changes moved."""
+    moved = 0
+    mid: Dict[Tuple[Optional[int], Optional[int]], List[int]] = {}
+    for pid, ks in key_by.items():
+        for b in range(1, len(ks)):
+            if ks[b] != ks[b - 1] and not _new_system(bars[pid][b]):
+                mid.setdefault((ks[b - 1], ks[b]), []).append(b)
+    for pid, ks in key_by.items():
+        for b in range(1, len(ks)):
+            if ks[b] == ks[b - 1] or not _new_system(bars[pid][b]):
+                continue
+            old, new = ks[b - 1], ks[b]
+            near = [c for c in mid.get((old, new), []) if c != b and abs(c - b) <= MAX_KEY_SLIDE]
+            if not near:
+                continue
+            c = min(near, key=lambda c: (abs(c - b), c))
+            if c > b and all(ks[i] == new for i in range(b, c)):         # the part carries the new key on to there
+                for i in range(b, c):
+                    ks[i] = old
+                moved += 1
+            elif c < b and all(ks[i] == old for i in range(c, b)):       # ... or keeps the old one until the real change
+                for i in range(c, b):
+                    ks[i] = new
+                moved += 1
+    return moved
+
+
 def _consensus(bars, data, total: int, title: str, report: List[str]):
     """Key and meter per bar by plurality over the parts, and the pickup; returns the score spec.
 
@@ -842,6 +882,9 @@ def _consensus(bars, data, total: int, title: str, report: List[str]):
             ks.append(ck)
             ms.append(cm)
         key_by[pid], met_by[pid] = ks, ms
+    slid = slide_key_changes(key_by, bars)
+    if slid:
+        report.append(f"score: {slid} key change(s) moved off a system's first bar to where another part prints the glyph")
     # The parts are printed in written pitch, so a transposing part's key signature differs from the
     # score's: vote on the *concert* key (written fifths + the part's shift) and write each part's
     # own key back as concert - shift.
@@ -970,6 +1013,7 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
     summary = dict(total=total, parts=len(data), key_meter=changes, bad_bars=0, repairs=0)
     built, infos = _build_parts(bars, flags, data, spec, shifts, unpitched, report, summary)
     summary["repairs"] = sum(1 for r in report if "-- check" in r.lower())
+    report.extend(unify_repeats(bars, built))    # repeat signs and 1st/2nd endings, voted over the parts
     if marks is not None:                # optional: make dynamics / hairpins consistent across parts
         stats, lines = normalize_marks([(infos[n]["name"], built[n]) for n in infos], marks)
         report.extend(lines)
@@ -977,6 +1021,8 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
     if tempo_vote:                       # one tempo mark per bar (plurality of the parts), in the first part
         report.extend(unify_tempo(built))
     report.extend(unify_system_text(built))      # words the parts print over the same bar: system text, once
+    report.extend(unify_rehearsal(built))        # circled numbers: voted over the parts, lettered in order
+    report.extend(opening_tempo(built))          # "Allegro" over the first bar: a tempo mark that plays
     score = build_score(spec, built, infos)
     _declare_transpositions(score, infos, data, bars, report)
     return score, report, summary

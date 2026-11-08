@@ -13,6 +13,8 @@ dependencies = [
     # Scan pre-processing (musicocr/preprocess.py): rasterise, deskew, crop, sharpen.
     "Pillow>=9",
     "numpy>=1.23",
+    # Circled rehearsal numbers found by shape (musicocr/text/circles.py).
+    "opencv-python-headless>=4.8",
 ]
 
 [project.optional-dependencies]
