@@ -259,6 +259,11 @@ default (on). Fixes declare ordering constraints (`after=`), which the registry 
   2:3 / 3:2 tuplets (Copisteria's decoder only offers triplets), and small
   digits are no longer taken as multi-rest counts. `fix_half_tuplets` finishes
   a duplet/triplet the model marked on only some of its notes.
+* **Stray slurs** (`slur_filter`, `musicocr/engines/copisteria/run.py`): a curve between two or three
+  neighbouring notes across a bar line whose box is 2.5+ staff spaces tall (real slurs there are flat) is
+  not written as a slur. Measured on the hand-cleaned GB pieces 2-3: 15 of the 18 slurs removed by hand
+  across bar lines were such curves, 4 of the 23 kept ones too. The detector's confidence does not
+  separate them. Same-pitch curves (ties) are left to `slur_ties`.
 * **Key and meter carry-over**: `fix_key_cancel` resets to C major at a staff
   start that prints no key signature (reading.json evidence; skips multi-rest
   follower bars), `fix_time_inherit` makes a page's unprinted opening meter

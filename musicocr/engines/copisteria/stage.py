@@ -147,6 +147,8 @@ def run(ctx: PipelineContext) -> StageResult:
         cmd = [py, str(run_script), str(img), "--out", str(pdir)]
         if not ctx.config.omr.copisteria.text_tuplets:
             cmd.append("--no-text-tuplets")
+        if not ctx.config.omr.copisteria.slur_filter:
+            cmd.append("--no-slur-filter")
         single = ctx.config.omr.copisteria.single_staff
         if single == "yes" or (single == "auto" and ctx.config.stages.transpose.instrument):
             cmd.append("--single-staff")      # a part: its staves are separate systems, however they look

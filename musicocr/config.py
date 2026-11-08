@@ -91,6 +91,7 @@ class CopisteriaConfig:
     fix_half_tuplets: bool = True   # finish a duplet/triplet the model gave to only some of its notes
     fill_empty_bars: bool = True   # bars the detector read nothing in: re-detect one size up, add what is found there
     single_staff: str = "auto"   # "yes": every staff is a system of its own (a part); "auto": when the part names its instrument
+    slur_filter: bool = True   # drop a tall box-shaped curve between two notes across a bar line (a stray curve, not a slur)
     text_tuplets: bool = True   # small "2"/"3" digits from the text layer mark duplets/triplets (copisteria_run.py)
     synth_multirest: bool = True   # synthesise a multiRest where a tall, centred, non-stacked count digit sits over an empty bar
     small_graces: bool = False   # before reading: small noteheads the detector called "not grace" become grace notes
@@ -135,6 +136,7 @@ class CopisteriaConfig:
                    fix_half_tuplets=bool(d.get("fix_half_tuplets", True)),
                    fill_empty_bars=bool(d.get("fill_empty_bars", True)),
                    text_tuplets=bool(d.get("text_tuplets", True)), single_staff=single,
+                   slur_filter=bool(d.get("slur_filter", True)),
                    synth_multirest=bool(d.get("synth_multirest", True)),
                    small_graces=bool(d.get("small_graces", False)),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),

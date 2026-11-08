@@ -302,14 +302,104 @@ def _install_text_layer(png: Path) -> None:
     w._events, w._direction = _events, _direction
 
 
+def _curve_links(w, rd, built) -> list:
+    """Where each real ``curve`` of the page would attach as a slur (the same rule as copisteria's ``_attach``):
+    its first and last note and the numbers that tell a real slur from a stray curve."""
+    L = rd.layout
+    sym = L.syms
+    pos, notes_on = {}, {}
+    for bi, measures in enumerate(built):
+        for mi, m in enumerate(measures):
+            for st in m["staves"]:
+                if st is None:
+                    continue
+                for evs in st["voices"].values():
+                    for e in evs:
+                        if e.kind == "note" and not e.copied and e.si >= 0:
+                            notes_on.setdefault(sym[e.si].staff, []).append(e)
+                            pos[id(e)] = (bi, mi)
+    for evs in notes_on.values():
+        evs.sort(key=lambda e: e.x)
+    out = []
+    for c in sorted((s for s in sym if s.staff >= 0 and w._real(rd, s.i) and w._cls(rd, s.i) == "curve"),
+                    key=lambda s: (s.staff, s.box[0])):
+        st = L.staves[c.staff]
+        sp = st.sp
+        tok = rd.tok[c.i]
+        rec = {"i": c.i, "staff": c.staff, "box": [round(v, 1) for v in c.box], "sp": round(sp, 2),
+               "p": round(tok["real"]["p"], 4), "det": tok["real"].get("det"),
+               "w": round((c.box[2] - c.box[0]) / sp, 2), "h": round((c.box[3] - c.box[1]) / sp, 2)}
+        cand = [e for e in notes_on.get(c.staff, []) if abs(sym[e.si].cy - c.cy) <= 7 * sp]
+        near = sorted(sym[e.si].cy for e in cand if c.box[0] - sp <= sym[e.si].cx <= c.box[2] + sp)
+        over = bool(near) and c.cy < near[len(near) // 2]
+        yend = c.box[3] if over else c.box[1]
+        rec["over"] = over
+        if cand:
+            def cost(e, x):
+                ls = sym[e.si]
+                return abs(ls.cx - x) / sp + 0.5 * abs(ls.cy - yend) / sp
+            a = min(cand, key=lambda e: cost(e, c.box[0]))
+            z = min(cand, key=lambda e: cost(e, c.box[2]))
+            rec["da"] = round(abs(sym[a.si].cx - c.box[0]) / sp, 2)
+            rec["dz"] = round(abs(sym[z.si].cx - c.box[2]) / sp, 2)
+            rec["a"], rec["z"] = list(pos.get(id(a), ())), list(pos.get(id(z), ()))
+            rec["cross"] = rec["a"] != rec["z"]
+            rec["notes"] = sum(1 for e in notes_on[c.staff] if sym[a.si].cx <= sym[e.si].cx <= sym[z.si].cx)
+            rec["pitch"] = [f"{a.step}{a.octave}", f"{z.step}{z.octave}"]
+            bars = [rd.layout.bar_box(c.staff, j)[0::2] for j in range(len(st.bars))]
+            rec["bars_x"] = [round(b[1], 1) for b in bars[:-1]]
+        out.append(rec)
+    return out
+
+
+STRAY_H_SP = 2.5     # a curve box this tall (staff spaces) across a bar line is not a slur
+STRAY_MAX_NOTES = 3  # ... when it spans only this many notes
+
+
+def stray_curve(rec: dict) -> bool:
+    """A curve between two (or three) neighbouring notes across a bar line whose box is tall and nearly
+    square: OMR models see one in the bar line, a stem or a pair of notes. A real slur there is flat.
+    Hand-cleaned GB pieces: 15 of the 18 slurs removed this way were such curves; 4 of 23 kept ones were too."""
+    if not rec.get("cross") or rec.get("pitch", ["a"])[0] == rec.get("pitch", ["a", "b"])[1]:
+        return False                                 # inside a bar, or a tie (same pitch: another fix's)
+    return rec["h"] >= STRAY_H_SP and rec.get("notes", 99) <= STRAY_MAX_NOTES and rec.get("da", 9) <= 2.5
+
+
+def _slur_hook(w, filtered: bool = True) -> None:
+    """Drop stray curves before copisteria attaches slurs (a changed class is no ``curve``); optional trace of
+    the page's curves (``MUSICOCR_SLUR_TRACE=<file>``)."""
+    import os
+    orig = w._attach
+
+    def _attach(rd, built, plans, texts, mask=None):
+        path = os.environ.get("MUSICOCR_SLUR_TRACE")
+        recs = _curve_links(w, rd, built) if (path or filtered) else []
+        if path:
+            with open(path, "w") as f:
+                json.dump(recs, f)
+        n = 0
+        for rec in recs if filtered else ():
+            if stray_curve(rec):
+                rd.tok[rec["i"]]["cls"]["v"] = "curve_stray"
+                n += 1
+        if n:
+            print(f"stray curves not written as slurs: {n}", file=sys.stderr)
+        return orig(rd, built, plans, texts, mask)
+
+    w._attach = _attach
+
+
 def main() -> None:
     _install()
+    import copisteria.write as _w
+    _slur_hook(_w, filtered="--no-slur-filter" not in sys.argv)
     page = next((Path(a) for a in sys.argv[1:] if a.lower().endswith(".png")), None)
     if page is not None and "--no-text-layer" not in sys.argv:
         _install_text_layer(page)
     if "--single-staff" in sys.argv:
         _single_staff()
-    argv = [a for a in sys.argv[1:] if a not in ("--no-text-tuplets", "--no-text-layer", "--single-staff")]
+    argv = [a for a in sys.argv[1:] if a not in ("--no-text-tuplets", "--no-text-layer", "--single-staff",
+                                                  "--no-slur-filter")]
     from copisteria.pipeline import main as pipeline_main
     pipeline_main(argv)
 

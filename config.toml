@@ -121,6 +121,9 @@ fill_empty_bars = true
 # tags the heads under the digit (and ignores small digits as multi-rest counts).
 single_staff = "auto"   # "yes" | "no" | "auto": a part (its batch names an instrument) has one staff per system, nothing joins staves
 text_tuplets = true
+# A "slur" between two notes across a bar line whose box is 2.5+ staff spaces tall is a stray curve
+# (a real slur between neighbours is flat): not written. Checked against hand-cleaned GB pieces.
+slur_filter = true
 # (see [omr.copisteria.text_layer] below for tempo / expression / technique words)
 # Fallback: synthesise a multiRest detection when a tall count digit (page text) sits over an
 # empty bar the detector read nothing in. The digit must be centred over its bar and not one of

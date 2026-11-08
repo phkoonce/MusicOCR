@@ -26,7 +26,7 @@ Checked by re-running pieces 1-3 (`output/gb-rerun2/`) and diffing against the h
 | # | Result |
 |---|---|
 | 1 rehearsal | Circle finder (`text/circles.py`) + placement on the barline (`ring_bar`) + vote and lettering (`assemble/rehearsal.py`): 8 / 15 / 10 marks, as many as by hand; positions equal to yours in 7/8 (p1) and 8/10 (p3) bars. |
-| 2 slurs | Not done: the kept and removed barline-crossing slurs look alike by note shape; needs slur-box confidence from the detector. |
+| 2 slurs | `slur_filter` (`engines/copisteria/run.py`): a curve across a bar line between 2-3 notes whose box is >= 2.5 staff spaces tall is not written (real ones are 0.7-2.4 tall). Of the 41 barline-crossing slurs in pieces 2-3 (not piece 1: its are ties), 15 of the 18 removed by hand are caught, 4 of the 23 kept are lost too (piece 2 horns 2-3, a messy piece). Detector confidence (`det`/`p`) does not separate them. Piece 3: all 4 removed caught, 0 kept lost. |
 | 3 key change | `slide_key_changes`: a change hung on a system's first bar moves to where another part reads the glyph (p3: bar 42, and the spurious 72 gone). |
 | 4 cresc./dim./tempo | cresc./dim. text -> dashed text line to the next dynamic (`marks.py` rule `lines`); opening word ("Allegro", "Marsch") -> tempo mark (`text_tempo.opening_tempo`). rit. / a tempo stay text. |
 | 5 placement | `marks.py` rule `placement`: no dynamic is left above the staff (5/8/13 before, 0 now). |
