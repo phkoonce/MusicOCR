@@ -415,11 +415,21 @@ the combined score. Per-part options for such books: `old_bass_clef` (old-notati
 octave-up bass clef, notes up an octave), `title`, `composer`, and a per-part `source_pdf` when each
 part is its own PDF (`musicocr/scoreops/retouch.py`, `musicocr/batch.py`).
 
+**Rehearsal marks, whatever the edition prints.** Every page is searched for rings *and* boxes (no setting) and the
+label inside each is read from a contact sheet (a lone digit or letter defeats Vision, a row of them does not):
+`<rehearsal>#12</rehearsal>`, `#C`, or `#` when unread. `musicocr/assemble/labels.py` decides the book's style, number
+or letter, by vote; a label of the other kind is a misread (an 8 for a B) and counts as unread. Unread labels are filled
+in the style (the one after the last, 1 after a restart), so a book comes out all numbers or all letters. Marks that at
+least half the parts print define stretches (`musicocr/assemble/anchored.py`: the plurality length, a part that lost or
+invented a bar is aligned by rhythm inside its own stretch only); with fewer than three agreed marks, or when the
+book has bar numbers, the usual alignment is kept and the marks serve as a second opinion: a part whose copy of an
+agreed mark sits more than a bar from the others' is reported and the bar flagged ("check"). Marks the PDF text layer
+carries (plain `A`, `12`) count for that check too. A lone `1` is the label Vision most often drops.
+
 What `combine` also does for such a book, by voting over the parts (the same marks are printed in every part):
 
-- **Rehearsal marks.** The circled numbers are found by shape on the page image (`musicocr/text/circles.py`; OCR
-  never reads them), placed above their bar (or under the staff), and numbered A, B, C ... in order, written once
-  (`musicocr/assemble/rehearsal.py`; needs two parts to agree).
+- **Rehearsal marks.** Found by shape (above), placed above their bar (or under the staff), written once with
+  their printed numbers or letters (`musicocr/assemble/rehearsal.py`; needs two parts to agree).
 - **Repeats and 1st/2nd endings** that two or more parts read are written to every part
   (`musicocr/assemble/repeats.py`).
 - **Key changes** a part hung on a system's first bar move to the bar another part reads the glyph on

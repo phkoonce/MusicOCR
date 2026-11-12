@@ -31,7 +31,9 @@ import sys
 from pathlib import Path
 
 RATIO = {2: "2/3", 3: "3/2"}
-MIN_TALL_SP = 3.5
+MIN_TALL_SP = 3.5           # a tuplet digit is shorter than this (staff spaces), the count of a multi-rest taller
+MIN_COUNT_SP = 2.5          # ... but a digit over a detected multi-rest H-bar is its count whatever its size: scans
+                            # set it 3.1-3.4 spaces tall (Goldfaden), under the bound that suits engraved parts
 
 
 def _install() -> None:
@@ -79,7 +81,7 @@ def _install() -> None:
 
     def _texts_near(texts, box, sp):
         if texts:
-            texts = [t for t in texts if "xyxy" in t and (t["xyxy"][3] - t["xyxy"][1]) >= MIN_TALL_SP * sp]
+            texts = [t for t in texts if "xyxy" in t and (t["xyxy"][3] - t["xyxy"][1]) >= MIN_COUNT_SP * sp]
         return orig_near(texts, box, sp)
 
     w._texts_near = _texts_near

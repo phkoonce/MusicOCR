@@ -41,6 +41,7 @@ from musicocr.assemble import voltas as vt
 from musicocr.musicxml import check_direction, multirest_count
 from musicocr.scoreops.marks import MarksOptions, normalize_marks
 from musicocr.assemble.text_system import text_keys, unify_system_text
+from musicocr.assemble.anchored import check_against_marks, lay_out_by_marks
 from musicocr.assemble.rehearsal import unify_rehearsal
 from musicocr.assemble.repeats import unify_repeats
 from musicocr.assemble.text_tempo import opening_tempo, unify_tempo
@@ -1004,10 +1005,17 @@ def combine(parts: Sequence[PartInput], title: str, *, pdftotext: str = "pdftote
     systems_of = systems_of or ((lambda pdf: printed_page_systems(pdf, pdftotext)) if reads_pdfs else None)
     report: List[str] = []
     data = _read_parts(parts, read_pages, starts_of, spans_of, bar_numbers, report, systems_of)
-    grid = _find_voltas(data, report)
-    total = _score_total(data, last_start_of, max_bar_of, report, grid)
-    ref = _plan_pages(data, total)
-    bars, flags = _lay_out_all(data, ref, total, bar_numbers, report)
+    by_marks = None if bar_numbers else lay_out_by_marks(data, report)    # ensemble book: align by rehearsal numbers
+    if by_marks:
+        total, bars, flags = by_marks
+        for d in data.values():
+            d["start"], d["target"], d["good"] = [1], [total], [False]
+    else:
+        grid = _find_voltas(data, report)
+        total = _score_total(data, last_start_of, max_bar_of, report, grid)
+        ref = _plan_pages(data, total)
+        bars, flags = _lay_out_all(data, ref, total, bar_numbers, report)
+        check_against_marks(bars, flags, report)     # rehearsal labels as a second opinion on the layout
     spec, shifts, unpitched, changes = _consensus(bars, data, total, title, report)
 
     summary = dict(total=total, parts=len(data), key_meter=changes, bad_bars=0, repairs=0)

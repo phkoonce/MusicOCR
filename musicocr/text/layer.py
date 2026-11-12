@@ -180,25 +180,43 @@ def build_items(words: Sequence[Word], staves: Sequence[Staff], lex: Optional[Le
     return res
 
 
-CIRCLE_TEXT = "#"        # the number is not read: the marks are numbered in order once the parts are combined
+CIRCLE_TEXT = "#"        # a boxed or ringed rehearsal mark: "#" + what was read inside ("#12", "#C"), "#" if nothing
 
 
-def circled_marks(img, staves: Sequence[Staff], cfg: Optional[TextLayerSettings] = None) -> List[dict]:
-    """Rehearsal marks drawn as a ring around a number, found by shape (``musicocr.text.circles``). Above a staff
-    like any rehearsal mark, or below it (printed under the bar when other text sits above)."""
-    from musicocr.text.circles import DEFAULT_SP, find_circles
+def shape_marks(img, staves: Sequence[Staff], cfg: Optional[TextLayerSettings] = None) -> List[dict]:
+    """Rehearsal marks drawn as a frame round a number or letter, found by shape: rings and boxes both, on every page
+    (``musicocr.text.circles``), whichever the edition uses. Each is read for its label (``read_mark_labels``);
+    ``#`` alone when that failed. Above a staff like any rehearsal mark, or below it (printed under the bar when
+    other text sits above), or resting on its top line (a box); ``circle`` items are placed at the barline they mark."""
+    from musicocr.text.circles import DEFAULT_SP, find_boxes, find_circles, read_mark_labels
     cfg = cfg or TextLayerSettings()
     if cfg.mode == "off":
         return []
     sp = sorted(s.sp for s in staves)[len(staves) // 2] if staves else DEFAULT_SP
-    out = []
-    for c in find_circles(img, sp):
-        si, d, above = _zone(c.box, staves) if staves else (0, 1.0, True)      # no staves read here: the engine places it
+    shapes = [(c, "ring") for c in find_circles(img, sp)]
+    for c in find_boxes(img, sp):
+        if not any(_overlap(c.box, r.box) for r, _ in shapes):          # one frame, one mark
+            shapes.append((c, "box"))
+    keep = []
+    for c, shape in shapes:
+        where = c.box
+        if shape == "box":              # a box may rest right on the staff's top line: judge it from its centre
+            cx, cy = (c.box[0] + c.box[2]) / 2, (c.box[1] + c.box[3]) / 2
+            where = (cx, cy, cx, cy)
+        si, d, above = _zone(where, staves) if staves else (0, 1.0, True)   # no staves read: the engine places it
         if d <= 0.3 or d > (cfg.above_sp if above else cfg.below_sp):      # inside a staff or far from every staff
             continue
-        out.append({"text": CIRCLE_TEXT, "kind": "rehearsal", "staff": si, "xyxy": [round(v, 1) for v in c.box],
-                    "style": "", "source": "shape", "flag": False, "circle": True})
-    return out
+        keep.append((c, shape, si))
+    labels: dict = {}
+    for shape in ("ring", "box"):       # one contact sheet per shape: only real candidates are read, so a stray
+        group = [k for k in keep if k[1] == shape]       # ring found on a title or a flat cannot spoil a row of boxes
+        labels.update(zip((id(k[0]) for k in group), read_mark_labels(img, [k[0] for k in group])))
+    out = []
+    for c, shape, si in keep:
+        out.append({"text": CIRCLE_TEXT + (labels.get(id(c)) or ""), "kind": "rehearsal", "staff": si,
+                    "xyxy": [round(v, 1) for v in c.box], "style": "", "source": "shape", "flag": False,
+                    "circle": True, "shape": shape})
+    return sorted(out, key=lambda it: (it["xyxy"][1], it["xyxy"][0]))
 
 
 def _dedupe(items: List[dict]) -> List[dict]:
@@ -270,7 +288,7 @@ def write_textlayer_json(png: Path, cfg: TextLayerSettings, log=None, **kw) -> i
     from PIL import Image
     img = Image.open(png).convert("L")
     res = build_items(words, staves, cfg=cfg, dets=dets, img=img)
-    res.items += circled_marks(img, staves, cfg)
+    res.items += shape_marks(img, staves, cfg)
     dropped.write_text(json.dumps(res.dropped, indent=0))
     if not res.items:
         dst.unlink(missing_ok=True)
