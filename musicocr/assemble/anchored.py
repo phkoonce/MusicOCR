@@ -53,6 +53,50 @@ def part_marks(bars: Sequence[Optional[Src]], style: Optional[str] = "number") -
     return out
 
 
+def raw_marks(bars: Sequence[Optional[Src]], style: Optional[str] = "number") -> List[Tuple[int, int]]:
+    """``[(bar index, number)]`` of the labelled marks in bar order, with no movement bookkeeping."""
+    return [(i, n) for i, src in enumerate(bars) if src is not None for n in mark_numbers(src[0], style) if n is not None]
+
+
+START_SLACK = 10          # bars a part's first matched mark may sit from the reference's (plus START_DRIFT of its position)
+START_DRIFT = 0.1
+JUMP_SLACK = 6            # bars the offset to the reference may change between two matched marks (plus JUMP_DRIFT of their gap)
+JUMP_DRIFT = 0.3
+
+
+def rematch_marks(raw: Sequence[Tuple[int, int]], ref: Dict[Label, int]) -> Dict[Label, int]:
+    """A part's marks labelled by where the reference part has the same number rather than by counting
+    movements itself: a movement's opening labels (a lone "1" is often unread) may be missing here, which makes the
+    counting carry the movement before on, and every label after it lands in the wrong one. The marks are matched to
+    the reference's in order, equal numbers only, with the offset between the two parts' positions changing slowly;
+    the longest such chain wins. What does not fit is a misread and is left out."""
+    cand = [(j, label, r) for j, (_, n) in enumerate(raw) for label, r in ref.items() if label[1] == n]
+    cand.sort(key=lambda c: (c[0], c[2]))
+    if not cand:
+        return {}
+    best: List[float] = []
+    prev: List[int] = []
+    for k, (j, label, r) in enumerate(cand):
+        i = raw[j][0]
+        d = i - r
+        score, back = (1.0 if abs(d) <= START_SLACK + START_DRIFT * r else -1e9), -1
+        for q in range(k):
+            j0, _, r0 = cand[q]
+            if j0 < j and r0 < r and best[q] > -1e8:
+                d0 = raw[j0][0] - r0
+                if abs(d - d0) <= JUMP_SLACK + JUMP_DRIFT * (r - r0) and best[q] + 1.0 - 0.001 * abs(d - d0) > score:
+                    score, back = best[q] + 1.0 - 0.001 * abs(d - d0), q
+        best.append(score)
+        prev.append(back)
+    k = max(range(len(cand)), key=lambda q: best[q])
+    out: Dict[Label, int] = {}
+    while k >= 0 and best[k] > -1e8:
+        j, label, _ = cand[k]
+        out[label] = raw[j][0]
+        k = prev[k]
+    return out
+
+
 def _consensus_labels(marks: Dict[str, Dict[Label, int]], need: int) -> List[Label]:
     votes = Counter(l for m in marks.values() for l in m)
     return sorted(l for l, c in votes.items() if c >= need)
@@ -82,6 +126,10 @@ def lay_out_by_marks(data: Dict[str, Dict[str, Any]], report: List[str]):
     runs = {pid: [s for pg in d["pages"] for s in pg] for pid, d in data.items()}
     style = book_style(m for r in runs.values() for m, _div in r)
     marks = {pid: part_marks(r, style) for pid, r in runs.items()}
+    if len(marks) > 2:
+        lead = max(sorted(marks), key=lambda pid: len(marks[pid]))
+        marks = {pid: m if pid == lead else rematch_marks(raw_marks(runs[pid], style), marks[lead])
+                 for pid, m in marks.items()}
     need = max(2, (len(runs) + 1) // 2)
     labels = _consensus_labels(marks, need)
     if len(labels) < MIN_COMMON:

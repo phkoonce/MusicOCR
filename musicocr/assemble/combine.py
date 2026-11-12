@@ -298,6 +298,46 @@ def align_to_target(rest_src: Sequence[float], ref: Sequence[float],
     return slots
 
 
+def _inherit_declaration(src: Src, dropped: Sequence[Src]) -> None:
+    """Source bars dropped from the layout may carry the key / time signature the bars after them rely on (a
+    page's first bar, read as one bar too many): what the next kept bar does not declare itself goes on to it."""
+    have_key, have_meter = _declared(src[0])
+    key, meter = None, None
+    for d in dropped:                       # the last declaration among them is the one in force
+        k, mt = _declared(d[0])
+        key, meter = (k if k is not None else key), (mt if mt is not None else meter)
+    key = key if have_key is None else None
+    meter = meter if have_meter is None else None
+    if key is None and meter is None:
+        return
+    att = src[0].find("attributes")
+    if att is None:
+        att = ET.Element("attributes")
+        src[0].insert(0, att)
+    if key is not None:
+        el = ET.Element("key")
+        ET.SubElement(el, "fifths").text = str(key)
+        att.insert(1 if att.find("divisions") is not None else 0, el)
+    if meter is not None:
+        el = ET.Element("time")
+        ET.SubElement(el, "beats").text = str(meter[0])
+        ET.SubElement(el, "beat-type").text = str(meter[1])
+        att.insert(sum(att.find(t) is not None for t in ("divisions", "key")), el)
+
+
+def _hand_on_declarations(pg: Sequence[Src], slots: Sequence[Optional[int]]) -> None:
+    """Every source bar the alignment dropped passes its key / time signature on to the next bar it kept."""
+    kept = {s for s in slots if s is not None}
+    run: List[Src] = []
+    for i, src in enumerate(pg):
+        if i not in kept:
+            run.append(src)
+            continue
+        if run:
+            _inherit_declaration(src, run)
+        run = []
+
+
 def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int, report: List[str],
                   decl_ref: Optional[List[float]] = None,
                   rhythm_ref: Optional[List[List[Any]]] = None,
@@ -351,6 +391,7 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
                           f"{[a + k for k in dropped]}, inserted rest bar(s) at {added}"
                           + (f", {len(outside)} of them outside the printed multi-rests {outside}"
                              if outside else "") + " -- check")
+            _hand_on_declarations(pg, slots)
             seq.extend(None if s is None else pg[s] for s in slots)
             for b in added:
                 if not d["rests"] or b not in d["rests"]:      # inside a printed multi-rest: a lost count, not a doubt
@@ -394,6 +435,7 @@ def _lay_out_segments(pid: str, d: Dict[str, Any], ref: Dict[int, float], pg: Li
         report.append(f"  {pid} bars {s0}-{s1 - 1} (page starting bar {a}): {len(part)} bars read for {n} printed"
                       f" -> aligned within its systems; dropped source bar(s) {[s0 + k for k in dropped]}, "
                       f"inserted rest bar(s) at {added} -- check")
+        _hand_on_declarations(part, slots)
         seq.extend(None if s is None else part[s] for s in slots)
         for b in added:
             if b not in d["rests"]:
@@ -601,23 +643,35 @@ def _read_parts(parts: Sequence[PartInput], read_pages, starts_of, spans_of, bar
                           + " -> checked against the other parts' total only")
         spans = spans_of(p.pdf) if p.pdf and p.pdf.exists() else []
         sysinfo = _system_info(p, pages, starts, systems_of, bar_numbers)
-        _increasing(p.pid, starts, sysinfo, report)
+        _increasing(p.pid, starts, sysinfo, report, [len(pg) for pg in pages])
         data[p.pid] = dict(p=p, pages=pages, starts=starts, spans=spans,
                            rests={b for a, e in spans for b in range(a, e + 1)}, sysinfo=sysinfo)
     return data
 
 
+BEHIND_SLACK = 0.15     # a page start may fall this share (min. 4 bars) behind where the bars read so far put it
+
+
 def _increasing(pid: str, starts: List[Optional[int]], sysinfo: List[Optional[Dict[str, Any]]],
-                report: List[str]) -> None:
+                report: List[str], lens: Optional[Sequence[int]] = None) -> None:
     """Bar numbers only grow from page to page: a page start (or system number) not above everything
-    before it is a misread ("103" read as "13") and is dropped; the page then follows on from the one before."""
+    before it is a misread ("103" read as "13") and is dropped; the page then follows on from the one before.
+    ``lens`` (bars read per page) also lets it reject a start far *behind* where the pages before it,
+    unnumbered ones included, already reach (a lost bar only makes that reach short, never long)."""
     top = 0
+    reach = 1            # the bar the next page starts at if it follows on from the bars read so far
     for i, s in enumerate(starts):
-        if s is not None and s <= top and i:
+        if s is not None and i and lens is not None and reach - s > max(4, BEHIND_SLACK * reach):
+            report.append(f"  {pid}: page {i + 1} starts at bar {s}, but the {reach - 1} bars read before it "
+                          f"reach past that -> start ignored")
+            starts[i] = None
+        elif s is not None and s <= top and i:
             report.append(f"  {pid}: page {i + 1} starts at bar {s}, not above bar {top} -> start ignored")
             starts[i] = None
         elif s is not None:
             top = max(top, s)
+        if lens is not None:
+            reach = (starts[i] if starts[i] is not None else reach) + lens[i]
         info = sysinfo[i]
         if info is not None:
             for k in sorted(info["anchors"]):
@@ -693,6 +747,20 @@ def _find_voltas(data: Dict[str, Dict[str, Any]], report: List[str]) -> "vt.Grid
     return grid
 
 
+TOTAL_AGREE = 0.06      # parts' totals this close (min. 2 bars) read the same piece; a lone far-off total is a misread
+
+
+def _agreeing_totals(cand: Sequence[int]) -> List[int]:
+    """The totals of the largest group of parts that agree to within ``TOTAL_AGREE`` (a tie goes to the group whose
+    commonest total is the commoner, then to the larger). Without this, four parts reading 79, 80, 85 and 144 bars are a four-way tie that the largest
+    wins, though the 144 is one part that read a neighbouring piece's systems or a staff twice."""
+    def group(t: int) -> List[int]:
+        return [x for x in cand if abs(x - t) <= max(2, round(TOTAL_AGREE * t))]
+    same = Counter(cand)
+    best = max(cand, key=lambda t: (len(group(t)), same[t], t))     # then the total most parts read exactly
+    return group(best)
+
+
 def _score_total(data: Dict[str, Dict[str, Any]], last_start_of, max_bar_of, report: List[str],
                  grid: Optional["vt.Grid"] = None) -> int:
     """The score's bar count: the consensus of the parts' last-page totals, bounded below by the print."""
@@ -718,6 +786,7 @@ def _score_total(data: Dict[str, Dict[str, Any]], last_start_of, max_bar_of, rep
     # real music), a bar read too many only pads, so the largest of them is taken
     anchored = [t for t in (_anchored_total(d) for d in data.values()) if t]
     if cand:
+        cand = _agreeing_totals(cand)
         top = Counter(cand).most_common()
         total = max(t for t, c in top if c == top[0][1])     # a tie goes to the larger total
     else:                        # every part is short (lost multi-rests): the print's own lower bound
