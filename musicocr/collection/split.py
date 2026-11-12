@@ -150,6 +150,20 @@ def consensus(tables: Sequence[List[Entry]]) -> List[Entry]:
 
 
 _NUM_TITLE = re.compile(r"^(\d{1,3})\.\s+\S")
+_BARE_MIN_X = 0.2
+
+
+_PAGE_THEN_HEADING = re.compile(r"^\d{1,3}\s+(\d{1,3}\.\s+\S.*)$")
+
+
+def _strip_page_number(ln: dict) -> Tuple[str, float]:
+    """Line text and left edge without a printed page number the OCR joined to the heading on the page's top
+    line ("18 10. Largo religioso": the heading of piece 10, the page number 18 in the corner)."""
+    t = ln["text"].strip()
+    m = _PAGE_THEN_HEADING.match(t)
+    if m and len(ln["words"]) > 2 and re.fullmatch(r"\d{1,3}", ln["words"][0]["text"]):
+        return m.group(1), ln["words"][1]["xyxy"][0]
+    return t, ln["x0"]
 
 
 def _heading(lines: List[dict], i: int, e: Entry, width: int, by_title: bool = True) -> Optional[int]:
@@ -157,9 +171,12 @@ def _heading(lines: List[dict], i: int, e: Entry, width: int, by_title: bool = T
     or in front of the title, else (``by_title``) a line that starts with its title."""
     want = _norm(e.title)
     for idx in range(i, len(lines)):
-        t = lines[idx]["text"].strip()
+        t, x0 = _strip_page_number(lines[idx])
         m = _NUM.match(t) or _NUM_TITLE.match(t)
-        if m and int(m.group(1)) == e.num and 0.1 * width < lines[idx]["x0"] < 0.7 * width:
+        # A number alone on a line is a heading only when centred: at the left margin (x0 ~ 0.1) it is the bar
+        # number opening a system ("13" above a staff), which used to pose as the heading of piece 13.
+        lo = _BARE_MIN_X if _NUM.match(t) else 0.1
+        if m and int(m.group(1)) == e.num and lo * width < x0 < 0.7 * width:
             return idx
     if not by_title:
         return None
@@ -197,7 +214,7 @@ def find_pieces(pdf: Path, entries: Sequence[Entry], first_page: int, last_page:
                 e = entries[k + skip]
                 top = lines[hit]["y0"]
                 if not _NUM.match(lines[hit]["text"].strip()) and hit and _NUM.match(lines[hit - 1]["text"].strip()) \
-                        and top - lines[hit - 1]["y0"] < 0.12 * h:
+                        and top - lines[hit - 1]["y0"] < 0.12 * h and lines[hit - 1]["x0"] > _BARE_MIN_X * w:
                     top = lines[hit - 1]["y0"]          # "4." printed on a line of its own above the title
                 found.append(Found(e.num, pg, top / h))
                 i, k, got = hit + 1, k + skip + 1, True
@@ -293,8 +310,9 @@ def _cut(gray: Image.Image, y: int, dpi: int) -> int:
 
 
 def build_piece_pdfs(pdf: Path, found: Sequence[Found], last_page: int, out_dir: Path, prefix: str,
-                     tmp: Path) -> Dict[int, Path]:
-    """One PDF per found piece (cropped page images at ``OUT_DPI``); ``{piece number: pdf}``."""
+                     tmp: Path, only: Optional[Sequence[int]] = None) -> Dict[int, Path]:
+    """One PDF per found piece (cropped page images at ``OUT_DPI``); ``{piece number: pdf}``. ``only``
+    limits the work to those piece numbers (the cuts of their neighbours are still taken into account)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     cache: Dict[int, Image.Image] = {}
 
@@ -305,12 +323,19 @@ def build_piece_pdfs(pdf: Path, found: Sequence[Found], last_page: int, out_dir:
         return cache[p]
 
     cuts: Dict[Tuple[int, int], int] = {}      # (piece index, page) -> row of the cut above its heading
+    keep = set(only) if only is not None else None
+    wanted = {i for i, f in enumerate(found) if keep is None or f.num in keep}
+    wanted |= {i + 1 for i in wanted if i + 1 < len(found)}
     for i, f in enumerate(found):
+        if i not in wanted:
+            continue
         im = page(f.page)
         y = int(f.y * im.height)
         cuts[(i, f.page)] = 0 if f.y < 0.12 else _cut(im, y, OUT_DPI)
     result: Dict[int, Path] = {}
     for i, f in enumerate(found):
+        if keep is not None and f.num not in keep:
+            continue
         nxt = found[i + 1] if i + 1 < len(found) else None
         end_page = nxt.page if nxt else last_page
         images = []

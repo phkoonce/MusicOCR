@@ -28,3 +28,29 @@ def test_stale_page_files_of_a_longer_earlier_run_are_not_combined(tmp_path):
     (tmp_path / "report.json").write_text(json.dumps({"page_files": [str(p) for p in pages[:2]]}))
     assert _pages_of_last_run(tmp_path, pages) == pages[:2]
     assert _pages_of_last_run(tmp_path / "none", pages) == pages      # no report: all of them
+
+
+def _line(text, x0, y0=100, w=1000):
+    words = [{"text": t, "xyxy": [x0 + 60 * i, y0, x0 + 60 * i + 50, y0 + 20]} for i, t in enumerate(text.split())]
+    return {"text": text, "x0": x0, "y0": y0, "y1": y0 + 20, "words": words}
+
+
+def test_a_bar_number_at_the_left_margin_is_not_a_heading():
+    from musicocr.collection.split import Entry, _heading
+    lines = [_line("13", 110, 250), _line("13. Ah, fors'e lui", 400, 700)]
+    assert _heading(lines, 0, Entry(13, "Ah, fors'e lui", ""), 1000) == 1
+
+
+def test_a_page_number_joined_to_the_heading_line_is_ignored():
+    from musicocr.collection.split import Entry, _heading
+    lines = [_line("18 10. Largo religioso", 80, 20)]
+    assert _heading(lines, 0, Entry(10, "Largo religioso", ""), 1000) == 0
+
+
+def test_a_bar_number_above_the_heading_does_not_move_its_top(monkeypatch):
+    from pathlib import Path
+    from musicocr.collection import split
+    lines = [_line("39", 80, 230), _line("8. Chor der Priester", 360, 320)]
+    monkeypatch.setattr(split, "page_lines", lambda *a, **k: (lines, 1000, 1000))
+    found = split.find_pieces(Path("x.pdf"), [split.Entry(8, "Chor der Priester", "")], 1, 1, Path("."), log=lambda s: None)
+    assert found[0].y == 0.32
