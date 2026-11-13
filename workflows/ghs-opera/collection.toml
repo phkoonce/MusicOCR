@@ -1,0 +1,32 @@
+# German Hornsound "the books" Vol. 2 Opera -- four horn books, the pieces' table of contents is scanned (pages 2-3), pieces
+# share pages, bar numbers are printed. Horn books use the old bass clef (octave-low), fixed by old_bass_clef.
+name = "ghs-opera"
+title = "the books Vol. 2 Opera - Horns 1-4"
+key_prefix = "GO_"
+instrument = "horn in f"
+part_name = "Horn"
+part_id_prefix = "h"
+bar_numbers = true
+toc_pages = "2-3"
+first_page = 4
+input_dir = "input/ghs-opera"
+
+[[books]]
+id = "1"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/GHS Opera/GHS Opera H1.pdf"
+old_bass_clef = true
+
+[[books]]
+id = "2"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/GHS Opera/GHS Opera H2.pdf"
+old_bass_clef = true
+
+[[books]]
+id = "3"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/GHS Opera/GHS Opera H3.pdf"
+old_bass_clef = true
+
+[[books]]
+id = "4"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/GHS Opera/GHS Opera H4.pdf"
+old_bass_clef = true
