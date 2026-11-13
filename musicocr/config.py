@@ -96,6 +96,7 @@ class CopisteriaConfig:
     slur_filter: bool = True   # drop a tall box-shaped curve between two notes across a bar line (a stray curve, not a slur)
     text_tuplets: bool = True   # small "2"/"3" digits from the text layer mark duplets/triplets (copisteria_run.py)
     synth_multirest: bool = True   # synthesise a multiRest where a tall, centred, non-stacked count digit sits over an empty bar
+    read_count_digits: bool = True   # read the bold count over each detected multi-rest from the pixels when OCR missed/misread it
     small_graces: bool = False   # before reading: small noteheads the detector called "not grace" become grace notes
     fix_pickup: bool = True   # page 1: make a padded opening bar a real pickup, show its time signature
     reveal_gaps: bool = True   # gaps Copisteria left (missed symbols) -> visible coloured rests
@@ -141,6 +142,7 @@ class CopisteriaConfig:
                    slur_filter=bool(d.get("slur_filter", True)),
                    synth_multirest=bool(d.get("synth_multirest", True)),
                    small_graces=bool(d.get("small_graces", False)),
+                   read_count_digits=bool(d.get("read_count_digits", True)),
                    staff_rank=int(d.get("staff_rank", 0)),
                    staff_rank_auto=bool(d.get("staff_rank_auto", False)),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),

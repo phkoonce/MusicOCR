@@ -77,6 +77,15 @@ def run(ctx: PipelineContext) -> StageResult:
             ctx.log(f"  {img.stem}: ring search skipped ({type(exc).__name__}: {exc})")
             return []
 
+    bank_cache: list = []
+
+    def _digit_bank():
+        """Shipped digit templates + this part's own OCR-read counts (built once per run)."""
+        if not bank_cache:
+            from musicocr.text.countdigits import default_bank
+            bank_cache.append(default_bank(ctx.workdir / "pages"))
+        return bank_cache[0]
+
     def _prepare_dets(img: Path, texts_found: bool) -> None:
         # Detect first (cached beside the page, the pipeline then reuses it), then adjust the
         # cached detections before the evidence model reads them: bars the detector found
@@ -100,6 +109,20 @@ def run(ctx: PipelineContext) -> StageResult:
                         ctx.log(f"  {img.stem}: empty-bar fill skipped (larger-scale detection failed)")
                     else:
                         ctx.log(f"  {img.stem}: empty-bar fill: {(res.output.strip().splitlines() or [''])[-1]}")
+                if cfg.read_count_digits:
+                    if texts.exists():
+                        # a tempo figure ("= 80") over a bar is not its count: needs the page's tempo phrases, so the
+                        # text layer is written once here, on the fresh detections (and again below, on the adjusted ones)
+                        from musicocr.text.countdigits import drop_tempo_digits
+                        _write_text_layer(img, int(img.stem[1:]), bool(pdftotext and source_pdf.exists()))
+                        drop_tempo_digits(texts, img.with_name(f"{img.stem}.textlayer.json"), log=ctx.log)
+                    # the bold counts that OCR missed or misread, read from the pixels over each detected H-bar
+                    try:
+                        from musicocr.text.countdigits import read_counts
+                        if read_counts(img, dets, texts, _digit_bank(), log=ctx.log, rings_fn=lambda d: _rings(img, dets)):
+                            texts_found = True
+                    except Exception as exc:  # noqa: BLE001
+                        ctx.log(f"  {img.stem}: count-digit reader skipped ({type(exc).__name__}: {exc})")
                 if texts_found:
                     drop_digit_repeat_marks(dets, texts, log=ctx.log)
                     if cfg.synth_multirest:

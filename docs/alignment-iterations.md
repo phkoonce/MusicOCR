@@ -351,3 +351,71 @@ No generic alignment cause left in these: lost multi-rest counts (digit not read
 ### Plateau
 Alignment-side changes are now worth a few bars per corpus (this round: p89 -5/-4, p76 -6); the remaining error is on the OMR side (count digits, shared-page neighbours, single-line percussion). Another alignment round is not worth it; a digit reader for bold counts is.
 Tests: `tests/test_round6.py` (4). Full suite 508 passed.
+
+## 2026-11-13, round 7: a reader for the bold count digits above multi-rests
+
+Baselines = the on-disk outputs recombined with the HEAD combine code (`output/scorecards/r7-base-*.json`; corpora not touched: `r6-final-*`),
+"final" = the adopted on-disk outputs recombined (`r7-final-*.json`). Numbers: inserted / dropped / wrong-length bars. No combine code changed.
+
+| corpus | before | after (adopted) |
+|---|---|---|
+| szeged-alpen | 246 / 35 / 85 (total 296) | 73 / 55 / 79 (total 288; tbn1's last system prints 281-287) |
+| szeged-frozen (vs ref extra/missing) | 118 / 1 / 2 (184 / 157) | 84 / 1 / 2 (170 / 143) |
+| braveheart-horns | 52 / 0 / 117 (8 horns read 67-87 of 124) | 9 / 0 / 8 (horns read 122-129 of 129) |
+| braveheart-tubas | 46 / 0 / 10 | 0 / 0 / 3 (bars 129) |
+| goldfaden | 67 / 69 / 126 | 65 / 55 / 127 |
+| ghs-opera | 161 / 42 / 39 | 156 / 42 / 39 (p01, p21, p23; p10 not adopted: +2) |
+| ghs-xmas | 146 / 17 / 189 | 141 / 19 / 178 (p02, p30; p15 not adopted: +1) |
+| paxman-all, gb-all, airbender | 327/67/210, 133/84/262, 97/0/8 | identical (the reader finds nothing to change there) |
+| GB p01-03 vs refs (extra/missing) | 9/9, 10/10, 16/24 | identical (output not touched) |
+| Zerberus vs ref | 76 / 76 | 76 / 76 |
+
+### The reader (`musicocr/text/countdigits.py`, `[omr.copisteria] read_count_digits`, on by default)
+For each detected `multiRest` (conf >= 0.5) the strip above the H-bar (9 staff spaces up to the staff's top line, 4 spaces wider than the bar each side) is
+binarised and cut into ink components of count-glyph size (1.6-6 spaces); components of one number share a baseline and a height (bands), a component wider than
+its height is two glued digits and is cut at the thinnest column ("11", "12", "19" are glued in the Szeged and Braveheart prints), and the group centred
+over the bar (<= 0.3 of its width + 1 space) that sits just above the staff is the number. Glyphs are classified by nearest template (28x28, blurred, correlation; a class
+scores the mean of its three best templates, so one mislabelled template cannot carry a class): templates are **self-supervised** from the digits OCR read
+confidently over multi-rests (`harvest_dir`: only when the component count equals the text length and the OCR box is bold, >= 2.2 spaces tall), shipped as
+`musicocr/text/data/countdigits_bank.npz` (240 kB, `scripts/build_digit_bank.py`: up to 40 varied templates per class from Alpen, Frozen, opera, xmas, airbender, Goldfaden, Zerberus; Braveheart's
+own OCR gave no counts to harvest) plus the part's own OCR-read counts at run time, plus synthetic bold-font renderings as a discounted fallback for a class the books
+never showed, against a "not a digit" class of letters and dynamics (a "p" or "f" over a bar matches as well as a "2" otherwise). `drop_contradicted` removes templates
+that other classes outvote (Vision read opera p21 h3's bold "9" as "6": that template poisoned class 6 and made every Braveheart 9 ambiguous until removed).
+A read is accepted only with similarity >= 0.84 and a margin of 0.05 over the runner-up; the number must be 2-199, not at a system's start (bar number), not inside a circled
+rehearsal number. It fills a missing count and replaces an OCR number the engine would have taken as the count only on a firm read (>= 0.93, margin 0.08).
+Written into `<page>.texts.json` (`"source": "countdigits"`) in `_prepare_dets`, before the multi-rest rules, so everything downstream is unchanged and pages with no OCR digit at all
+(Braveheart) now get their counts. Two more fixes the Braveheart re-runs exposed: **a tempo figure over a bar is not its count** ("Giocoso = 128" over a 5-bar rest became a
+128-bar rest; "Andante sostenuto = 80" over a whole rest became 80 bars: horns read 252 and tubas 208 of 129 bars): digit boxes inside a `kind = "tempo"` phrase of the page's text layer are
+dropped (`drop_tempo_digits`; the layer is now also written once on the fresh detections, before the multi-rest rules), and any other OCR number the engine would take as the count
+that a firm read contradicts is dropped (`rivals`). Paxman is not served: its counts are small thin digits (2-2.5 spaces) and the reader abstains there (the three H-bars with
+no OCR count are spiral-binding false detections: no glyph, no read); the template bank was not built from it.
+
+### Digit accuracy (sample: 714 H-bars of the melodic corpora with a located bold count; paxman excluded)
+- 180 counts OCR **missed** (Alpen 32, Frozen 9, opera 5, xmas 5, Goldfaden 11, Braveheart horns 79, tubas 39): read from the page by the reader and checked one by one on contact sheets of the
+  crops: **180/180 correct**, none rejected except one non-digit ("spl" text: correctly refused). The OCR got 0 of them.
+- 534 counts OCR **read** (label = the OCR text, optimistic): leave-one-out against all other samples: 519 identical, 14 abstain, 1 differs: opera p21 h3, where the page shows a 9 and Vision said 6
+  (the reader is right). So the reader alone is 520/534 = 97.4% with 0 wrong; where it abstains the OCR text stays.
+- Whole sample: OCR alone 533/714 = 74.7% (180 missed, 1 misread); OCR + reader 714/714 on this sample (all 180 gaps filled, the 9 corrected, abstentions keep the OCR number).
+  The only reader error met while tuning was a thin Goldfaden "7" read as "2" at similarity 0.81 (before the 0.84 floor; now abstains). Cross-book (shipped bank only, no own-book samples): Alpen 161/171, Frozen 61/61, opera 24/25, xmas 31/31, Goldfaden 5/48 (a thin font:
+  needs its own book's templates, which it has at run time), no wrong reads.
+
+### Re-runs and adoption
+`scripts/countdigits_offline_check.py output/<corpus>` lists the cached page-parts the reader would change: Alpen 22 page-parts (14 parts), Frozen 7, opera 6, xmas 5, Goldfaden 7, Braveheart
+horns 16 (8 parts), tubas 8, paxman / airbender / zerberus / gb 0. Those pages were re-run through the batch (staged copies in `output/iter/<corpus>-r7`, only the page `pNNN.musicxml`
+deleted, `--redo`), recombined with the on-disk rest, adopted **per piece** when inserted+dropped+wrong-length fell: all of Alpen (366 -> 207), Frozen (121 -> 87), Goldfaden (262 -> 247),
+Braveheart horns (169 -> 17) and tubas (56 -> 3); opera p01 (-1), p21 (4 -> 1 inserted: the 9), p23 (-1), not p10 (h1/h3 re-reads: +2); xmas p02 (45 -> 32), p30 (-1), not p15 (+1). The combined
+`.mscz` of every adopted piece was regenerated (`output/<corpus>/_combined/...`, Braveheart tubas has one for the first time). Old parts and combined scores: `output/<corpus>-pre-round7/`.
+Hand-edited GB p01-03 and Drive files untouched. Scorecards `output/scorecards/r7-*.json`.
+
+Alpen note: the combined total moved 296 -> 288. The old 296 came from parts that lost multi-rest counts; tbn1's last system (281, 282, a 3-bar rest, two single bars) ends at bar 287, and 288 is
+the plurality of the parts now. Dropped bars rose (+20) because the tuba's pages 3-4 start at "42"/"265" in a way the aligner cannot reconcile (tuba bars 63-159: 55 read for 97 printed).
+
+### Cross-part vote at combine: not added
+`_extended_rests` (round 5) already turns slots that all other parts rest into "count read short or lost, added without doubt"; after the reader the Alpen report still has exactly one such stretch (the glockenspiel's tacet tail, 252 bars). The remaining insertions are
+lost bars among playing parts (tuba, tbn3/tbn5 pages 157-232), not counts; a vote cannot restore those, and a count the reader read wrongly would need parts that disagree, which was not seen.
+
+### Plateau / further rounds
+The count-digit lever is spent: Braveheart and Alpen moved by 150-250 bars, the rest by 5-35; every remaining count the OCR misses is now read, and no H-bar the detector missed has a bold digit over it (76 H-bar-shaped
+ink runs on Alpen's melodic parts not covered by a detection: none has a digit above). What is left is OMR-side: lost bars among playing parts (Alpen tuba, glockenspiel/percussion, Goldfaden), changing meters (xmas p02), shared-page neighbours (GB), paxman's thin small counts
+(a separate reader tuned on camera scans would be needed; only ~0 bars are known to be at stake after the round-5 rules). A further alignment/count round is not worthwhile; the next real gain is OMR quality on dense pages.
+Tests: `tests/test_round7.py` (11). Full suite 519 passed.

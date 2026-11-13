@@ -28,7 +28,7 @@ musicocr = "musicocr.cli:main"
 packages.find = { include = ["musicocr*"] }
 
 [tool.setuptools.package-data]
-"musicocr.text" = ["vision_ocr.swift", "lexicon.toml"]
+"musicocr.text" = ["vision_ocr.swift", "lexicon.toml", "data/*.npz"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

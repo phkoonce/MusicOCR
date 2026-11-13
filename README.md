@@ -279,6 +279,15 @@ default (on). Fixes declare ordering constraints (`after=`), which the registry 
   (`drop_digit_repeat_marks`: a numeral's curl reads as a segno), and a weak `note_breve` under a big
   digit, or a very weak one alone in its bar, is re-labelled as the multi-rest H-bar it is
   (the bar was otherwise read as an 8-beat breve swallowing its neighbour).
+* **Count-digit reader** (`read_count_digits`, on by default; `musicocr/text/countdigits.py`): Vision/rapidocr often miss
+  a bold lone digit over a multi-rest H-bar or misread it ("9" as "6"). For every detected `multiRest` the digit(s) above it
+  are cut from the page image (components of count-glyph size on one baseline, centred over the bar, glued pairs split), and
+  classified by nearest template: a shipped bank (`musicocr/text/data/countdigits_bank.npz`, built by `scripts/build_digit_bank.py`
+  from the digits OCR read confidently in several books), plus the part's own OCR-read counts, plus synthetic bold fonts
+  as fallback, against letters/dynamics as a "not a digit" class. A count below 2, an unsure match, a number at a system's start
+  (bar number) or in a circled rehearsal number is never written; an OCR digit is replaced only by a firm, overlapping read.
+  The count goes into `<page>.texts.json` (`"source": "countdigits"`), so the engine's count rules are unchanged.
+  `scripts/countdigits_offline_check.py output/<corpus>` lists the cached page-parts the reader would change.
 * `synth_multirest` (on by default) synthesises a multi-rest from a tall, centred,
   non-stacked count digit over an empty bar (stacked digits are a time signature).
   **Opt-in:** `small_graces` (size-based grace-note marking, tuned on timpani;
@@ -577,7 +586,7 @@ musicocr/
                        # multirest, measure_normalize
   musicxml/            # shared MusicXML helpers (measure lengths, writing files, page merge)
   scoreops/            # transpose, instruments, retouch, marks (dynamics/hairpin consistency)
-  text/                # page text and OCR, tempo/expression/technique words -> <direction>
+  text/                # page text and OCR, count-digit reader (countdigits.py), tempo/expression/technique words -> <direction>
                        # (page_text, ocr_backends, words, classify, layer, lexicon.toml)
   assemble/            # combine parts by printed bar number: combine, alignment/, unnumbered,
                        # scenes, mscz_sections, text_system, text_tempo
