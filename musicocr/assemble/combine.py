@@ -412,7 +412,8 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
         info = d["sysinfo"][pi] if d.get("sysinfo") else None
         if info and info.get("slots"):
             last_open = pi == len(d["pages"]) - 1 and len(pg) - info["breaks"][-1] == 1 and is_rest_only(pg[-1][0])
-            cuts = vt.segments(len(pg), a, t, info["breaks"], info["slots"], open_last=last_open)
+            cuts = vt.segments(len(pg), a, t, info["breaks"], info["slots"], open_last=last_open,
+                               rest=[is_rest_only(m[0]) for m in pg])
             if len(cuts) > 1:
                 _lay_out_segments(pid, d, ref, pg, a, t, cuts, prev_meter, seq, flags, report, decl_ref, final=last_open)
                 continue

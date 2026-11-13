@@ -53,9 +53,11 @@ def read_score(path: Path, barlen0: float | None = None) -> list[dict]:
     out = []
     for part in root.findall("part"):
         divisions, barlen = 1, barlen0
-        rhythm, strict, rest = [], [], []
+        rhythm, strict, rest, tm = [], [], [], []
         for m in part.findall("measure"):
             voice, events, prev, mrest = None, [], None, 0
+            merged: list = []               # events with tied notes (inside the bar) merged into one
+            tie_open = False
             for el in m:
                 if el.tag == "attributes":
                     d = el.findtext("divisions")
@@ -77,13 +79,24 @@ def read_score(path: Path, barlen0: float | None = None) -> list[dict]:
                     dur = round(float(el.findtext("duration", "0")) / divisions, 3)
                     if el.find("rest") is not None:
                         events.append((dur, "r"))
+                        merged.append((dur, "r"))
+                        tie_open = False
                         continue
                     p = el.find("pitch")
                     if p is None:       # unpitched percussion: rhythm only
                         events.append((dur, "u"))
+                        merged.append((dur, "u"))
+                        tie_open = False
                         continue
                     midi = 12 * int(p.findtext("octave", "4")) + STEP.get(p.findtext("step", "C"), 0) + int(float(p.findtext("alter", "0")))
-                    events.append((dur, "S" if prev is None else (midi - prev) % 12))
+                    ev = (dur, "S" if prev is None else (midi - prev) % 12)
+                    events.append(ev)
+                    ties = {t.get("type") for t in el.findall("tie")}
+                    if "stop" in ties and tie_open and merged and merged[-1][1] != "r":     # a tied continuation: one longer note
+                        merged[-1] = (round(merged[-1][0] + dur, 3), merged[-1][1])
+                    else:
+                        merged.append(ev)
+                    tie_open = "start" in ties
                     prev = midi
             total = round(sum(e[0] for e in events), 3)
             allrest = all(e[1] == "r" for e in events)
@@ -94,10 +107,11 @@ def read_score(path: Path, barlen0: float | None = None) -> list[dict]:
                 n = int(round(total / barlen))
             for _ in range(n):
                 dur_t = tuple(e[0] for e in events) if n == 1 else (barlen,)
+                tm.append((tuple(e[0] for e in merged), tuple(e[1] for e in merged)) if n == 1 else ((barlen,), ("r",)))
                 rhythm.append(dur_t)
                 strict.append((dur_t, tuple(e[1] for e in events) if n == 1 else ("r",)))
                 rest.append(allrest)
-        out.append({"name": names.get(part.get("id"), ""), "rhythm": rhythm, "strict": strict, "rest": rest, "barlen": barlen})
+        out.append({"name": names.get(part.get("id"), ""), "rhythm": rhythm, "strict": strict, "rest": rest, "tm": tm, "barlen": barlen})
     return out
 
 
@@ -119,7 +133,7 @@ def read_raw_part(out: Path, key: str) -> dict | None:
             if acc is None:
                 acc = {k: list(sc[0][k]) if isinstance(sc[0][k], list) else sc[0][k] for k in sc[0]}
             else:
-                for k in ("rhythm", "strict", "rest"):
+                for k in ("rhythm", "strict", "rest", "tm"):
                     acc[k] += sc[0][k]
         if acc:
             return acc
@@ -154,7 +168,8 @@ def bar_match(cand: dict, ref: dict) -> dict:
     pairs = lcs(cand["strict"], ref["strict"])
     rp = lcs(cand["rhythm"], ref["rhythm"])
     nr = sum(1 for i, _ in pairs if not cand["rest"][i])
-    return {"cand": len(cand["strict"]), "ref": len(ref["strict"]), "matched": len(pairs),
+    tp = lcs(cand["tm"], ref["tm"])           # the same with tied notes merged inside each bar (a tie written as two notes vs one longer)
+    return {"extra_tm": len(cand["tm"]) - len(tp), "missing_tm": len(ref["tm"]) - len(tp), "cand": len(cand["strict"]), "ref": len(ref["strict"]), "matched": len(pairs),
             "extra": len(cand["strict"]) - len(pairs), "missing": len(ref["strict"]) - len(pairs),
             "matched_notes": nr, "rhythm_matched": len(rp)}
 
@@ -301,8 +316,8 @@ def score_group(group, cpath, spec, ref_path, cache):
     if ref_path:
         refn = [len(p["strict"]) for p in ref]
         d["ref_bars"] = max(refn) if refn else 0
-        d["combined_vs_ref"] = {k: sum(r["combined_vs_ref"][k] for r in rows if "combined_vs_ref" in r) for k in ("matched", "extra", "missing", "matched_notes", "rhythm_matched")}
-        d["raw_vs_ref"] = {k: sum(r["raw_vs_ref"][k] for r in rows if "raw_vs_ref" in r) for k in ("matched", "extra", "missing", "matched_notes", "rhythm_matched")}
+        d["combined_vs_ref"] = {k: sum(r["combined_vs_ref"][k] for r in rows if "combined_vs_ref" in r) for k in ("matched", "extra", "missing", "matched_notes", "rhythm_matched", "extra_tm", "missing_tm")}
+        d["raw_vs_ref"] = {k: sum(r["raw_vs_ref"][k] for r in rows if "raw_vs_ref" in r) for k in ("matched", "extra", "missing", "matched_notes", "rhythm_matched", "extra_tm", "missing_tm")}
     return d
 
 
@@ -348,7 +363,7 @@ def totals(groups: list[dict]) -> dict:
         t["ref_pieces"] = len(refs)
         t["ref_bars"] = sum(g["ref_bars"] for g in refs)
         t["ref_combined_bars"] = sum(g["combined_bars"] for g in refs)
-        for k in ("matched", "extra", "missing"):
+        for k in ("matched", "extra", "missing", "extra_tm", "missing_tm"):
             t[f"combined_vs_ref_{k}"] = sum(g["combined_vs_ref"][k] for g in refs)
             t[f"raw_vs_ref_{k}"] = sum(g["raw_vs_ref"][k] for g in refs)
     return t

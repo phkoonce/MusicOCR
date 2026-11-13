@@ -136,20 +136,30 @@ class Grid:
         return bool(self.voltas) or bool(self.pickup)
 
 
+NO_REST_EXCESS = 6       # slots beyond the bars read in an all-playing stretch before its closing anchor is distrusted
+
+
 def segments(n_src: int, first: int, length: int, breaks: Sequence[int],
-             anchor: Dict[int, int], open_last: bool = False) -> List[Tuple[int, int, int, int]]:
+             anchor: Dict[int, int], open_last: bool = False,
+             rest: Optional[Sequence[bool]] = None) -> List[Tuple[int, int, int, int]]:
     """Cut a page at its anchored systems: [(src_lo, src_hi, slot_lo, slot_hi)].
 
     ``anchor`` maps a system index to the slot its first bar must land on. Anchors that cannot be right
     (not increasing, fewer slots than systems, more than 14 bars per system) are ignored.
     ``open_last``: the last system is a single rest bar (a part that is tacet to the end of the piece), which may span any
-    number of bars."""
+    number of bars.
+    ``rest``: per source bar, whether it is a rest-only bar. A stretch that holds no rest bar yet has ``NO_REST_EXCESS`` or more
+    slots than bars is not a lost multi-rest: the anchor that makes it so is a misread number (paxman p45 prints the
+    second-time numbers "21" after "8 (16)" and a repeat the other parts write out; the part's own bars cannot fill that
+    stretch) and is ignored."""
     edge = list(breaks) + [n_src]
     bounds = [(0, first)]
     for i in sorted(anchor):
         s = anchor[i]
         li, ls = bounds[-1]
         if i <= li or s - ls < i - li or s - ls > 14 * (i - li):
+            continue
+        if rest is not None and (s - ls) - (edge[i] - edge[li]) >= NO_REST_EXCESS and not any(rest[edge[li]:edge[i]]):
             continue
         if first + length - s < len(breaks) - i or first + length - s > 14 * (len(breaks) - i - open_last) + (
                 10 ** 6 if open_last else 0):

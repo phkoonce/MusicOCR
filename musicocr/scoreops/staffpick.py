@@ -40,6 +40,97 @@ def is_score_page(groups: List[List[int]], n_staves: int) -> bool:
     return len(sizes) == 1 and min(sizes) >= 2 and sum(len(g) for g in groups) == n_staves
 
 
+def local_staves(img):
+    """Staves read in narrow column windows near the staves' left ends, the window with most staves winning.
+    A warped camera scan bends the lines, which ``find_staves`` (one wide band) smears: the last system of paxman p89
+    h2/h3 was missed there (9 and 10 of 12 staves). A narrow window sees them straight."""
+    import numpy as np
+    from musicocr.text.words import Staff
+    a = np.asarray(img) < 200
+    w = a.shape[1]
+    best: list = []
+    for fx in (0.2, 0.15, 0.25, 0.3, 0.4, 0.6):
+        x0 = int(w * fx)
+        band = a[:, x0:x0 + int(w * .06)].mean(axis=1)
+        lines: List[List[int]] = []
+        for y in np.flatnonzero(band > 0.5):
+            if lines and y - lines[-1][-1] <= 2:
+                lines[-1].append(int(y))
+            else:
+                lines.append([int(y)])
+        ys = [sum(g) // len(g) for g in lines]
+        found, i = [], 0
+        while i + 4 < len(ys):
+            gaps = [ys[i + j + 1] - ys[i + j] for j in range(4)]
+            if max(gaps) <= 1.5 * min(gaps) + 1 and min(gaps) >= 6:
+                found.append(Staff(ys[i], ys[i + 4], x0))
+                i += 5
+            else:
+                i += 1
+        if len(found) > len(best):
+            best = found
+    return best
+
+
+def spacing_groups(staves) -> List[List[int]]:
+    """Systems told by spacing alone: the gaps between consecutive staves fall into two clusters (inside a system ~1.7 staff
+    heights, between systems 2.4+, regular on an engraved score page); a page whose gaps do not split into two firm clusters (at least two system breaks, or a single odd gap such as a
+    title or a missing system on a part page) gives one group per staff."""
+    n = len(staves)
+    gaps = [staves[i + 1].top - staves[i].bottom for i in range(n - 1)]
+    if len(gaps) >= 2:
+        order = sorted(gaps)
+        ratios = [(order[i + 1] / max(order[i], 1), i) for i in range(len(order) - 1)]
+        ratio, k = max(ratios)
+        small, large = order[:k + 1], order[k + 1:]
+        if ratio >= 1.3 and len(large) >= 2 and max(small) <= 1.25 * min(small) and max(large) <= 1.7 * min(large):
+            cut = (order[k] + order[k + 1]) / 2
+            groups: List[List[int]] = [[0]]
+            for i, g in enumerate(gaps):
+                if g > cut:
+                    groups.append([i + 1])
+                else:
+                    groups[-1].append(i + 1)
+            return groups
+    return [[i] for i in range(n)]
+
+
+def staff_groups(img, arr):
+    """(staves, groups) of a page: the systems told by the system barline across the gap (``linked_groups``) or, when that
+    does not make a score page (a skewed scan), by staff spacing (``spacing_groups``), on the staves of ``find_staves`` or
+    of the narrow-window ``local_staves`` (whichever found more). A page that is no score page by any test keeps
+    ``find_staves`` and its barline groups."""
+    from musicocr.text.words import find_staves
+    staves = find_staves(img)
+    base = linked_groups(arr, staves) if len(staves) >= 2 else [[k] for k in range(len(staves))]
+    loc = local_staves(img)
+    cands = [loc, staves] if len(loc) > len(staves) else [staves]
+    for st in cands:
+        if len(st) < 4:
+            continue
+        lg = base if st is staves else linked_groups(arr, st)
+        if is_score_page(lg, len(st)):
+            return st, lg
+        sg = spacing_groups(st)
+        if is_score_page(sg, len(st)) and any(len(g) >= 2 for g in lg):     # some barline evidence: a part page of paired
+            return st, sg                                                    # staves (two versions per page) has none
+    return staves, base
+    cands = [staves]
+    loc = local_staves(img)
+    if len(loc) > len(staves):
+        cands.insert(0, loc)
+    for st in cands:
+        if len(st) < 4:
+            continue
+        lg = linked_groups(arr, st)
+        if is_score_page(lg, len(st)):
+            return st, lg
+        sg = spacing_groups(st)
+        if is_score_page(sg, len(st)) and any(len(g) >= 2 for g in lg):     # some barline evidence: a part page of paired
+            return st, sg                                                    # staves (two versions per page) has none
+    return staves, base
+
+
 def part_number(label: str) -> int:
     """The number a part's label ends with ("... - Horn 3" -> 3; 0 when it has none)."""
     import re
@@ -53,13 +144,11 @@ def isolate_staff(img_path: Path, rank: int, log=print, uniform: bool = False) -
     ``uniform``: only a page whose staves all sit in joined systems of one size is touched (``is_score_page``)."""
     import numpy as np
     from PIL import Image
-    from musicocr.text.words import find_staves
     img = Image.open(img_path).convert("L")
-    staves = find_staves(img)
+    arr = np.asarray(img) < 160
+    staves, all_groups = staff_groups(img, arr)
     if len(staves) < 2:
         return 0
-    arr = np.asarray(img) < 160
-    all_groups = linked_groups(arr, staves)
     if uniform and not is_score_page(all_groups, len(staves)):
         return 0
     groups = [g for g in all_groups if len(g) >= 2]

@@ -289,3 +289,65 @@ Tests: `tests/test_round5.py` (8 new). Full suite 504 passed.
   drop its anchor), p81 (19 wrong-length, three movements), p86 (22 inserted / 9 wrong-length), p73 (507-515 bars); opera p03/p06; xmas p02.
 - httyd2: 139 of 157 cached pages would change; run after a scene scorecard exists (`scripts/combine_scenes.py`).
 - Szeged Alpen: 246 inserted remain, all parts lose multi-rest counts among playing parts (tbn1 220-296, euph 217-296 ...); the bass drum read 13 of 296 bars (round-4 figure, not re-checked).
+
+## 2026-11-13, round 6: staff choice on skewed scans (paxman p89), all-playing stretches, what dominates the reference diffs
+
+Baselines = the current outputs recombined with the HEAD code (`output/scorecards/r6-base-*.json`), "final" = `r6-final-*.json`, summary
+`alignment-round6-2026-11-13.json`. Inserted / dropped / wrong-length bars (recombined, i.e. before adopting anything on disk in the
+last column):
+
+| corpus | round-5 on disk | base (p89 re-run) | final (recombined) |
+|---|---|---|---|
+| paxman-all | 338 / 67 / 214 | 333 / 67 / 210 | 327 / 67 / 210 (p76 4 instead of 10: not adopted on disk) |
+| ghs-opera, ghs-xmas, goldfaden, gb-all, braveheart-horns/tubas, airbender, szeged-alpen, szeged-frozen | | | identical to base |
+| GB p01-03 vs refs / Zerberus vs ref (extra/missing) | 35/43, 76/76 | | identical |
+
+### 1. Per-part staff choice by staff spacing (kept; paxman p89 adopted)
+`staffpick.staff_groups`: the staves come from `find_staves` or from a narrow-window finder (`local_staves`: 6 windows of 6% of the page
+width near the staves' left ends, the one with most staves wins) and the systems of the page from the system barline (as before) or, when that
+does not give a score page, from the gaps between staves (`spacing_groups`: two firm clusters, >= 2 system breaks, small gaps within 25%, big
+gaps within 1.7x; **and** some barline evidence on the page, so a part page of paired staves (xmas p39 h3: 270 / 450 px gaps, two versions
+per page) is never taken for a score). Cause of the p89 failures: a warped camera scan bends the lines so the wide band of `find_staves`
+lost the last system's staves (h2 p2: 9 of 12, h3: 10 of 12; the narrow window sees 12 of 12) and the barline test failed on the left-bound
+staves of h4 p2 (the first four systems). Scan of every cached page of every corpus (`prepped/p*.png`; paxman, gb, opera, xmas, goldfaden,
+Szeged, Zerberus, Braveheart, airbender): the only pages that are score pages by the new test are p88 and p89 (p88 gives the same groups as before),
+after two false positives (paxman p15/p41 h4, p65 h2: a part page with one odd gap; xmas p39: pairs) were excluded by the tests above.
+Re-run (copisteria, `staff_rank = "auto"`, h1-h3; `p89_h4` set `score = false`, a trio): p89 reads 27/27/27 bars (was 81 bars: 5 inserted, 4 wrong-length, 4 parts
+for a 3-voice piece); piece recombined with `--convert`. Old part dirs and combined piece in `output/paxman-all-pre-round6/`; `batches/paxman-all.toml`
+(git-ignored) has `staff_rank = "auto"` on p89_h1-h3 and `score = false` on p89_h4 (old file: `output/paxman-all-pre-round6/paxman-all.toml.bak`).
+p88 not re-run (same groups, same ranks).
+
+### 2. `segments`: an anchor that an all-playing stretch cannot fill is ignored (kept, threshold 6)
+`voltas.segments(rest=...)`: when the bars read between the previous anchor and this one hold no rest-only bar and the slots exceed the bars by
+`NO_REST_EXCESS` = 6 or more, the anchor is a misread (or a printed repeat the part does not write out: paxman p45 horn 4 prints "4 (12)", "8 (16)", "21", the other parts
+write the repeated 1-8 and 33-40 out: 40 bars read for 56) and is dropped. Threshold 4 (the request) was measured: paxman 333 -> 319 inserted (p26 4 -> 0, p66 4 -> 0, p76 10 -> 4)
+but xmas p15 +5 wrong-length (a system that really lost 4 bars, anchor correct) and p10 +1; 6 keeps only p76 (10 -> 4) with no regression anywhere.
+Value is small: p76's total (26 vs 20-22 bars read) is still doubtful, so it was not adopted on disk. The p45 case is not an anchor problem but a
+repeat the others write out (h4 gets 8 + 8 inserted rest bars where copies of bars 1-8 and 33-40 belong): "unroll a part's own repeat when the
+other parts write it out" is the real fix and was not attempted.
+**Tried and rejected: recover a page start from the previous page's last system number** (`start = last-system number + bars read in it`). It gives the
+right 37 for p24 h1 (and xmas p06 68 -> 58 bars, 31 -> 7 inserted, but 2 -> 18 dropped), but changed the Alpen total 296 -> 287 and
+paxman +10 on the sum, with p24 unchanged: removed. The real cause of unread starts is the OCR (Szeged tbn1 page 5 prints "234", read as "24", then rejected by the
+`reach` test: the page is bars 234-296).
+
+### 3. Szeged
+- **Frozen vs the reference (184 extra / 157 missing)**: the dominant difference is tie notation. The reference writes a tied pair as one longer note
+  ((1.5, 1.5, 1.0) where the OMR has (1.0, 0.5, 0.5, 1.0, 1.0) with ties): `score_alignment` now also reports `extra_tm` / `missing_tm` with tied notes
+  merged inside each bar: **130 / 103** (54 extra and 54 missing bars were tie notation). What remains: 3 tail bars (the arrangement prints 126-128, the
+  reference ends at 125: ~25 extra rest bars), the glockenspiel (a 12-bar play stretch read as rests/other bars) and scattered pitch/rhythm misreads; not repeats or
+  cues, and no further generic cause. NB: the same merge makes GB p01-03 worse (35/43 -> 101/109: its refs are written with separate tied notes), so it is a supplementary column, not a replacement.
+- **Alpen**: per part 252-284 of 296 bars, 246 inserted. The page checked (tbn1 p5, 46 bars read for 63 printed): 2 of its 4 bold counts (the "4" and the "6" over the H-bars) are not read at all and
+  the page start "234" is read as "24". Vision does not read a bold lone digit even from a clean contact sheet of the strip above the staff (tested: tiles read nothing, "3" only at 2x), rapidocr reads nothing.
+  Fixing it means a digit classifier (templates from the digits Vision did read on the same part, or a small CNN) and a re-run of the part pages: the biggest lever left for Alpen (and for opera p21 and
+  Braveheart). Bass drum / snare (`score = false`): single-line staves with multi-rests and cue staves ("4th Tbn."), the 5-line staff finder does not apply: not attempted.
+- Zerberus vs 'New' ref (76/76): all 210 bars aligned, the 152 differences are substitutions in place: horns 1-4 play bars 63-68 in the print/OMR where the ref has rests (6 bars x 4 parts = 24 + 24),
+  the 12 timpani bars, small pitch/rhythm differences. Content differences between the edition and the hand-edited ref, not alignment.
+
+### 4. Survey: ten worst (inserted + dropped + wrong-length, base)
+Alpen 366, goldfaden 262, braveheart-horns 169 (117 wrong-length: 8 horns read 67-104 of 124 bars, "no part reaches the printed lower bound", pages with lost multi-rest counts / systems), Frozen 121, airbender 105 (97 inserted, no
+raw outputs to compare), gb p84 84 and p83 71 (pieces sharing pages), xmas p06 56, braveheart-tubas 56, xmas p02 45 (alternating 7/8 - 6/8, durations misread against the declared meter).
+No generic alignment cause left in these: lost multi-rest counts (digit not read), neighbours' bars on shared pages, OMR duration misreads in changing meters. httyd2 not run (scene book, no scorecard).
+
+### Plateau
+Alignment-side changes are now worth a few bars per corpus (this round: p89 -5/-4, p76 -6); the remaining error is on the OMR side (count digits, shared-page neighbours, single-line percussion). Another alignment round is not worth it; a digit reader for bold counts is.
+Tests: `tests/test_round6.py` (4). Full suite 508 passed.
