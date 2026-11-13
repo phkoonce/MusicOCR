@@ -106,3 +106,52 @@ Broader re-runs worth doing with the fix (`collection split` itself rewrites inp
   19 h3, 20 h1/h3/h4, 21 h2/h4, 22 h2/h4 (plus the piece ending where each starts: 7, 9, 10, 12, 18-21), ~25 parts.
 - paxman-all: 8 h3, 13 h4, 45/46 h2, 58 h4, 63 h2/h4, 69/82/83 h1/h4 (+ 87 h1, 55 h4, 56/70/71/84 are done above): ~15 parts.
 - ghs-xmas: 5 h4, 13 h4, 31 and 35 (all books), 33 h1: ~10 parts.
+
+## 2026-11-13, round 3: the split fix applied to the real corpora
+
+Baselines re-measured with the code at e8721e8 (`output/scorecards/r3-base-*.json`), then every changed part re-split, re-run (copisteria,
+`--jobs 2`) and recombined in a staging area (`output/iter/<corpus>-r3`: symlinks to the unchanged parts, round-2 re-runs reused when their
+input is identical, `scratch/r3/stage*.py`), scored (`r3-new-*.json`) and only then adopted into `output/<corpus>/`. Replaced part
+outputs and combined pieces are in `output/<corpus>-pre-round3/`; the old split PDFs are in `input/_pre-round3/<project>/`, the old
+`pieces.json` / batch spec are `pieces.pre-round3.json` / `batches/<corpus>.pre-round3.toml`.
+
+| corpus | before | after (all pieces recombined) | on disk now |
+|---|---|---|---|
+| ghs-opera | 1310 / 40 / 395 | 176 / 42 / 39 (bars 2863 -> 1466; \|part - combined\| 5218 -> 335) | same |
+| paxman-all | 1073 / 54 / 410 | 499 / 58 / 221 | 497 / 206 / 221 (p88 and p76 deliberately kept as they were) |
+| ghs-xmas | 207 / 21 / 199 | 146 / 17 / 189 | same |
+| gb-all | 133 / 84 / 262 | 133 / 84 / 262 | unchanged |
+| gb p01-03 (vs refs), zerberus (vs ref) | | split not touched; combine identical with and without the round-3 changes; zerberus 76/76 | unchanged |
+
+Re-split: GB's found-table is identical under the fixed splitter, so its PDFs are unchanged. 30 opera, 34 paxman and 20 xmas part PDFs
+changed (page images compared); 19 / 29 / 20 of them needed an OMR run (the rest were reused from round 2 or are new parts such as opera
+p11/12/14/17/19-21 h1-h4 and paxman p69/82/83 h4 that the old, buggy cuts had lost). Opera p13/16/19/20/22, paxman p44/55/56/63/70/71/84 and
+xmas p5/12/13/30-35 now read their own pages only.
+
+### Kept combine changes (each one measured on all corpora, cache-only)
+1. **Lone misread "last system" number must not set the lower bound** (`_plausible_lasts`). Paxman p24: one scan read "99" for 66, the
+   score became 108 bars for a 75-bar piece (4 parts read 62-74). The largest of >= 3 distinct printed numbers is dropped when it is more than
+   15% above both the next one and the largest total read. p24 118 -> 30 inserted, p23 64 -> 9, p41 110 -> 17 (the same cause).
+2. **A page start or system number far beyond anything read is a misread** (`_far_ahead`, factor 2 x the most bars any part read + 10).
+   Opera p18 h2/h3: "opt. Schluss 2" numbers 77b, 83b ... were OCR'd as "776", "836" -> a 1019-bar score; now 150 (parts read 129-140).
+   Xmas p02 95 -> 64 bars (parts 60-64).
+3. **`_common_left` crashed** when a page had >= 3 staves but no staff-start columns (`max()` of an empty list): `combine` of GB p01-03 failed
+   outright with the current code. It now returns None. GB p01-03 can be recombined again: vs refs extra/missing 9/9, 10/10, 16/24
+   (the scorecard saved earlier had 7/7 for p01; the difference is not from round 3: the control run with the round-3 constants switched off
+   is byte-identical).
+Tests: `tests/test_alignment_iterations.py` (3 new).
+
+### Diagnosed, no change needed any more (they were mis-splits)
+paxman p44 h2 (149 vs 56: its 4-page cut held the next piece's pages; now 57), p63 (h2/h4 began on the previous piece's last system, "23" as the
+first number), opera p05 h3 (5 of 69 bars, now 59), p19 h2/h3 (0 inserted, all four parts 46 bars). Opera p20 and p19 are now exact (0/0/0).
+
+### Not adopted
+Paxman p76: the combine changes alone move its total 22 -> 26 (the misread "107" page number no longer blocks the noisy
+printed-system-start total); abs part-vs-score gap 5 -> 21, so its old combined score stays. Paxman p88 (3-staff score page): new
+recombine reads 102 bars without drops, the old one 66 with 144 dropped; neither is right (~30 bars), left as it was. Needs the per-part staff
+choice (not attempted).
+
+### Remaining worst pieces (OMR lost or misread bars; not alignment)
+paxman p11 (157 bars: 39 inserted), p10 (h1 reads 35 of 57), p24 (30), p31 (24), p33 (23), p07 (23), p45 (22), p86 (20 / 10 wrong-length), p81
+(23 wrong-length), p88; opera p03 (26), p06 (22: three parts lose the last 5 bars), p21 (19: h1/h3 read the "11" multi-rest as one bar),
+p18 (19), p02 (15), p12 (14), p10 (11, 8 dropped); xmas p02 (37 wrong-length), p01, p06, p15, p34.

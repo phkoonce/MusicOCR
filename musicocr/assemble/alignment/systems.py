@@ -140,7 +140,10 @@ def _common_left(starts: List[List[int]], width: int) -> Optional[int]:
     """
     if len(starts) < 3:
         return None
-    best = max((sum(1 for st in starts if any(abs(x - c) <= 12 for x in st)), -c, c) for st in starts for c in st)
+    cands = [(sum(1 for st in starts if any(abs(x - c) <= 12 for x in st)), -c, c) for st in starts for c in st]
+    if not cands:                      # staves found but no barline start on any of them (a clean page of text-layer music)
+        return None
+    best = max(cands)
     return best[2] if best[0] >= max(3, 0.4 * len(starts)) else None
 
 

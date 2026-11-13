@@ -81,3 +81,31 @@ def test_dropped_bar_does_not_overwrite_the_next_bars_own_declaration():
                "<note><rest/><duration>4</duration></note>")]
     _hand_on_declarations(pg, [1])
     assert _declared(pg[1][0]) == (None, (6, 8))
+
+
+def test_plausible_lasts_drops_a_lone_misread_number():
+    from musicocr.assemble.combine import _plausible_lasts
+    # paxman p24: the scan read "99" for 66; no other part or total comes near
+    assert _plausible_lasts([33, 99, 72, 53, 33, 99, 72, 53], [64, 75, 74, 69]) == [33, 72, 53, 33, 72, 53]
+    # a number the totals support stays
+    assert _plausible_lasts([30, 99, 72, 30], [100, 98, 97]) == [30, 99, 72, 30]
+    # too few distinct numbers to call one an outlier
+    assert _plausible_lasts([20, 99], [60]) == [20, 99]
+
+
+def test_far_ahead_drops_numbers_beyond_anything_read():
+    from musicocr.assemble.combine import _far_ahead
+    def part(starts, bars, anchors=None):
+        return dict(pages=[[0] * b for b in bars], starts=list(starts), sysinfo=[dict(anchors=dict(a)) for a in (anchors or [{}] * len(bars))])
+    data = {"a": part([1, 63, 776], [60, 45, 40], [{0: 1}, {0: 63}, {0: 776, 1: 836}]),
+            "b": part([1, 64], [62, 50])}
+    rep: list = []
+    _far_ahead(data, rep)
+    assert data["a"]["starts"] == [1, 63, None] and data["a"]["sysinfo"][2]["anchors"] == {}
+    assert data["b"]["starts"] == [1, 64] and rep      # the real starts stay
+
+
+def test_common_left_survives_staves_without_start_columns():
+    from musicocr.assemble.alignment.systems import _common_left
+    assert _common_left([[], [], []], 600) is None
+    assert _common_left([[40], [41], [42]], 600) == 40

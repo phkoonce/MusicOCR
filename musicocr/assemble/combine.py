@@ -646,7 +646,32 @@ def _read_parts(parts: Sequence[PartInput], read_pages, starts_of, spans_of, bar
         _increasing(p.pid, starts, sysinfo, report, [len(pg) for pg in pages])
         data[p.pid] = dict(p=p, pages=pages, starts=starts, spans=spans,
                            rests={b for a, e in spans for b in range(a, e + 1)}, sysinfo=sysinfo)
+    _far_ahead(data, report)
     return data
+
+
+AHEAD_FACTOR = 2.0      # a printed number may be this many times the most bars any part read (plus AHEAD_PLUS)
+AHEAD_PLUS = 10
+
+
+def _far_ahead(data: Dict[str, Dict[str, Any]], report: List[str]) -> None:
+    """A page start or system number far beyond anything the parts read is a misread: "77b" (an optional ending
+    numbered 77b, 83b, ...) came out of the OCR as "776", "836", and made one part 821 bars long. A bar number
+    ahead of the longest part's read bars by more than AHEAD_FACTOR is dropped (the page follows on; with all
+    of a page's numbers gone it is unnumbered)."""
+    if len(data) < 2:
+        return
+    cap = AHEAD_FACTOR * max(sum(len(pg) for pg in d["pages"]) for d in data.values()) + AHEAD_PLUS
+    for pid, d in data.items():
+        for i, s in enumerate(d["starts"]):
+            if s is not None and s > cap and i:
+                report.append(f"  {pid}: page {i + 1} starts at bar {s}, far beyond the {cap:.0f} bars the parts "
+                              f"read -> start ignored")
+                d["starts"][i] = None
+        for info in d["sysinfo"]:
+            if info:
+                for k in [k for k, n in info["anchors"].items() if n > cap]:
+                    del info["anchors"][k]
 
 
 BEHIND_SLACK = 0.15     # a page start may fall this share (min. 4 bars) behind where the bars read so far put it
@@ -761,6 +786,23 @@ def _agreeing_totals(cand: Sequence[int]) -> List[int]:
     return group(best)
 
 
+LAST_OUTLIER = 1.15     # a part's printed last number this far above the next part's and the read totals is a misread
+
+
+def _plausible_lasts(lasts: Sequence[int], totals: Sequence[int]) -> List[int]:
+    """Drop printed last-system numbers that no other part and no read total comes near: one scan read "99"
+    for 66 and made the lower bound (hence the score) 108 bars long for a 70-bar piece. The largest of at least
+    three distinct numbers goes when it is more than ``LAST_OUTLIER`` times both the next-largest number and the largest
+    total read (a real number that others missed only lowers the bound, which the totals vote then restores)."""
+    vals = sorted({x for x in lasts if x})
+    if len(vals) < 3 or not totals:
+        return list(lasts)
+    top, nxt, tmax = vals[-1], vals[-2], max(totals)
+    if top > LAST_OUTLIER * nxt + 2 and top > LAST_OUTLIER * tmax + 2:
+        return [x for x in lasts if x != top]
+    return list(lasts)
+
+
 def _score_total(data: Dict[str, Dict[str, Any]], last_start_of, max_bar_of, report: List[str],
                  grid: Optional["vt.Grid"] = None) -> int:
     """The score's bar count: the consensus of the parts' last-page totals, bounded below by the print."""
@@ -776,6 +818,7 @@ def _score_total(data: Dict[str, Dict[str, Any]], last_start_of, max_bar_of, rep
     lasts = [last_start_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
     lasts += [max_bar_of(d["p"].pdf) for d in data.values() if d["p"].pdf and d["p"].pdf.exists()]
     lasts = [x for x in lasts if x and (not totals or x <= 1.5 * max(totals) + 5)]     # a misread number (811) must not set the length
+    lasts = _plausible_lasts(lasts, totals)
     if grid:
         lasts = [grid.slot(x) for x in lasts]
     ends = [e for d in data.values() for _, e in d["spans"]]
