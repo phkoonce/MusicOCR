@@ -220,3 +220,72 @@ combined pieces) and `output/ghs-opera-pre-round4/` (p21 h1/h3 and combined); th
 - Szeged: a staff-wise `score_alignment` for Alpen needs a reference (none); the merged part file drops `multiple-rest` tags (the
   per-page files keep them), so "raw bars" in the scorecard under-count parts that open with multi-rests.
 - `staff_rank` is manual; a trio page read for a fourth horn (`p88_h4`) is simply not combined.
+
+## 2026-11-13, round 5: round-4 multi-rest rules applied corpus-wide, tacet parts, auto staff pick
+
+Baselines = the on-disk outputs recombined with the round-4 code (`output/scorecards/r5-base-*.json`); "final" =
+`r5-final-paxman-all.json`, `r5-v2-*.json` (corpora whose parts were not replaced); summary `alignment-round5-2026-11-13.json`.
+Numbers: inserted / dropped / wrong-length bars.
+
+| corpus | before | after |
+|---|---|---|
+| paxman-all | 481 / 59 / 221 (193 parts differing) | 338 / 67 / 214 (176) |
+| szeged-alpen | 506 / 35 / 85 | 246 / 35 / 85 |
+| szeged-frozen (vs ref 184/157 extra/missing) | 119 / 1 / 2 | 118 / 1 / 2, vs ref unchanged |
+| ghs-opera, ghs-xmas, gb-all, goldfaden, braveheart-horns | 161/42/39, 146/17/189, 133/84/262, 67/69/126, 52/0/117 | identical (nothing re-run or adopted) |
+| GB p01-03 vs refs (extra/missing) | 9/9, 10/10, 16/24 | identical (output not touched) |
+| Zerberus vs ref | 76/76 | 76/76 |
+
+### 1. The round-4 multi-rest rule applied to the cached pages (kept for 20 paxman pieces)
+Listing the page-parts the rule changes: `scripts/multirest_offline_check.py output/<corpus>` runs `add_missing_multirest_dets` on copies
+of every page's cached detections/texts (nothing written). Paxman 83 of 617 pages, gb-all 4 of 260 (GB p03 h1/h2/h4 and p09 h3), goldfaden 1,
+ghs-opera / ghs-xmas / Zerberus / Szeged 0 (Szeged was already re-run in round 4), httyd2 139 of 157 (not run: a scene book, no scorecard).
+Staging (`output/iter/<corpus>-r5`, real copies of the affected part dirs, only those pages' `pNNN.musicxml` deleted, batch `--redo`), scored
+against the on-disk state, adopted **per piece** when inserted+dropped+wrong-length fell (or tied with fewer differing parts). Adopted paxman pieces:
+4, 6, 7, 11, 12, 14, 17, 24, 33, 36, 38, 41, 43, 44, 45, 61, 75, 79, 80, 85 (e.g. p07 23 -> 3 inserted, p43 11 -> 0, p85 12 -> 0, p11 39 -> 18, p33 23 -> 9,
+p06 24 -> 12, p24 30 -> 24, p45 22 -> 16). Not adopted (worse): p20, p55, p73, p78, p81, p86 (dropped/wrong-length rose; p73/p81 re-reads gain
+bars of real multi-rests but the page layout then disagrees by a few bars). Old outputs of every adopted piece (parts and combined) are in
+`output/paxman-all-pre-round5/`. Two bugs in the rule were found by looking at page crops of the additions and fixed before adopting:
+- **A multi-rest was synthesised twice for one digit**: the thick block under a count digit was re-labelled `multiRest` and the next loop added
+  another over the "empty" bar, because `content` was computed before the re-labelling (`add_missing_multirest_dets`). About 30 pages.
+- **A bar number at the start of a system is not a count** (paxman p56 h4: "65" over an undetected first bar became a 65-bar rest, the part read 144
+  bars): a digit whose centre is within `SYSTEM_START_SP` = 6 spaces of the system's left edge (leftmost measure or clef) is a bar number.
+GB: p03 (hand-edited, never replaced) compared in scratch only: bars 99 -> 102 (= the reference's 102), extra/missing vs ref 16/24 -> 20/20; GB p09 h3
+gains a genuine "2" bar (26 bars vs 25) but the piece's inserted count rises 5 -> 8 (the other parts read the "2" bar as one), so it was not adopted. Goldfaden
+h4 p7: genuine addition, scorecard identical, not adopted.
+
+### 2. Vote on multi-rest counts at combine (small; kept)
+Where the parts agree a stretch is rest-only, a part that read it short or lost the count is an alignment of rest bars, not a doubt:
+`_extended_rests` (combine.py) takes the slots the aligner had to insert (>= 2 other parts rest there, on pages that read the right number of bars, and the
+slot follows a rest-only source bar) and reports them as "multi-rest count read short or lost ... added without doubt" instead of
+"inserted ... -- check" (no check flag on the bar). On the corpora this is rare: only 5/161 (opera), 19/481 (paxman), 19/506 (Alpen) of the inserted
+bars sit where all other parts rest; the others are lost bars among playing parts, which no vote can restore. Szeged Frozen -1 inserted, everything else identical.
+Vision's "9" read as "6" (opera p21 h3) is not fixed by it: h1 rests 11 bars, h2 7, h3 10 - the parts do not agree on the stretch.
+**Tacet to the end** (found while looking at the Alpen glockenspiel, which plays bars 1-36 of 296 and then has a bare "TACET" rest): a part whose last
+page ends in a rest-only bar with >= 8 slots to go gets those slots as rests without doubt, and `voltas.segments(open_last=True)` no longer drops all
+the system anchors because the last system "holds more than 14 bars per system": the glockenspiel's playing bars were landing in the wrong bars (all 60 first
+bars rests) and are now at 14-20 and 31-35 as printed. Alpen inserted 506 -> 246 (the other 260 were the tacet tail).
+
+### 3. Scorecard raw bars from the per-page files (kept)
+`score_alignment.read_raw_part` concatenates `<key>.pNNN.musicxml` (what `combine` reads) instead of the merged part file, which keeps only some
+`multiple-rest` tags. Zerberus parts differing 19 -> 6 (|raw - combined| 996 -> 40), raw vs ref extra/missing 67/828 -> 89/93; combined numbers unchanged
+(76/76). Also: the reference rules accept a `stage-` prefixed batch name.
+
+### 4. Auto staff rank (kept as a feature; paxman p89 not adopted)
+`staff_rank = "auto"` (batch part) / `--staff-rank-auto`: N is the number the part's label ends with, and only a page that is *wholly* a score
+is touched (`staffpick.is_score_page`: every staff in a joined system of one size >= 2). A looser test was tried first and rejected: the joined-staves
+test alone fires on spiral-binding shadows (paxman p56 h1 `[6]`, p65, p71-p73 `[2]`/`[3]`), so p56 would have been cut. Pages with a stray joined
+group are left alone; a part whose number exceeds the staves of the page (horn 4 of a trio) still needs `score = false`. Paxman p88 is unchanged
+(manual ranks); p89 (three-voice canzonet, in every horn's book) was re-run as a test: horn 1 reads 11 + 16 bars (right: 27), but `find_staves`
+misses staves of the last system of page 2 in the h2/h3 scans (9 and 10 of 12 staves), so those books still read that system whole (24 / 48 bars) and
+the piece was not adopted. Needs a staff finder that survives the scans, or a per-part rank by system spacing (intra-system gaps 170 px, between systems 240+ px,
+perfectly regular on p89).
+Tests: `tests/test_round5.py` (8 new). Full suite 504 passed.
+
+### Remaining worst pieces and findings
+- paxman p11 (18 inserted, 8 dropped), p24 (24: h1's page 2 gets bars 30-75 because page 1 lost bars and the page start "37" is unread: other parts read 33/34/36, the true
+  start 37), p31 (4 inserted but 11 wrong-length), p33 (9), p45 (16: second-time numbers "4 (12)", "33 (41)" in parentheses: the third system's printed "21" cannot
+  be reconciled with 8 + 5 bars read, 8 bars are inserted in a system whose bars are all played - a segment whose slots exceed its bars by >= 4 with no rest bar in it should
+  drop its anchor), p81 (19 wrong-length, three movements), p86 (22 inserted / 9 wrong-length), p73 (507-515 bars); opera p03/p06; xmas p02.
+- httyd2: 139 of 157 cached pages would change; run after a scene scorecard exists (`scripts/combine_scenes.py`).
+- Szeged Alpen: 246 inserted remain, all parts lose multi-rest counts among playing parts (tbn1 220-296, euph 217-296 ...); the bass drum read 13 of 296 bars (round-4 figure, not re-checked).

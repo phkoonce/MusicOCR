@@ -342,6 +342,9 @@ def _blocks_to_multirests(dets: list[dict], digits: list[list[float]], sp: float
     return fixed
 
 
+SYSTEM_START_SP = 6.0      # a digit's centre this close to the system's left edge is a bar number, not a multi-rest count
+
+
 def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None, rings=()) -> int:
     """Add a ``multiRest`` detection to an *empty* bar that has a big count digit over it.
 
@@ -381,6 +384,8 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None, ring
     counts = [t["xyxy"] for t in texts if _DIGITS.fullmatch(str(t.get("text", "")).strip()) and int(t["text"]) >= 2
               and t["xyxy"] in medium]
     added += _blocks_to_multirests(dets, [b for b in counts if not stacked_digit(b, medium)], sp, log)
+    content = [d for d in dets if d.get("cls", "").split("_")[0] in ("note", "rest", "mRest", "multiRest")
+               and d.get("conf", 1.0) >= 0.5]      # now with the multi-rests just made from blocks (no second one for the same digit)
 
     for t in texts:
         if not _DIGITS.fullmatch(str(t.get("text", "")).strip()):
@@ -393,6 +398,11 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None, ring
             x0, y0, x1, y1 = m["xyxy"]
             if not (x0 < cx < x1 and y0 - 8 * sp < cy < y0 + (y1 - y0) / 2):
                 continue
+            left = min([q["xyxy"][0] for q in measures if abs(q["xyxy"][1] - y0) < sp]
+                       + [q["xyxy"][0] for q in dets if str(q.get("cls", "")).startswith("clef") and q.get("conf", 1.0) >= 0.5
+                          and y0 - sp < (q["xyxy"][1] + q["xyxy"][3]) / 2 < y1 + sp] + [x0])
+            if cx - left < SYSTEM_START_SP * sp:
+                break          # at the start of its system a digit is the bar number (clef, key and a bar's width come first)
             x0, x1 = _firm_bar_span(dets, x0, y0, x1, y1, cx)
             if abs(cx - (x0 + x1) / 2) > 0.2 * (x1 - x0):
                 break          # a count is centred over its bar; a time signature sits at its left edge

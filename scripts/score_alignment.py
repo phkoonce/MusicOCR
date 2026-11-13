@@ -38,20 +38,21 @@ STEP = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 
 # batch-stem regex -> reference file for a piece number (None = the whole book); relative to --ref-dir
 RULES = [
-    (r"^gb-", lambda piece: f"gb_p{piece:02d}.ref.musicxml" if piece else None),
-    (r"^zerberus$", lambda piece: "zerberus_new_ref.musicxml"),
-    (r"^szeged-frozen$", lambda piece: "szeged_frozen_misc.ref.musicxml"),
+    (r"^(stage-)?gb-", lambda piece: f"gb_p{piece:02d}.ref.musicxml" if piece else None),
+    (r"^(stage-)?zerberus$", lambda piece: "zerberus_new_ref.musicxml"),
+    (r"^(stage-)?szeged-frozen$", lambda piece: "szeged_frozen_misc.ref.musicxml"),
 ]
 
 
 # ---------------------------------------------------------------- MusicXML -> bar signatures
-def read_score(path: Path) -> list[dict]:
-    """[{name, rhythm: [tuple], strict: [tuple], rest: [bool]}] per part; multi-bar rest measures expanded."""
+def read_score(path: Path, barlen0: float | None = None) -> list[dict]:
+    """[{name, rhythm: [tuple], strict: [tuple], rest: [bool], barlen}] per part; multi-bar rest measures expanded.
+    ``barlen0``: the bar length (quarters) in force before the file starts (a page file that declares no meter)."""
     root = ET.parse(path).getroot()
     names = {p.get("id"): (p.findtext("part-name") or "") for p in root.iter("score-part")}
     out = []
     for part in root.findall("part"):
-        divisions, barlen = 1, None
+        divisions, barlen = 1, barlen0
         rhythm, strict, rest = [], [], []
         for m in part.findall("measure"):
             voice, events, prev, mrest = None, [], None, 0
@@ -96,8 +97,34 @@ def read_score(path: Path) -> list[dict]:
                 rhythm.append(dur_t)
                 strict.append((dur_t, tuple(e[1] for e in events) if n == 1 else ("r",)))
                 rest.append(allrest)
-        out.append({"name": names.get(part.get("id"), ""), "rhythm": rhythm, "strict": strict, "rest": rest})
+        out.append({"name": names.get(part.get("id"), ""), "rhythm": rhythm, "strict": strict, "rest": rest, "barlen": barlen})
     return out
+
+
+def read_raw_part(out: Path, key: str) -> dict | None:
+    """A part's own bars. The merged `<key>.musicxml` keeps only some `multiple-rest` tags, so the per-page
+    files (`<key>.pNNN.musicxml`, which `combine` reads) are used when there are any: multi-rest bars count as
+    their printed length."""
+    pages = sorted((out / key).glob(f"{key}.p[0-9][0-9][0-9].musicxml"))
+    if pages:
+        acc, barlen = None, None
+        for f in pages:
+            try:
+                sc = read_score(f, barlen)
+            except ET.ParseError:
+                continue
+            if not sc:
+                continue
+            barlen = sc[0]["barlen"] or barlen
+            if acc is None:
+                acc = {k: list(sc[0][k]) if isinstance(sc[0][k], list) else sc[0][k] for k in sc[0]}
+            else:
+                for k in ("rhythm", "strict", "rest"):
+                    acc[k] += sc[0][k]
+        if acc:
+            return acc
+    merged = out / key / f"{key}.musicxml"
+    return (read_score(merged) or [None])[0] if merged.exists() else None
 
 
 def lcs(a: list, b: list) -> list[tuple[int, int]]:
@@ -255,8 +282,7 @@ def score_group(group, cpath, spec, ref_path, cache):
     rows = []
     for i, mem in enumerate(members):
         c = comb[i] if len(members) == len(comb) else by_name[part_key(mem["label"].split(" - ")[-1])]
-        raw_p = out / mem["key"] / f"{mem['key']}.musicxml"
-        raw = (read_score(raw_p) or [None])[0] if raw_p.exists() else None
+        raw = read_raw_part(out, mem["key"])
         row = {"id": mem["id"], "raw_bars": len(raw["strict"]) if raw else None, "combined_bars": len(c["strict"])}
         rp = ref_by.get(part_key(c["name"])) if ref else None
         if ref and rp is None and len(ref) == len(comb):

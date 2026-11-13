@@ -338,6 +338,52 @@ def _hand_on_declarations(pg: Sequence[Src], slots: Sequence[Optional[int]]) -> 
         run = []
 
 
+class _Share(dict):
+    """``{bar: share of the other parts resting there}``; ``n[bar]`` is how many parts that share is over."""
+    n: Dict[int, int] = {}
+
+
+AGREE_MIN_PARTS = 2      # parts that must all rest at a bar for it to count as an agreed rest
+
+
+TACET_MIN_BARS = 8       # a part's final page ending in a rest, with at least this many bars to go, is tacet to the end
+
+
+def _extended_rests(ref: Dict[int, float], a: int, slots: Sequence[Optional[int]], src: Sequence[Src],
+                    final: bool = False) -> List[int]:
+    """Bars among the inserted slots of ``slots`` (the slot j is bar ``a + j``) that are the rest of a multi-rest this part
+    read short or without its count: every other part with a bar there (>= AGREE_MIN_PARTS of them) rests, and the slot follows a rest-only
+    source bar or another such slot. They are the same repair as a printed multi-rest span makes, so no doubt is raised.
+    ``final``: the page is the part's last. When its last bar is a rest and ``TACET_MIN_BARS`` or more slots follow it, the part
+    is tacet to the end of the piece (a glockenspiel that plays the first 36 bars of 296): those slots are rests too."""
+    n = getattr(ref, "n", {})
+    out: List[int] = []
+    prev_rest = None                 # was the previous slot a rest bar (source or extended)?
+    nxt_rest = [None] * len(slots)   # a run of inserted slots at the page start follows a rest bar too
+    after = None
+    for j in range(len(slots) - 1, -1, -1):
+        nxt_rest[j] = after
+        if slots[j] is not None:
+            after = is_rest_only(src[slots[j]][0])
+    for j, sl in enumerate(slots):
+        b = a + j
+        if sl is not None:
+            prev_rest = is_rest_only(src[sl][0])
+            continue
+        agreed = ref.get(b) == 1.0 and n.get(b, 0) >= AGREE_MIN_PARTS
+        if agreed and (prev_rest or (prev_rest is None and nxt_rest[j])):
+            out.append(b)
+            prev_rest = True
+        else:
+            prev_rest = False
+    if final:
+        last = max((j for j, sl in enumerate(slots) if sl is not None), default=None)
+        tail = [a + j for j in range(last + 1, len(slots))] if last is not None else []
+        if tail and len(tail) >= TACET_MIN_BARS and is_rest_only(src[slots[last]][0]):
+            out = sorted(set(out) | set(tail))
+    return out
+
+
 def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int, report: List[str],
                   decl_ref: Optional[List[float]] = None,
                   rhythm_ref: Optional[List[List[Any]]] = None,
@@ -365,9 +411,10 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
             continue
         info = d["sysinfo"][pi] if d.get("sysinfo") else None
         if info and info.get("slots"):
-            cuts = vt.segments(len(pg), a, t, info["breaks"], info["slots"])
+            last_open = pi == len(d["pages"]) - 1 and len(pg) - info["breaks"][-1] == 1 and is_rest_only(pg[-1][0])
+            cuts = vt.segments(len(pg), a, t, info["breaks"], info["slots"], open_last=last_open)
             if len(cuts) > 1:
-                _lay_out_segments(pid, d, ref, pg, a, t, cuts, prev_meter, seq, flags, report, decl_ref)
+                _lay_out_segments(pid, d, ref, pg, a, t, cuts, prev_meter, seq, flags, report, decl_ref, final=last_open)
                 continue
         r = [1.0 if (a + j) in d["rests"] else ref.get(a + j) for j in range(t)]
         by_rhythm = rhythm_ref is not None and len(rhythm_ref) == t
@@ -384,13 +431,17 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
                                         _src_changes(pg, prev_meter),
                                         decl_ref[a - 1:a - 1 + t] if decl_ref and len(decl_ref) >= a - 1 + t else None)
             dropped = sorted(set(range(len(pg))) - {s for s in slots if s is not None})
-            added = [a + j for j, s in enumerate(slots) if s is None]
+            extended = [] if by_rhythm else _extended_rests(ref, a, slots, pg, final=pi == len(d['pages']) - 1)
+            added = [a + j for j, s in enumerate(slots) if s is None and a + j not in extended]
             outside = [b for b in added if d["rests"] and b not in d["rests"]]
             report.append(f"  {pid} page bars {a}-{a + t - 1}: {len(pg)} bars read for {t} printed"
                           f" -> aligned to the other parts' {'rhythm' if by_rhythm else 'rest pattern'}; dropped source bar(s) "
                           f"{[a + k for k in dropped]}, inserted rest bar(s) at {added}"
                           + (f", {len(outside)} of them outside the printed multi-rests {outside}"
-                             if outside else "") + " -- check")
+                             if outside else "") + (" -- check" if added or dropped else ""))
+            if extended:
+                report.append(f"  {pid}: multi-rest count read short or lost (or tacet to the end) -> rest bar(s) added without doubt: "
+                              f"{extended}")
             _hand_on_declarations(pg, slots)
             seq.extend(None if s is None else pg[s] for s in slots)
             for b in added:
@@ -412,11 +463,12 @@ def _lay_out_part(pid: str, d: Dict[str, Any], ref: Dict[int, float], total: int
 
 def _lay_out_segments(pid: str, d: Dict[str, Any], ref: Dict[int, float], pg: List[Src], a: int, t: int,
                       cuts: List[Tuple[int, int, int, int]], prev_meter, seq: List[Optional[Src]],
-                      flags: Dict[int, str], report: List[str], decl_ref: Optional[List[float]]) -> None:
+                      flags: Dict[int, str], report: List[str], decl_ref: Optional[List[float]],
+                      final: bool = False) -> None:
     """A page cut at the systems whose first bar number was read: each stretch between two of them is
     aligned on its own, so a bar read too many (or lost) moves nothing outside its own system(s)."""
     meter = prev_meter
-    for lo, hi, s0, s1 in cuts:
+    for ci, (lo, hi, s0, s1) in enumerate(cuts):
         part, n = pg[lo:hi], s1 - s0
         if len(part) == n:
             seq.extend(part)
@@ -431,10 +483,14 @@ def _lay_out_segments(pid: str, d: Dict[str, Any], ref: Dict[int, float], pg: Li
                                 extend_rests=True)
         meter = _last_meter(part, meter)
         dropped = sorted(set(range(len(part))) - {s for s in slots if s is not None})
-        added = [s0 + j for j, s in enumerate(slots) if s is None]
+        extended = _extended_rests(ref, s0, slots, part, final=final and ci == len(cuts) - 1)
+        added = [s0 + j for j, s in enumerate(slots) if s is None and s0 + j not in extended]
         report.append(f"  {pid} bars {s0}-{s1 - 1} (page starting bar {a}): {len(part)} bars read for {n} printed"
                       f" -> aligned within its systems; dropped source bar(s) {[s0 + k for k in dropped]}, "
-                      f"inserted rest bar(s) at {added} -- check")
+                      f"inserted rest bar(s) at {added}" + (" -- check" if added or dropped else ""))
+        if extended:
+            report.append(f"  {pid}: multi-rest count read short or lost (or tacet to the end) -> rest bar(s) added without doubt: "
+                          f"{extended}")
         _hand_on_declarations(part, slots)
         seq.extend(None if s is None else part[s] for s in slots)
         for b in added:
@@ -884,7 +940,9 @@ def _plan_pages(data: Dict[str, Dict[str, Any]], total: int) -> Dict[int, float]
                     acc = sums.setdefault(a + j, [0.0, 0.0])
                     acc[0] += _rest_flag(s)
                     acc[1] += 1
-    return {b: v[0] / v[1] for b, v in sums.items()}
+    share = _Share({b: v[0] / v[1] for b, v in sums.items()})
+    share.n = {b: int(v[1]) for b, v in sums.items()}
+    return share
 
 
 def _rhythm_refs(bars_by: Dict[str, List[Optional[Src]]], usable, total: int) -> Dict[str, List[List[Any]]]:

@@ -49,6 +49,7 @@ class Part:
     instrument: str = ""  # transposition-table name; empty = leave pitches as written
     score: bool = True    # include in `musicocr combine` (False for e.g. percussion)
     small_graces: bool = False  # copisteria: small noteheads are ruff/flam grace notes (timpani, drums)
+    staff_rank_auto: bool = False   # `staff_rank = "auto"`: N is the number the label ends with; only whole-score pages are cut
     staff_rank: int = 0   # the part PDF is a score page: read staff N of each multi-staff system (copisteria)
     old_bass_clef: bool = False  # old-notation horn edition (see musicocr.scoreops.retouch)
     title: str = ""
@@ -77,6 +78,15 @@ class BatchSpec:
     def key(self, part: Part) -> str:
         """Pipeline key of a part (``<output_dir>/<key>/``, ``<key>.pdf``)."""
         return f"{self.key_prefix}{part.id}"
+
+
+def _staff_rank(raw: dict) -> int:
+    """`staff_rank = N`, or "auto": the number the part's label ends with ("... - Horn 3" -> 3)."""
+    v = raw.get("staff_rank", 0)
+    if v == "auto":
+        from musicocr.scoreops.staffpick import part_number
+        return part_number(str(raw.get("label") or raw.get("id", "")))
+    return int(v)
 
 
 def _require(data: dict, field_name: str, kind: type):
@@ -109,7 +119,8 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
             instrument=raw.get("instrument", ""),
             score=bool(raw.get("score", True)),
             small_graces=bool(raw.get("small_graces", False)),
-            staff_rank=int(raw.get("staff_rank", 0)),
+            staff_rank=_staff_rank(raw),
+            staff_rank_auto=raw.get("staff_rank") == "auto",
             old_bass_clef=bool(raw.get("old_bass_clef", False)),
             title=str(raw.get("title", "")),
             composer=str(raw.get("composer", "")),
@@ -277,7 +288,7 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
     if part.small_graces and not spec.engines:
         cmd.append("--small-graces")
     if part.staff_rank and not spec.engines:
-        cmd += ["--staff-rank", str(part.staff_rank)]
+        cmd += ["--staff-rank", str(part.staff_rank)] + (["--staff-rank-auto"] if part.staff_rank_auto else [])
     with open(out_dir / f"{key}.run.log", "w") as log:
         rc = subprocess.run(
             cmd, stdout=log, stderr=subprocess.STDOUT,

@@ -91,6 +91,7 @@ class CopisteriaConfig:
     fix_half_tuplets: bool = True   # finish a duplet/triplet the model gave to only some of its notes
     fill_empty_bars: bool = True   # bars the detector read nothing in: re-detect one size up, add what is found there
     single_staff: str = "auto"   # "yes": every staff is a system of its own (a part); "auto": when the part names its instrument
+    staff_rank_auto: bool = False   # staff_rank was derived from the part's number: only pages that are wholly a score are touched
     staff_rank: int = 0   # a score page inside a part book: keep staff N of each multi-staff system (0: off; musicocr/scoreops/staffpick.py)
     slur_filter: bool = True   # drop a tall box-shaped curve between two notes across a bar line (a stray curve, not a slur)
     text_tuplets: bool = True   # small "2"/"3" digits from the text layer mark duplets/triplets (copisteria_run.py)
@@ -141,6 +142,7 @@ class CopisteriaConfig:
                    synth_multirest=bool(d.get("synth_multirest", True)),
                    small_graces=bool(d.get("small_graces", False)),
                    staff_rank=int(d.get("staff_rank", 0)),
+                   staff_rank_auto=bool(d.get("staff_rank_auto", False)),
                    reveal_gaps=bool(d.get("reveal_gaps", True)),
                    multirest_form=form, ocr_backend=ocr_backend,
                    repo=str(d.get("repo", base.repo)),

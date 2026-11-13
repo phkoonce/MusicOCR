@@ -137,11 +137,13 @@ class Grid:
 
 
 def segments(n_src: int, first: int, length: int, breaks: Sequence[int],
-             anchor: Dict[int, int]) -> List[Tuple[int, int, int, int]]:
+             anchor: Dict[int, int], open_last: bool = False) -> List[Tuple[int, int, int, int]]:
     """Cut a page at its anchored systems: [(src_lo, src_hi, slot_lo, slot_hi)].
 
     ``anchor`` maps a system index to the slot its first bar must land on. Anchors that cannot be right
-    (not increasing, fewer slots than systems, more than 14 bars per system) are ignored."""
+    (not increasing, fewer slots than systems, more than 14 bars per system) are ignored.
+    ``open_last``: the last system is a single rest bar (a part that is tacet to the end of the piece), which may span any
+    number of bars."""
     edge = list(breaks) + [n_src]
     bounds = [(0, first)]
     for i in sorted(anchor):
@@ -149,7 +151,8 @@ def segments(n_src: int, first: int, length: int, breaks: Sequence[int],
         li, ls = bounds[-1]
         if i <= li or s - ls < i - li or s - ls > 14 * (i - li):
             continue
-        if first + length - s < len(breaks) - i or first + length - s > 14 * (len(breaks) - i):
+        if first + length - s < len(breaks) - i or first + length - s > 14 * (len(breaks) - i - open_last) + (
+                10 ** 6 if open_last else 0):
             continue
         bounds.append((i, s))
     bounds.append((len(breaks), first + length))

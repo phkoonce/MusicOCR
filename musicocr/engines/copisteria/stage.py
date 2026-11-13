@@ -122,7 +122,8 @@ def run(ctx: PipelineContext) -> StageResult:
         if ctx.config.omr.copisteria.staff_rank:
             try:
                 from musicocr.scoreops.staffpick import isolate_staff
-                k = isolate_staff(img, ctx.config.omr.copisteria.staff_rank, log=ctx.log)
+                k = isolate_staff(img, ctx.config.omr.copisteria.staff_rank, log=ctx.log,
+                                     uniform=ctx.config.omr.copisteria.staff_rank_auto)
                 ctx.log(f"  {img.stem}: staff {ctx.config.omr.copisteria.staff_rank} kept in {k} multi-staff system(s)"
                         if k else f"  {img.stem}: no multi-staff system found, page read as it is")
             except Exception as exc:  # noqa: BLE001

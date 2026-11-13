@@ -33,9 +33,24 @@ def linked_groups(arr, staves) -> List[List[int]]:
     return groups
 
 
-def isolate_staff(img_path: Path, rank: int, log=print) -> int:
+def is_score_page(groups: List[List[int]], n_staves: int) -> bool:
+    """True when *every* staff of the page sits in a joined system of the same size (>= 2): a page of a score.
+    A part page with one stray joined pair (a cue, a binding shadow, a piano reduction) is not."""
+    sizes = {len(g) for g in groups}
+    return len(sizes) == 1 and min(sizes) >= 2 and sum(len(g) for g in groups) == n_staves
+
+
+def part_number(label: str) -> int:
+    """The number a part's label ends with ("... - Horn 3" -> 3; 0 when it has none)."""
+    import re
+    m = re.search(r"(\d+)\s*$", label.strip())
+    return int(m.group(1)) if m else 0
+
+
+def isolate_staff(img_path: Path, rank: int, log=print, uniform: bool = False) -> int:
     """Blank all but staff ``rank`` (1-based) of each multi-staff system, in place; the original is kept as
-    ``<stem>.full.png``. Returns the number of systems handled (0: the page is untouched)."""
+    ``<stem>.full.png``. Returns the number of systems handled (0: the page is untouched).
+    ``uniform``: only a page whose staves all sit in joined systems of one size is touched (``is_score_page``)."""
     import numpy as np
     from PIL import Image
     from musicocr.text.words import find_staves
@@ -44,7 +59,10 @@ def isolate_staff(img_path: Path, rank: int, log=print) -> int:
     if len(staves) < 2:
         return 0
     arr = np.asarray(img) < 160
-    groups = [g for g in linked_groups(arr, staves) if len(g) >= 2]
+    all_groups = linked_groups(arr, staves)
+    if uniform and not is_score_page(all_groups, len(staves)):
+        return 0
+    groups = [g for g in all_groups if len(g) >= 2]
     if not groups:
         return 0
     out = np.asarray(img).copy()

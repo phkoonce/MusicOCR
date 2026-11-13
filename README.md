@@ -423,7 +423,7 @@ part is its own PDF (`musicocr/scoreops/retouch.py`, `musicocr/batch.py`).
 **A score page inside a part book.** A trio printed on staves joined by a system barline in every horn's book
 would read as one part with all its staves (three times the bars). `staff_rank = N` on a batch part (or `--staff-rank N`
 on `run`) keeps staff N of every multi-staff system and blanks the rest of the page image before the OMR
-(`musicocr/scoreops/staffpick.py`; pages of single staves are left alone; the original page is kept as `pNNN.full.png`).
+(`musicocr/scoreops/staffpick.py`; pages of single staves are left alone; the original page is kept as `pNNN.full.png`)). `staff_rank = "auto"` takes N from the number the part's label ends with ("... - Horn 3") and touches only pages that are wholly a score (every staff in a joined system of one size, so a stray bracket or a spiral binding never triggers it); a part whose number exceeds the staves of the page (the fourth horn of a trio) still needs `score = false`.
 
 **Rehearsal marks, whatever the edition prints.** Every page is searched for rings *and* boxes (no setting) and the
 label inside each is read from a contact sheet (a lone digit or letter defeats Vision, a row of them does not):
