@@ -49,6 +49,7 @@ class Part:
     instrument: str = ""  # transposition-table name; empty = leave pitches as written
     score: bool = True    # include in `musicocr combine` (False for e.g. percussion)
     small_graces: bool = False  # copisteria: small noteheads are ruff/flam grace notes (timpani, drums)
+    staff_rank: int = 0   # the part PDF is a score page: read staff N of each multi-staff system (copisteria)
     old_bass_clef: bool = False  # old-notation horn edition (see musicocr.scoreops.retouch)
     title: str = ""
     composer: str = ""
@@ -108,6 +109,7 @@ def parse_spec(data: dict, name: str, root: Path = ROOT) -> BatchSpec:
             instrument=raw.get("instrument", ""),
             score=bool(raw.get("score", True)),
             small_graces=bool(raw.get("small_graces", False)),
+            staff_rank=int(raw.get("staff_rank", 0)),
             old_bass_clef=bool(raw.get("old_bass_clef", False)),
             title=str(raw.get("title", "")),
             composer=str(raw.get("composer", "")),
@@ -274,6 +276,8 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
         cmd += ["--composer", part.composer]
     if part.small_graces and not spec.engines:
         cmd.append("--small-graces")
+    if part.staff_rank and not spec.engines:
+        cmd += ["--staff-rank", str(part.staff_rank)]
     with open(out_dir / f"{key}.run.log", "w") as log:
         rc = subprocess.run(
             cmd, stdout=log, stderr=subprocess.STDOUT,

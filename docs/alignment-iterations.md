@@ -155,3 +155,68 @@ choice (not attempted).
 paxman p11 (157 bars: 39 inserted), p10 (h1 reads 35 of 57), p24 (30), p31 (24), p33 (23), p07 (23), p45 (22), p86 (20 / 10 wrong-length), p81
 (23 wrong-length), p88; opera p03 (26), p06 (22: three parts lose the last 5 bars), p21 (19: h1/h3 read the "11" multi-rest as one bar),
 p18 (19), p02 (15), p12 (14), p10 (11, 8 dropped); xmas p02 (37 wrong-length), p01, p06, p15, p34.
+
+## 2026-11-13, round 4: Szeged arrangements, one staff of a score page, small multi-rest counts
+
+### Szeged (new corpora, copisteria, `batches/szeged-frozen.toml`, `batches/szeged-alpen.toml`, outputs in `output/szeged-*`)
+Part boundaries (the Stimmen PDFs are scans; the title block "If you like our arrangement ..." opens each part):
+Frozen 22 pp = Tbn 1 (1-2), 2 (3-4), 3 (5-6), 4 (7-8), Baritone in C (9-10), Tbn 5 (11-13), Bass Tbn 1 (14-16), Bass Tbn 2 (17-19), Drum Set
+(20-21), Glockenspiel (22). Alpen 57 pp = Tbn 1/Alto 1-5, Tbn 2 6-10, 3 11-15, 4 16-20, 5 21-25, Euphonium Bb 26-30, Euphonium C 31-35,
+Bass Tbn 36-40, Contrabass Tbn 41-44, Tuba 45-48, Timpani 49-52, Snare/Cymbals 53-54, Glockenspiel 55, Bass Drum 56-57 (drums `score = false`).
+Reference for Frozen: `Source/Musescore/Lopez - Let It Go - misc {Frozen}.mscz` converted to `output/refs/szeged_frozen_misc.ref.musicxml`
+(125 bars; 9 pitched parts; `Frozen - Szeged.mscz~` backup also converted, 125 bars, no Bass Tbn 2); `score_alignment.py` finds it by rule
+(`szeged-frozen`). No reference exists for Alpensinfonie.
+
+| corpus | combined bars | inserted / dropped / wrong-length | vs ref (matched / extra / missing) |
+|---|---|---|---|
+| szeged-frozen, round-3 code | 128 | 141 / 1 / 2 | 944 / 208 / 181 (raw parts 833 / 95 / 292) |
+| szeged-frozen, round-4 code | 128 | 119 / 1 / 2 | 968 / 184 / 157 (raw 837 / 93 / 288) |
+| szeged-alpen, round-3 code | 296 (parts read 198-262) | 511 / 32 / 85 | no ref |
+| szeged-alpen, round-4 code | 296 | 506 / 35 / 85 | no ref |
+
+Findings: Frozen's 128 bars vs 125 in the reference: the arrangement prints the last bars 126-128 (the ref lacks them or merges). The
+"raw bars" of a part are under-counted by `score_alignment` because the merged part file keeps only some `multiple-rest` tags
+(`score_alignment` counts a tag as N bars; `combine` reads the per-page files). Both pieces are dominated by OMR-side losses:
+multi-rest counts (see below), "a 2-bar-long measure read as one" (two tied whole notes whose bar line the OMR missed; combine splits
+these, 29 in Alpen), and 8-19 bar multi-rests that the OMR reads without count. Alpen total printed bars: 296 (the last-page totals of
+the parts that lost nothing). Glockenspiel and Bass Drum read 28 / 13 of 296 bars (mostly multi-rests).
+
+### Kept changes
+1. **Multi-rest counts 2.0-2.5 staff spaces tall were dropped** (`engines/copisteria/run.py` `_is_count`; `text/page_text.py`
+   `add_missing_multirest_dets`, `_blocks_to_multirests`, `_firm_bar_span`). The digit-height bound (2.5 spaces, then 3.5 for
+   synthesised H-bars) discarded the counts of engraved parts and camera scans (Szeged "8"/"3", Wagner "11", Paxman "2"-"7"). Now a
+   digit >= 1.5 spaces counts when it is centred over the multi-rest bar (nearest to the bar's centre first, so a bar number at the
+   bar's left end still loses); a digit >= 1.8 spaces over an *empty* bar of >= 6 spaces' width, not stacked (time signature), not inside a
+   circled rehearsal number (`find_circles` boxes passed from `stage._prepare_dets`), makes a `multiRest`; a short thick block
+   (1-2.6 spaces) under such a digit that the detector read as `barLine_single`/whole rest/breve is re-labelled `multiRest`, and the
+   bar's extent comes from the *firm* bar lines around it. Offline check of the changed rule on all cached detections (`add_missing_...`
+   on copies; precision judged from ~40 page crops: paxman, gb, httyd2): every sampled addition a real count except GB rehearsal rings (fixed by the
+   ring list and the width bound; GB p01-03 p03 h1/h2 add 4 genuine "2" rests; re-read in scratch: bars and vs-ref unchanged). Re-runs:
+   opera p21 h1 21 -> 31 bars (p21 inserted 19 -> 4; h3 still 21 because Vision reads the bold "9" as "6"), paxman p10 inserted
+   31 -> 13 (h2-h4 55/50/55 -> 57/56/57, h1 35 -> 40 of 57). Szeged Frozen 141 -> 119 inserted.
+2. **Per-part staff choice for a score page inside a part book** (`scoreops/staffpick.py`, `staff_rank` batch/CLI/config key). The trio
+   page (paxman p88: "Horn 1/2/3" on joined staves) was read as one part with 3 staves per system. The staves of a system are told by a
+   vertical line (system barline / bracket) across the gap left of the staves; the other staves of each system are whitened before the
+   OMR (original kept as `pNNN.full.png`). Pages of single staves are untouched (tested on a part page). paxman p88 h1-h3 66-102
+   bars -> 34/34/34, piece 34 bars 0 inserted/dropped/wrong (was 66 bars with 144 dropped; or 102); `p88_h4` set `score = false` (a trio:
+   there is no fourth staff). The batch part needs `staff_rank = N`; there is no auto-detect of N.
+Tests: `tests/test_round4.py` (4). Full suite 496 passed.
+
+### Regression check
+Combine code is unchanged in this round, so scorecards of corpora whose parts were not re-run are identical to round 3 (GB p01-03 vs refs
+9/9, 10/10, 16/24 extra/missing; Zerberus vs ref 76/76 with 210 bars; `output/scorecards/r4-gb-p01-03.json`, `r4-zerberus.json`). The OMR
+changes were verified offline on cached detections for goldfaden (1 genuine addition), ghs-opera / ghs-xmas / zerberus / braveheart (0 additions)
+and not re-run on those corpora. Replaced outputs are backed up in `output/paxman-all-pre-round4/` (p88 h1-h4, p10 h1-h4, their
+combined pieces) and `output/ghs-opera-pre-round4/` (p21 h1/h3 and combined); the first Szeged runs (round-3 code) are in
+`output/szeged-frozen-r4base/`, `output/szeged-alpen-r4base/`. Scorecards: `output/scorecards/r4-*.json`, summary
+`alignment-round4-2026-11-13.json`.
+
+### Not done / remaining
+- Multi-rest counts: Vision reads a bold "9" as "6" (opera p21 h3): a vote over the other parts' counts at combine would fix it; paxman p10 h1 still reads 40 of 57
+  (thick blocks read as strong bar lines / whole rests in some bars: re-run with the final code was done, the rest are digits not
+  over a firm-bar-lines bar); p11 (157 bars) and p07 were not re-run (same kind of "2"-"7" counts). Re-run the pages that the offline check changes (paxman about 90
+  page-parts, gb-all about 6)
+  to adopt the fix corpus-wide; httyd2 has 139 page-parts with additions (its cached detections predate the synthetic H-bars).
+- Szeged: a staff-wise `score_alignment` for Alpen needs a reference (none); the merged part file drops `multiple-rest` tags (the
+  per-page files keep them), so "raw bars" in the scorecard under-count parts that open with multi-rests.
+- `staff_rank` is manual; a trio page read for a fourth horn (`p88_h4`) is simply not combined.

@@ -169,6 +169,8 @@ def boost_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
 
 MIN_TALL_SP = 3.5     # a multi-rest count is set big (3.7-10 staff spaces tall, by scan and OCR box); tuplet digits, bar numbers
                       # and fingerings are 2-3 spaces
+MIN_SMALL_COUNT_SP = 1.8  # ... but camera scans and engraved parts set it only 2.0-2.5 spaces tall (Paxman, Szeged): over an
+                          # empty bar, centred, and not stacked with another digit it is still a count (add_missing_multirest_dets)
 MIN_DIGIT_MARK_SP = 3.0  # a digit box this tall (staff spaces) can swallow a segno/coda detection (drop_digit_repeat_marks)
 REAL_CONF = 0.5       # detections below this are not counted as evidence of what a bar holds
 BREVE_ALONE_CONF = 0.3  # without a digit over it, only a breve this weak that is alone in its bar is re-labelled
@@ -265,7 +267,82 @@ def drop_digit_repeat_marks(dets_path: Path, texts_path: Path, log=None) -> int:
     return dropped
 
 
-def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> int:
+def _firm_bar_span(dets: list[dict], x0: float, y0: float, x1: float, y1: float, cx: float) -> tuple[float, float]:
+    """The bar around ``cx`` between *firm* bar lines (and the clef / key / time signature before it).
+
+    A multi-rest's thick H-bar is often read as a weak bar line (Paxman scans: ``barLine_single`` at 0.4), which
+    cuts the bar in two ``measure`` boxes with the count digit on the seam; the digit is centred on the real bar.
+    """
+    left, right = [], []
+    for e in dets:
+        if e.get("conf", 1.0) < REAL_CONF:
+            continue
+        b, c = e["xyxy"], e.get("cls", "")
+        if b[3] < y0 or b[1] > y1:
+            continue
+        if c.startswith("barLine") and (b[0] + b[2]) / 2 > cx:
+            right.append((b[0] + b[2]) / 2)
+        elif (c.startswith("barLine") or c.split("_")[0] in ("clef", "keySig", "meterSig")) and b[2] <= cx:
+            left.append(b[2])
+    nx0, nx1 = max(left, default=x0), min(right, default=x1)
+    return (nx0, nx1) if nx0 < cx < nx1 else (x0, x1)
+
+
+def stacked_digit(b, digits) -> bool:
+    """Another digit right above/below it: the two numerals of a time signature."""
+    w, h = b[2] - b[0], b[3] - b[1]
+    return any(o is not b and abs((o[0] + o[2]) / 2 - (b[0] + b[2]) / 2) <= 0.6 * max(w, 1)
+               and 0 < abs(o[1] - b[1]) <= 1.8 * h for o in digits)
+
+
+MIN_BAR_SP = 6.0          # a multi-rest bar is at least this wide (the bar a rehearsal number/ring stands over is clef-to-repeat narrow)
+BLOCK_MAX_SP = 2.6        # a thick multi-rest block read as a bar line or a whole rest is shorter than a staff's 4 spaces
+
+
+def _blocks_to_multirests(dets: list[dict], digits: list[list[float]], sp: float, log=None) -> int:
+    """Re-label a short thick block under a count digit as the multi-rest H-bar.
+
+    Old-style engravings (Paxman, Szeged) draw a multi-rest as a short thick bar on the middle line with its count over
+    it. The detector reads it as a ``barLine_single`` (which then cuts the bar in two, whatever the confidence) or as a
+    whole-measure rest. A bar line is a whole staff tall, a whole rest is a thin slab; a block of 1-2.6 spaces
+    directly under a digit is the H-bar, so it becomes a ``multiRest`` over the bar between the firm bar lines around it.
+    """
+    fixed = 0
+    for b in digits:
+        cx = (b[0] + b[2]) / 2
+        for d in list(dets):
+            cls = str(d.get("cls", ""))
+            if cls not in ("barLine_single", "mRest_measure", "rest_whole", "note_breve") or d.get("conf", 1.0) < 0.2:
+                continue
+            x0, y0, x1, y1 = d["xyxy"]
+            h = y1 - y0
+            if not (abs((x0 + x1) / 2 - cx) <= max(0.5 * (b[2] - b[0]), 0.7 * sp) and 0 < y0 - b[3] < 4 * sp
+                    and (cls != "barLine_single" or sp <= h <= BLOCK_MAX_SP * sp)):
+                continue
+            rest = [e for e in dets if e is not d]
+            staff = [e for e in rest if e.get("cls") == "measure" and e["xyxy"][0] < cx < e["xyxy"][2]
+                     and e["xyxy"][1] - 8 * sp < y0 < e["xyxy"][3]]
+            if not staff:
+                break
+            m = staff[0]["xyxy"]
+            bx0, bx1 = _firm_bar_span(rest, m[0], m[1], m[2], m[3], cx)
+            if any(e.get("conf", 1.0) >= REAL_CONF and bx0 < (e["xyxy"][0] + e["xyxy"][2]) / 2 < bx1
+                   and abs((e["xyxy"][1] + e["xyxy"][3]) / 2 - (y0 + y1) / 2) < 6 * sp
+                   and e.get("cls", "").split("_")[0] in ("note", "rest", "multiRest") for e in rest):
+                break       # the bar has notes of its own: the digit is something else
+            if abs(cx - (bx0 + bx1) / 2) > 0.2 * (bx1 - bx0) or bx1 - bx0 < MIN_BAR_SP * sp:
+                break       # a count is centred over a bar of some width; a rehearsal number over a repeat bar line is not
+            box = [bx0 + 0.02 * (bx1 - bx0), m[1] - sp, bx1 - 0.02 * (bx1 - bx0), m[1] + 0.7 * (m[3] - m[1])]
+            if log:
+                log(f"  {cls} at ({x0:.0f},{y0:.0f}) under a count digit: re-labelled multiRest")
+            dets.remove(d)
+            dets.append(_multirest_det(box))
+            fixed += 1
+            break
+    return fixed
+
+
+def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None, rings=()) -> int:
     """Add a ``multiRest`` detection to an *empty* bar that has a big count digit over it.
 
     Copisteria's detector sometimes misses a multi-rest H-bar altogether at its default input
@@ -275,6 +352,7 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> i
     note/rest/multiRest detection of its own is an independent witness, so a box shaped like the
     detector's own (the bar's width, from one space above its top to 0.7 of its height) is added
     with a confident score.
+    ``rings`` are the boxes of circled rehearsal numbers: a digit inside one is never a count.
     Rewrites ``dets_path`` in place; returns the number of detections added.
     """
     try:
@@ -285,6 +363,8 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> i
     sp = _staff_space(dets)
     if not sp:
         return 0
+    texts = [t for t in texts if "xyxy" not in t or not any(
+        r[0] <= (t["xyxy"][0] + t["xyxy"][2]) / 2 <= r[2] and r[1] <= (t["xyxy"][1] + t["xyxy"][3]) / 2 <= r[3] for r in rings)]
     measures = [d for d in dets if d.get("cls") == "measure"]
     tall = [t["xyxy"] for t in texts if _DIGITS.fullmatch(str(t.get("text", "")).strip())
             and t["xyxy"][3] - t["xyxy"][1] >= MIN_TALL_SP * sp]
@@ -292,25 +372,32 @@ def add_missing_multirest_dets(dets_path: Path, texts_path: Path, log=None) -> i
     content = [d for d in dets if d.get("cls", "").split("_")[0] in ("note", "rest", "mRest", "multiRest")
                and d.get("conf", 1.0) >= 0.5]
 
+    medium = [t["xyxy"] for t in texts if _DIGITS.fullmatch(str(t.get("text", "")).strip())
+              and t["xyxy"][3] - t["xyxy"][1] >= MIN_SMALL_COUNT_SP * sp]
+
     def stacked(b) -> bool:
-        """Another tall digit right above/below it: the two numerals of a time signature."""
-        w, h = b[2] - b[0], b[3] - b[1]
-        return any(o is not b and abs((o[0] + o[2]) / 2 - (b[0] + b[2]) / 2) <= 0.6 * max(w, 1)
-                   and 0 < abs(o[1] - b[1]) <= 1.8 * h for o in tall)
+        return stacked_digit(b, medium)
+
+    counts = [t["xyxy"] for t in texts if _DIGITS.fullmatch(str(t.get("text", "")).strip()) and int(t["text"]) >= 2
+              and t["xyxy"] in medium]
+    added += _blocks_to_multirests(dets, [b for b in counts if not stacked_digit(b, medium)], sp, log)
 
     for t in texts:
         if not _DIGITS.fullmatch(str(t.get("text", "")).strip()):
             continue
         tx0, ty0, tx1, ty1 = t["xyxy"]
-        if (ty1 - ty0) < MIN_TALL_SP * sp or stacked(t["xyxy"]):
+        if (ty1 - ty0) < MIN_SMALL_COUNT_SP * sp or stacked(t["xyxy"]):
             continue
         cx, cy = (tx0 + tx1) / 2, (ty0 + ty1) / 2
         for m in measures:
             x0, y0, x1, y1 = m["xyxy"]
             if not (x0 < cx < x1 and y0 - 8 * sp < cy < y0 + (y1 - y0) / 2):
                 continue
+            x0, x1 = _firm_bar_span(dets, x0, y0, x1, y1, cx)
             if abs(cx - (x0 + x1) / 2) > 0.2 * (x1 - x0):
                 break          # a count is centred over its bar; a time signature sits at its left edge
+            if (ty1 - ty0) < MIN_TALL_SP * sp and x1 - x0 < MIN_BAR_SP * sp:
+                break          # a small digit over a narrow bar is a rehearsal number over a repeat sign, not a count
             if any(x0 <= (c["xyxy"][0] + c["xyxy"][2]) / 2 <= x1
                    and y0 - 3 * sp <= (c["xyxy"][1] + c["xyxy"][3]) / 2 <= y1 + 3 * sp for c in content):
                 break

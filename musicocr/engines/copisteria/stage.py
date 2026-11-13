@@ -64,6 +64,19 @@ def run(ctx: PipelineContext) -> StageResult:
     def _big_cache(img: Path) -> Path:
         return img.with_name(f"{img.stem}.big_dets.json")
 
+    def _rings(img: Path, dets: Path) -> list:
+        """Boxes of the circled rehearsal numbers on the page (their digits are not multi-rest counts)."""
+        try:
+            from PIL import Image
+            from musicocr.text.circles import find_circles
+            from musicocr.text.page_text import _staff_space
+            sp = _staff_space(json.loads(dets.read_text()))
+            with Image.open(img) as im:
+                return [c.box for c in find_circles(im.convert("L"), sp or 36.0)]
+        except Exception as exc:  # noqa: BLE001
+            ctx.log(f"  {img.stem}: ring search skipped ({type(exc).__name__}: {exc})")
+            return []
+
     def _prepare_dets(img: Path, texts_found: bool) -> None:
         # Detect first (cached beside the page, the pipeline then reuses it), then adjust the
         # cached detections before the evidence model reads them: bars the detector found
@@ -90,7 +103,7 @@ def run(ctx: PipelineContext) -> StageResult:
                 if texts_found:
                     drop_digit_repeat_marks(dets, texts, log=ctx.log)
                     if cfg.synth_multirest:
-                        add_missing_multirest_dets(dets, texts, log=ctx.log)
+                        add_missing_multirest_dets(dets, texts, log=ctx.log, rings=_rings(img, dets))
                     boost_multirest_dets(dets, texts, log=ctx.log)
                 if cfg.small_graces:        # after the fill, whose added notes may be small too
                     n = mark_small_graces(dets)
@@ -106,6 +119,14 @@ def run(ctx: PipelineContext) -> StageResult:
         if mode == "auto":
             mode = "pdf-layer" if have_pdf and pdf_has_text(pdftotext, source_pdf, page,
                                                             log=ctx.log) else "ocr"
+        if ctx.config.omr.copisteria.staff_rank:
+            try:
+                from musicocr.scoreops.staffpick import isolate_staff
+                k = isolate_staff(img, ctx.config.omr.copisteria.staff_rank, log=ctx.log)
+                ctx.log(f"  {img.stem}: staff {ctx.config.omr.copisteria.staff_rank} kept in {k} multi-staff system(s)"
+                        if k else f"  {img.stem}: no multi-staff system found, page read as it is")
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  {img.stem}: staff pick skipped ({type(exc).__name__}: {exc})")
         n = 0
         if mode == "pdf-layer" and have_pdf:
             n = write_texts_json(pdftotext, source_pdf, page, img, log=ctx.log)

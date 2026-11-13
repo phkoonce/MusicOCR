@@ -32,8 +32,26 @@ from pathlib import Path
 
 RATIO = {2: "2/3", 3: "3/2"}
 MIN_TALL_SP = 3.5           # a tuplet digit is shorter than this (staff spaces), the count of a multi-rest taller
-MIN_COUNT_SP = 2.5          # ... but a digit over a detected multi-rest H-bar is its count whatever its size: scans
-                            # set it 3.1-3.4 spaces tall (Goldfaden), under the bound that suits engraved parts
+MIN_COUNT_SP = 2.5          # a digit over a detected multi-rest H-bar this tall is its count: scans set it 3.1-3.4
+                            # spaces tall (Goldfaden)
+MIN_CENTRED_SP = 1.5        # engraved parts set it 2.0-2.4 spaces: counted when centred on the H-bar, not a bar number
+CENTRED_FRAC = 0.35         # centred = |digit centre - bar centre| <= this share of the bar's width + 1 space
+
+
+def _is_count(xyxy, box, sp: float) -> bool:
+    """Is this digit box the count of the multi-rest whose H-bar is ``box``?
+
+    A tall digit is (``MIN_COUNT_SP``); a small one only when it sits over the middle of the H-bar. The
+    counts of engraved parts are often 2.0-2.4 spaces tall (Szeged "8", "3"; Wagner "11") and were dropped
+    by the height bound alone, while the small numbers that must not count (a bar number or a rehearsal
+    number above a system's first bar) stand at the bar's left end, not over its middle.
+    """
+    if (xyxy[3] - xyxy[1]) >= MIN_COUNT_SP * sp:
+        return True
+    if (xyxy[3] - xyxy[1]) < MIN_CENTRED_SP * sp:
+        return False
+    w = box[2] - box[0]
+    return abs((xyxy[0] + xyxy[2]) / 2 - (box[0] + box[2]) / 2) <= CENTRED_FRAC * w + sp
 
 
 def _install() -> None:
@@ -81,7 +99,9 @@ def _install() -> None:
 
     def _texts_near(texts, box, sp):
         if texts:
-            texts = [t for t in texts if "xyxy" in t and (t["xyxy"][3] - t["xyxy"][1]) >= MIN_COUNT_SP * sp]
+            bc = (box[0] + box[2]) / 2
+            texts = sorted((t for t in texts if "xyxy" in t and _is_count(t["xyxy"], box, sp)),
+                           key=lambda t: abs((t["xyxy"][0] + t["xyxy"][2]) / 2 - bc))   # the most central digit first
         return orig_near(texts, box, sp)
 
     w._texts_near = _texts_near

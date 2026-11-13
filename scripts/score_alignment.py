@@ -40,6 +40,7 @@ STEP = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 RULES = [
     (r"^gb-", lambda piece: f"gb_p{piece:02d}.ref.musicxml" if piece else None),
     (r"^zerberus$", lambda piece: "zerberus_new_ref.musicxml"),
+    (r"^szeged-frozen$", lambda piece: "szeged_frozen_misc.ref.musicxml"),
 ]
 
 

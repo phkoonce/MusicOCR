@@ -35,6 +35,8 @@ def apply_run_overrides(config: Config, args) -> Config:
         omr = replace(omr, extra_constants=list(g("constant")))
     if g("small_graces") is not None:
         omr = replace(omr, copisteria=replace(omr.copisteria, small_graces=g("small_graces")))
+    if g("staff_rank"):
+        omr = replace(omr, copisteria=replace(omr.copisteria, staff_rank=g("staff_rank")))
 
     pp = config.preprocess
     if g("preprocess") is not None:
@@ -365,6 +367,9 @@ def _add_run_parser(sub) -> None:
                    help="copisteria: treat small noteheads as grace notes (timpani/drum ruffs and "
                         "flams; overrides [omr.copisteria] small_graces)")
     r.add_argument("--no-small-graces", dest="small_graces", action="store_false")
+    r.add_argument("--staff-rank", dest="staff_rank", type=int, default=None, metavar="N",
+                   help="copisteria: the page is a score inside a part book; read staff N of each "
+                        "multi-staff system (a trio page in every horn's book: horn N)")
     r.add_argument("--old-bass-clef", dest="old_bass_clef", action="store_true", default=None,
                    help="old-notation horn edition: make bass clefs octave-up and raise their notes an octave")
     r.add_argument("--title", metavar="TEXT", help="piece title for the score metadata (drops the misread printed title)")

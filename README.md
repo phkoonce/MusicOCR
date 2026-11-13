@@ -209,6 +209,11 @@ default (on). Fixes declare ordering constraints (`after=`), which the registry 
   picks one or the union, the default, since each misses some isolated numerals) and
   `texts = "auto"` picks the PDF layer when the page has one, else OCR. Without
   either, scanned multi-rest counts are lost.
+* **Small count digits.** Old-style engravings (Paxman, Szeged, Wagner parts) set a multi-rest's count only 2.0-2.5 staff
+  spaces tall. A digit that size is a count when it sits over the middle of the multi-rest H-bar, or over an empty bar of at
+  least 6 spaces' width where the detector found only a short thick block (read as a `barLine_single`, a whole rest or a
+  breve: it is re-labelled `multiRest`), is not stacked with another digit (time signature) and is not inside a circled
+  rehearsal number (`musicocr/text/page_text.py`, `engines/copisteria/run.py`).
 * **Multi-rest form.** With counts, Copisteria writes the standard expanded form
   (a tagged bar plus N−1 following rest bars, so bar numbers match print);
   homr writes one collapsed bar per multi-rest. The pipeline's canonical form is
@@ -414,6 +419,11 @@ flagged "check". Pick one piece's parts with `--only`; `title` / `composer` on t
 the combined score. Per-part options for such books: `old_bass_clef` (old-notation horn editions:
 octave-up bass clef, notes up an octave), `title`, `composer`, and a per-part `source_pdf` when each
 part is its own PDF (`musicocr/scoreops/retouch.py`, `musicocr/batch.py`).
+
+**A score page inside a part book.** A trio printed on staves joined by a system barline in every horn's book
+would read as one part with all its staves (three times the bars). `staff_rank = N` on a batch part (or `--staff-rank N`
+on `run`) keeps staff N of every multi-staff system and blanks the rest of the page image before the OMR
+(`musicocr/scoreops/staffpick.py`; pages of single staves are left alone; the original page is kept as `pNNN.full.png`).
 
 **Rehearsal marks, whatever the edition prints.** Every page is searched for rings *and* boxes (no setting) and the
 label inside each is read from a contact sheet (a lone digit or letter defeats Vision, a row of them does not):
