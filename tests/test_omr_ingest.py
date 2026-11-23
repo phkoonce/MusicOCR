@@ -131,7 +131,7 @@ def test_homr_reuses_existing_output_unless_forced(tmp_path, monkeypatch):
     fake = tmp_path / "py"
     fake.write_text("")
     ctx = _ctx(tmp_path, pages="1", tools={"homr_python": str(fake)})
-    existing = ctx.workdir / "pages" / "p001" / "p001.musicxml"
+    existing = ctx.scratch / "pages" / "p001" / "p001.musicxml"
     existing.parent.mkdir(parents=True)
     existing.write_text("<score-partwise/>")
     calls = _fake_homr(monkeypatch, ok_pages={1})
@@ -185,8 +185,8 @@ def test_ingest_copies_pdf_and_parses_page_count(tmp_path, monkeypatch):
 
     monkeypatch.setattr(ingest, "run_cmd", lambda cmd, **kw: (seen.append(cmd), P)[1])
     res = ingest.run(ctx)
-    assert (ctx.workdir / "source.pdf").read_bytes() == b"%PDF fake"
-    assert ctx.artifacts.source_pdf == ctx.workdir / "source.pdf"
+    assert (ctx.scratch / "source.pdf").read_bytes() == b"%PDF fake"
+    assert ctx.artifacts.source_pdf == ctx.scratch / "source.pdf"
     assert ctx.artifacts.page_count == 7
     assert res.detail == "in, 7 page(s)"
     assert res.data == {"page_count": 7}

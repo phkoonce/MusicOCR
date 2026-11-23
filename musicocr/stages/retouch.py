@@ -2,7 +2,7 @@
 ``musicocr.scoreops.retouch`` -- old-notation bass clefs, and the piece's title and composer.
 
 Off unless ``--old-bass-clef``, ``--title`` or ``--composer`` is given (or ``[stages.retouch]`` sets
-them). Re-runnable like transpose: the untouched file is kept under ``<workdir>/pre-retouch/`` and
+them). Re-runnable like transpose: the untouched file is kept under ``<scratch>/pre-retouch/`` and
 every run starts from that copy.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ def run(ctx: PipelineContext) -> StageResult:
     targets = [xml] + [p for p in (ctx.artifacts.musicxml_pages or []) if p != xml]
 
     stamps = ctx.artifacts.retouch_stamps
-    backup_dir = ctx.workdir / "pre-retouch"
+    backup_dir = ctx.scratch / "pre-retouch"
     backup_dir.mkdir(parents=True, exist_ok=True)
     moved = dropped = 0
     for path in targets:

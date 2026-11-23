@@ -44,13 +44,14 @@ def run(ctx: PipelineContext) -> StageResult:
     by_page = ctx.artifacts.mxl_by_page
     if not by_page:
         flat = ctx.artifacts.mxl_files or sorted(
-            p for p in ctx.workdir.rglob("*.mxl") if "experiments" not in p.parts)
+            p for p in ctx.scratch.rglob("*.mxl") if "experiments" not in p.parts)
         if not flat:
             raise StageError("no .mxl files found; run the omr stage first")
         by_page = {0: flat}
 
-    out = ctx.workdir
-    master = out / f"{ctx.book_name}.musicxml"
+    out = ctx.scratch                       # per-page / movement files: intermediates
+    out.mkdir(parents=True, exist_ok=True)
+    master = ctx.workdir / f"{ctx.book_name}.musicxml"   # the deliverable
 
     # Whole-book mode (single pseudo-page 0): behave like a plain extract.
     if set(by_page) == {0}:

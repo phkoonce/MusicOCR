@@ -25,11 +25,11 @@ def run(ctx: PipelineContext) -> StageResult:
     if not tool:
         return StageResult("qa", "skipped", "pdftoppm not found (brew install poppler)")
 
-    qa_dir = ctx.workdir / "qa"
+    qa_dir = ctx.scratch / "qa"
     dpi = ctx.config.output.qa_dpi
-    source_pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.shared_scratch / "source.pdf")
     render_pdfs = ctx.artifacts.render_pdfs or [
-        ctx.artifacts.render_pdf or (ctx.workdir / "render.pdf")
+        ctx.artifacts.render_pdf or (ctx.scratch / "render.pdf")
     ]
 
     src_pages, omr_pages = [], []

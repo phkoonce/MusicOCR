@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable
 
 from musicocr.artifacts import Artifacts
-from musicocr.config import Config
+from musicocr.config import Config, scratch_dir
 from musicocr.errors import StageError, StageResult
 from musicocr.state import load_state, restore_missing, save_state
 from musicocr.stages import STAGE_ORDER, load_stage
@@ -45,6 +45,18 @@ class PipelineContext:
     def shared(self) -> Path:
         return self.shared_dir or self.workdir
 
+    # Everything that is not a final deliverable (rasters, OMR projects, logs, per-page
+    # files, backups, QA renders, state, reports) lives under a ``ttl=<n><unit>`` directory,
+    # which the ttl-sweep launchd job prunes by age. Only ``<book>.musicxml`` / ``.mscz``
+    # sit directly in ``workdir`` and are kept indefinitely.
+    @property
+    def scratch(self) -> Path:
+        return scratch_dir(self.workdir, self.config)
+
+    @property
+    def shared_scratch(self) -> Path:
+        return scratch_dir(self.shared, self.config)
+
 
 def resolve_slice(from_stage: str | None, to_stage: str | None) -> list[str]:
     start = STAGE_ORDER.index(from_stage) if from_stage else 0
@@ -66,8 +78,8 @@ def run_pipeline(
 ) -> list[StageResult]:
     slc = resolve_slice(from_stage, to_stage)
     # Re-entering mid-pipeline: reload artifacts saved by earlier stages.
-    if slc and slc[0] != STAGE_ORDER[0] and ctx.workdir.exists():
-        prior = load_state(ctx.workdir)
+    if slc and slc[0] != STAGE_ORDER[0] and ctx.scratch.exists():
+        prior = load_state(ctx.scratch)
         restored = restore_missing(ctx.artifacts, prior)
         if restored:
             ctx.log(f"  (restored {restored} artifact(s) from a previous run)")
@@ -86,8 +98,8 @@ def run_pipeline(
         result.duration_s = time.monotonic() - t0
         results.append(result)
         ctx.log(f"[{name}] {result.status} ({result.duration_s:.1f}s) {result.detail}".rstrip())
-        if result.ok and ctx.workdir.exists():
-            save_state(ctx.workdir, ctx.artifacts)
+        if result.ok and ctx.scratch.exists():
+            save_state(ctx.scratch, ctx.artifacts)
         if not result.ok and not keep_going:
             break
     return results

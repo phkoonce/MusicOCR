@@ -50,8 +50,8 @@ def test_run_part_writes_into_batch_output_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(batch.subprocess, "run", fake_run)
     entry = batch.run_part(spec, spec.parts[0], tmp_path / "Demo_a.pdf")
     assert seen["cmd"][seen["cmd"].index("--output") + 1] == str(spec.output_dir)
-    assert entry["status"] == batch.DONE and "output/demo/Demo_a/report.md" in entry["note"]
-    assert (spec.output_dir / "Demo_a.run.log").exists()
+    assert entry["status"] == batch.DONE and "output/demo/Demo_a/ttl=30d/report.md" in entry["note"]
+    assert (spec.output_dir / "ttl=30d" / "Demo_a.run.log").exists()
 
 
 def test_engines_selects_compare_command(tmp_path, monkeypatch):

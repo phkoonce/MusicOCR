@@ -36,7 +36,7 @@ def ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
     pdftoppm = ctx.config.resolve_tool("pdftoppm")
     if not pdftoppm:
         return None
-    source_pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.shared_scratch / "source.pdf")
     return prepare_page(source_pdf, page, dst, ctx.config.preprocess, pdftoppm, ctx.log)
 
 
@@ -59,7 +59,7 @@ def run_raster_pages(
     if not pages:
         raise StageError("no pages to transcribe (unknown page count and no --pages)")
 
-    pages_root = ctx.workdir / "pages"
+    pages_root = ctx.scratch / "pages"
     by_page: dict[int, list[Path]] = {}
     failed: list[int] = []
     logs: list[Path] = []

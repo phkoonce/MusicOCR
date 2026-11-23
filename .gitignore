@@ -49,3 +49,6 @@ __pycache__/
 
 # Per-project caches (collection page OCR); the rest of workflows/<name>/ is committed
 /workflows/*/cache/
+
+# Intermediates / logs swept by ~/Dev/ttl-sweep
+ttl=*/

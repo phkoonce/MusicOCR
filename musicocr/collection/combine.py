@@ -41,7 +41,8 @@ def piece_row(spec: CollectionSpec, num: int, redo: bool = False,
             cmd.append("--no-bar-numbers")
         r = (run or (lambda c: subprocess.run(c, capture_output=True, text=True)))(cmd)
         if d.exists():
-            (d / "combine.log").write_text(r.stdout + r.stderr)
+            (d / "ttl=30d").mkdir(exist_ok=True)     # log is cruft: swept by ttl-sweep
+            (d / "ttl=30d" / "combine.log").write_text(r.stdout + r.stderr)
     report = d / f"{spec.name}_combined.report.txt"
     bars, lengths, repaired, bad = parse_report(report.read_text() if report.exists() else "")
     return Row(num, bars, lengths, repaired, bad, mscz.exists())

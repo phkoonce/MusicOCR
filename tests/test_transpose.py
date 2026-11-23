@@ -179,7 +179,7 @@ def test_stage_is_idempotent_and_restores_from_written_copy(tmp_path):
     assert stage.run(ctx).status == "ok"          # second run must not shift again
     assert xml.read_text() == first
     assert _read(ET.parse(xml).getroot()) == [("F", 0, 4)]
-    assert _read(ET.parse(tmp_path / "written" / "book.musicxml").getroot()) == [("C", 0, 5)]
+    assert _read(ET.parse(tmp_path / "ttl=30d" / "written" / "book.musicxml").getroot()) == [("C", 0, 5)]
 
     # a fresh upstream rewrite becomes the new written copy
     ET.ElementTree(_score("Voice", [("D", 0, 5)])).write(xml)

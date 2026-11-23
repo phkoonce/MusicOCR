@@ -56,7 +56,7 @@ def run(ctx: PipelineContext) -> StageResult:
     detector = ctx.config.omr.copisteria.detector
 
     pdftotext = ctx.config.resolve_tool("pdftotext")
-    source_pdf = ctx.artifacts.source_pdf or (ctx.shared / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.shared_scratch / "source.pdf")
 
     run_script = Path(__file__).resolve().parent / "run.py"
     script = Path(__file__).resolve().parent / "detect.py"
@@ -83,7 +83,7 @@ def run(ctx: PipelineContext) -> StageResult:
         """Shipped digit templates + this part's own OCR-read counts (built once per run)."""
         if not bank_cache:
             from musicocr.text.countdigits import default_bank
-            bank_cache.append(default_bank(ctx.workdir / "pages"))
+            bank_cache.append(default_bank(ctx.scratch / "pages"))
         return bank_cache[0]
 
     def _prepare_dets(img: Path, texts_found: bool) -> None:

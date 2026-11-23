@@ -55,15 +55,15 @@ def _newest_log(d: Path):
 
 
 def _run_whole_book(ctx, tool, source_pdf) -> StageResult:
-    cmd = _base_cmd(ctx, tool, ctx.workdir)
+    cmd = _base_cmd(ctx, tool, ctx.scratch)
     if ctx.pages:
         cmd += ["-sheets", *ctx.pages.split()]
     cmd += ["--", str(source_pdf)]
     res = run_cmd_lenient(cmd, timeout=ctx.config.omr.timeout, log=ctx.log)
     if res is None:
         raise StageError(f"could not launch Audiveris: {tool}")
-    mxl = _mxls_in(ctx.workdir, recursive=False)
-    ctx.artifacts.omr_log = _newest_log(ctx.workdir)
+    mxl = _mxls_in(ctx.scratch, recursive=False)
+    ctx.artifacts.omr_log = _newest_log(ctx.scratch)
     if not mxl:
         tail = (res.output or "").strip().splitlines()[-15:]
         raise StageError(
@@ -74,13 +74,13 @@ def _run_whole_book(ctx, tool, source_pdf) -> StageResult:
     ctx.artifacts.mxl_files = mxl
     ctx.artifacts.mxl_by_page = {0: mxl}
     ctx.artifacts.omr_failed_pages = []
-    omr = _iter_omr(ctx.workdir, recursive=False)
+    omr = _iter_omr(ctx.scratch, recursive=False)
     ctx.artifacts.omr_project = omr[-1] if omr else None
     return StageResult("omr", "ok", f"{len(mxl)} .mxl (whole book)")
 
 
 def _run_per_page(ctx, tool, source_pdf, pages: list[int]) -> StageResult:
-    pages_root = ctx.workdir / "pages"
+    pages_root = ctx.scratch / "pages"
     prepped = ctx.artifacts.prepped_pages or {}
     by_page: dict[int, list[Path]] = {}
     failed: list[int] = []
@@ -146,21 +146,21 @@ def run(ctx: PipelineContext) -> StageResult:
             f"Audiveris not found at {ctx.config.tools.audiveris!r} (edit config.toml [tools])"
         )
 
-    source_pdf = ctx.artifacts.source_pdf or (ctx.workdir / "source.pdf")
+    source_pdf = ctx.artifacts.source_pdf or (ctx.shared_scratch / "source.pdf")
     if not source_pdf.exists():
         raise StageError("no source PDF in workdir; run the ingest stage first")
 
     # Reuse a previous *whole-book* export (files directly in the work dir).
     # Per-page reuse is handled inside _run_per_page, page by page.
-    existing = _mxls_in(ctx.workdir, recursive=False)
+    existing = _mxls_in(ctx.scratch, recursive=False)
     if existing and not ctx.force:
         ctx.log("  reusing existing whole-book Audiveris output (--force to re-run)")
         ctx.artifacts.mxl_files = existing
         ctx.artifacts.mxl_by_page = {0: existing}
         ctx.artifacts.omr_failed_pages = []
-        omr = _iter_omr(ctx.workdir, recursive=False)
+        omr = _iter_omr(ctx.scratch, recursive=False)
         ctx.artifacts.omr_project = omr[-1] if omr else None
-        ctx.artifacts.omr_log = _newest_log(ctx.workdir)
+        ctx.artifacts.omr_log = _newest_log(ctx.scratch)
         return StageResult("omr", "skipped", f"{len(existing)} .mxl already present")
 
     pages = resolve_pages(ctx)

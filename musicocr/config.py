@@ -1,6 +1,7 @@
 """Load and validate config.toml."""
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -241,6 +242,8 @@ class TransposeConfig:
 class OutputConfig:
     formats: List[str] = field(default_factory=lambda: list(DEFAULT_FORMATS))
     qa_dpi: int = 150
+    # Age limit encoded in the scratch dir name (``ttl=30d``); see ``scratch_dir``.
+    scratch_ttl: str = "30d"
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "OutputConfig":
@@ -248,7 +251,18 @@ class OutputConfig:
         bad = set(formats) - VALID_FORMATS
         if bad:
             raise ConfigError(f"invalid output.formats entries: {sorted(bad)}")
-        return cls(formats=formats, qa_dpi=int(d.get("qa_dpi", 150)))
+        ttl = str(d.get("scratch_ttl", "30d"))
+        if not re.fullmatch(r"\d+[hdw]", ttl):
+            raise ConfigError(f"invalid output.scratch_ttl {ttl!r} (expected e.g. 30d, 12h, 2w)")
+        return cls(formats=formats, qa_dpi=int(d.get("qa_dpi", 150)), scratch_ttl=ttl)
+
+
+DEFAULT_SCRATCH_TTL = "30d"
+
+
+def scratch_dir(base: Path, config: "Config") -> Path:
+    """``<base>/ttl=<n><unit>``: where non-final files go so ttl-sweep can prune them."""
+    return base / f"ttl={config.output.scratch_ttl}"
 
 
 @dataclass

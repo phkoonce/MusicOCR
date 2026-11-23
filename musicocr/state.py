@@ -96,6 +96,7 @@ def save_state(workdir: Path, artifacts: Artifacts) -> None:
     # Serialisation bugs (TypeError) must surface; only I/O failure is tolerated.
     text = json.dumps(artifacts_to_json(artifacts), indent=2)
     try:
+        workdir.mkdir(parents=True, exist_ok=True)
         (workdir / STATE_FILE).write_text(text)
     except OSError as exc:
         log.warning("could not write %s: %s", workdir / STATE_FILE, exc)

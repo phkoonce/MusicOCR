@@ -21,6 +21,8 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import tomllib
 
+from musicocr.config import DEFAULT_SCRATCH_TTL
+
 ROOT = Path(__file__).resolve().parent.parent
 
 DONE = "done"
@@ -74,6 +76,11 @@ class BatchSpec:
     state_path: Path
     doc_path: Path
     root: Path = field(default=ROOT)
+
+    @property
+    def scratch_ttl(self) -> str:
+        """Age limit of the ``ttl=`` dirs the pipeline writes intermediates to (config default)."""
+        return DEFAULT_SCRATCH_TTL
 
     def key(self, part: Part) -> str:
         """Pipeline key of a part (``<output_dir>/<key>/``, ``<key>.pdf``)."""
@@ -289,7 +296,9 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
         cmd.append("--small-graces")
     if part.staff_rank and not spec.engines:
         cmd += ["--staff-rank", str(part.staff_rank)] + (["--staff-rank-auto"] if part.staff_rank_auto else [])
-    with open(out_dir / f"{key}.run.log", "w") as log:
+    log_dir = out_dir / f"ttl={spec.scratch_ttl}"     # run logs are cruft: swept by ttl-sweep
+    log_dir.mkdir(parents=True, exist_ok=True)
+    with open(log_dir / f"{key}.run.log", "w") as log:
         rc = subprocess.run(
             cmd, stdout=log, stderr=subprocess.STDOUT,
         ).returncode
@@ -297,9 +306,9 @@ def run_part(spec: BatchSpec, part: Part, pdf: Path) -> Dict[str, str]:
         else out_dir / key / f"{key}.musicxml"
     if produced.exists() and produced.stat().st_size > 0:
         minutes = (time.time() - started) / 60
-        report = "compare.md" if spec.engines else "report.md"
+        report = "compare.md" if spec.engines else f"ttl={spec.scratch_ttl}/report.md"
         return {"status": DONE, "note": f"{minutes:.1f} min, rc={rc}; see {_rel(out_dir / key, spec.root)}/{report}"}
-    return {"status": FAILED, "note": f"rc={rc}; see {_rel(out_dir / (key + '.run.log'), spec.root)}"}
+    return {"status": FAILED, "note": f"rc={rc}; see {_rel(log_dir / (key + '.run.log'), spec.root)}"}
 
 
 def run_batch(

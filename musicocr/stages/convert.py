@@ -8,6 +8,8 @@ Formats (from config ``output.formats``):
 """
 from __future__ import annotations
 
+import shutil
+
 from musicocr.errors import StageError, StageResult
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._common import require_musicxml
@@ -73,12 +75,20 @@ def run(ctx: PipelineContext) -> StageResult:
                 name = f"render.{suffix}.pdf" if fmt == "qa-pdf" else f"{ctx.book_name}.{suffix}{_EXT[fmt]}"
             else:
                 name = "render.pdf" if fmt == "qa-pdf" else f"{ctx.book_name}{_EXT[fmt]}"
-            dst = _convert(tool, src, ctx.workdir / name, ctx.log)
+            # Only the .mscz is a deliverable; MIDI and the QA render are throwaway checks.
+            out_dir = ctx.workdir if fmt == "mscz" else ctx.scratch
+            dst = _convert(tool, src, out_dir / name, ctx.log)
             if suffix:
                 outputs.setdefault(fmt, []).append(dst)
             else:
                 outputs[fmt] = dst
             produced.append(dst.name)
+
+    if not merged and len(pages) > 1:
+        # per-page MusicXML is then the deliverable: publish it beside the .mscz files
+        for suffix, src in sources:
+            if src.parent != ctx.workdir:
+                shutil.copy2(src, ctx.workdir / f"{ctx.book_name}.{suffix}.musicxml")
 
     if "qa-pdf" in wanted:
         qa_out = outputs["qa-pdf"]

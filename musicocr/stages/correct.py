@@ -25,7 +25,7 @@ def _projects(ctx: PipelineContext) -> list[Path]:
     single = ctx.artifacts.omr_project
     if single:
         return [Path(single)]
-    return sorted(ctx.workdir.glob("pages/p*/*.omr"))
+    return sorted(ctx.scratch.glob("pages/p*/*.omr"))
 
 
 def run(ctx: PipelineContext) -> StageResult:

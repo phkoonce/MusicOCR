@@ -173,8 +173,9 @@ def _md(report: dict, base: Path) -> str:
 
 def write_reports(ctx: PipelineContext, results: list[StageResult]) -> tuple[Path, Path]:
     report = build_report(ctx, results)
-    json_path = ctx.workdir / "report.json"
-    md_path = ctx.workdir / "report.md"
+    ctx.scratch.mkdir(parents=True, exist_ok=True)
+    json_path = ctx.scratch / "report.json"
+    md_path = ctx.scratch / "report.md"
     json_path.write_text(json.dumps(report, indent=2))
     md_path.write_text(_md(report, ctx.workdir))
     return json_path, md_path

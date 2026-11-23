@@ -160,7 +160,7 @@ def test_run_compare_layout_ingest_once_and_skip(monkeypatch, tmp_path):
     omr_dirs = [c[1] for c in calls if c[0] == "omr"]
     assert omr_dirs == [book / "engines" / "homr", book / "engines" / "copisteria"]
     assert all(c[2] == book for c in calls if c[0] != "ingest")
-    assert (book / "engines" / "homr" / "report.md").exists()
+    assert (book / "engines" / "homr" / "ttl=30d" / "report.md").exists()
     assert not (book / "engines" / "audiveris").exists()
     status = {m["engine"]: m["status"] for m in out["metrics"]}
     assert status == {"homr": "ran", "audiveris": "skipped", "copisteria": "ran"}

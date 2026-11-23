@@ -70,9 +70,9 @@ def test_no_inputs_raises(tmp_path):
 
 
 def test_fallback_scans_workdir_but_skips_experiments(tmp_path):
-    _mxl(tmp_path / "found.mxl", _xml())
-    (tmp_path / "experiments").mkdir()
-    _mxl(tmp_path / "experiments" / "ignored.mxl", _xml(5))
+    (tmp_path / "ttl=30d" / "experiments").mkdir(parents=True)
+    _mxl(tmp_path / "ttl=30d" / "found.mxl", _xml())
+    _mxl(tmp_path / "ttl=30d" / "experiments" / "ignored.mxl", _xml(5))
     ctx = _ctx(tmp_path)
     res = extract.run(ctx)
     assert res.status == "ok"
@@ -108,7 +108,7 @@ def test_whole_book_multiple_movements_no_merge(tmp_path):
     res = extract.run(ctx)
     assert res.detail == "2 movements (not merged)"
     assert ctx.artifacts.extract_merged is False
-    assert ctx.artifacts.musicxml == tmp_path / "book.mvt1.musicxml"
+    assert ctx.artifacts.musicxml == tmp_path / "ttl=30d" / "book.mvt1.musicxml"
     assert not (tmp_path / "book.musicxml").exists()
 
 
@@ -158,7 +158,7 @@ def test_per_page_no_merge_keeps_pages_separate(tmp_path):
     res = extract.run(ctx)
     assert "kept separate" in res.detail
     assert ctx.artifacts.extract_merged is False
-    assert ctx.artifacts.musicxml == tmp_path / "book.p001.musicxml"
+    assert ctx.artifacts.musicxml == tmp_path / "ttl=30d" / "book.p001.musicxml"
     assert not (tmp_path / "book.musicxml").exists()
 
 
@@ -184,5 +184,5 @@ def test_per_page_all_unreadable_merge_produces_nothing(tmp_path):
     res = extract.run(ctx)
     assert "merge produced nothing" in res.detail
     assert ctx.artifacts.extract_merged is False
-    assert ctx.artifacts.musicxml == tmp_path / "book.p001.musicxml"
+    assert ctx.artifacts.musicxml == tmp_path / "ttl=30d" / "book.p001.musicxml"
     assert len(ctx.artifacts.merge_skipped) == 2

@@ -1,7 +1,7 @@
 # Example batch spec for scripts/batch_run.py. Copy to batches/<name>.toml
 # (git-ignored) and edit. The file stem <name> determines the derived paths:
 #   input/<name>/<key>.pdf          per-part PDFs
-#   output/<name>/<key>/            per-part pipeline outputs (+ <key>.run.log)
+#   output/<name>/<key>/            final <key>.musicxml/.mscz; all else under ttl=30d/ (swept)
 #   output/<name>/_state.json       resume state
 #   batches/<name>-progress.md      progress table (text outside the batch markers is kept)
 

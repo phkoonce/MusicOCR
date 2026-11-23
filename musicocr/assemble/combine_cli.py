@@ -32,6 +32,7 @@ def part_inputs(spec: BatchSpec, engine: str | None, only=None) -> list[PartInpu
         d = spec.output_dir / key
         if spec.engines or engine:
             d = d / "engines" / (engine or spec.engines[0])
+        d = d / f"ttl={spec.scratch_ttl}"      # per-page files are intermediates (see musicocr.config.scratch_dir)
         pages = sorted((p for p in d.glob(f"{key}.p[0-9][0-9][0-9].musicxml")),
                        key=lambda p: int(re.search(r"\.p(\d{3})\.musicxml$", p.name).group(1)))
         pages = _pages_of_last_run(d, pages)

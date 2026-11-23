@@ -257,6 +257,10 @@ enabled = false
 formats = ["musicxml", "mscz", "midi", "qa-pdf"]
 # DPI for the side-by-side QA page renders.
 qa_dpi = 150
+# Only <book>.musicxml and <book>.mscz are kept in output/<book>/. Everything else
+# (page rasters, OMR projects, per-page MusicXML, logs, state, reports, QA renders,
+# MIDI) goes to output/<book>/ttl=<this>/, which the ttl-sweep job prunes by age.
+scratch_ttl = "30d"
 
 [fixes]
 # Automatic repairs of OMR output, by name (`musicocr fixes` lists them with their state;

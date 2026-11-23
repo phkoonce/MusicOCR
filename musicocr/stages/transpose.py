@@ -12,7 +12,7 @@ Off by default (``[stages.transpose] enabled``). Shift comes from, in order:
 ``<part-name>``. Typical OMR'd single parts have a generic name, so for those
 set ``instrument``.
 
-Re-runnable: the untransposed file is kept under ``<workdir>/written/`` and every
+Re-runnable: the untransposed file is kept under ``<scratch>/written/`` and every
 run transposes from that copy, so ``--from transpose`` never stacks shifts. A
 fresh extract/normalize rewrite of the master is detected (mtime stamp) and
 becomes the new "written" copy.
@@ -43,7 +43,7 @@ def run(ctx: PipelineContext) -> StageResult:
         targets = list(pages)          # convert/qa use the per-page files in that case
 
     stamps = ctx.artifacts.transpose_stamps
-    backup_dir = ctx.workdir / "written"
+    backup_dir = ctx.scratch / "written"
     backup_dir.mkdir(parents=True, exist_ok=True)
 
     total = 0

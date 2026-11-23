@@ -125,7 +125,7 @@ def test_qa_section(tmp_path):
 def test_write_reports_writes_json_and_md(tmp_path):
     ctx = _ctx(tmp_path)
     jp, mp = write_reports(ctx, _results())
-    assert (jp, mp) == (tmp_path / "report.json", tmp_path / "report.md")
+    assert (jp, mp) == (tmp_path / "ttl=30d" / "report.json", tmp_path / "ttl=30d" / "report.md")
     data = json.loads(jp.read_text())
     assert data["book"] == "My_Book" and len(data["stages"]) == 2
     assert mp.read_text().endswith("\n")

@@ -36,22 +36,30 @@ Requires Python 3.11+ (setup.sh picks python3.13/3.12/3.11, or falls back to uv)
 python -m musicocr run input/my-part.pdf
 ```
 
-Everything lands in `output/<book>/`:
+Only the deliverables stay in `output/<book>/` indefinitely:
 
 | File | What it is |
 |---|---|
 | `<book>.musicxml` | interchange master — pages stitched into one score |
-| `<book>.pNNN.musicxml` | per-page MusicXML (kept even when merged) |
 | `<book>.mscz` | open/edit in MuseScore |
+
+Everything else goes to `output/<book>/ttl=30d/` (set by `[output] scratch_ttl`), which the
+`~/Dev/ttl-sweep` launchd job prunes by file age. Paths below are relative to that folder:
+
+| File | What it is |
+|---|---|
+| `<book>.pNNN.musicxml` | per-page MusicXML (kept even when merged; `combine` reads these) |
 | `<book>.mid` | quick aural check |
 | `render.pdf` | MuseScore's rendering of the OMR result |
 | `qa/src-*.png`, `qa/omr-*.png` | source scan vs render, page by page |
 | `report.md` / `report.json` | stage log + validation findings + QA images |
 | `pages/pNNN/*.log` | per-page OMR engine logs (homr or Audiveris) |
-| `<book>.omr` | Audiveris project file — only when using the Audiveris engine with GUI correction enabled (see below) |
-| `source.pdf` | copy of the input |
+| `pages/…/*.omr` | Audiveris project files |
+| `source.pdf`, `prepped/` | copy of the input and its rasterised pages |
+| `written/`, `pre-retouch/` | pre-transpose / pre-retouch backups |
+| `.musicocr-state.json` | resume state (after expiry, re-run from `ingest`) |
 
-Read `report.md` first. Findings are ranked 🔴 error / 🟡 warn / 🔵 info, with
+Read `ttl=30d/report.md` first. Findings are ranked 🔴 error / 🟡 warn / 🔵 info, with
 part + measure numbers. Cross-check flagged measures against the `qa/` image
 pairs, then fix in MuseScore.
 
@@ -96,7 +104,7 @@ instrument name and a MusicXML `<transpose>` so MuseScore shows the written scor
 and its "Concert pitch" toggle does the shift. Set `mode = "concert"` to rewrite
 the pitches instead. To do it inside a run, enable the `transpose` stage (`[stages.transpose]` in
 `config.toml`, or `--transpose-instrument "horn in f"` / `--transpose-semitones -7`
-on `run`). The untransposed file is kept in `output/<book>/written/`, and re-running
+on `run`). The untransposed file is kept in `output/<book>/ttl=30d/written/`, and re-running
 `--from transpose` always starts from that copy, so shifts never stack. The `qa`
 render is at the new pitch in `concert` mode, so it won't visually match a written-pitch scan.
 
