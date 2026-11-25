@@ -411,6 +411,31 @@ It replaces line and page breaks, keeps section breaks, and refuses a score whos
 matches the pages read. It needs the per-page files under `ttl=*/`, so run it before they are pruned.
 Tried so far on clean 600 dpi and born-digital scans only; it needs the copisteria engine's system marks.
 
+## Reviewing a score against the original (`musicocr review`)
+
+A local page that compares a `.mscz` with its original line by line, independent of the pipeline:
+
+```
+musicocr review score.mscz --source original.pdf
+```
+
+Each line shows the original, the score as MuseScore draws it (stretched so the bar lines meet) and an
+overlay (red: original, blue: score). `--source` is remembered. The score needs the original's line
+breaks (see above).
+
+* **D** marks a line as right. Click a picture to mark a spot, with or without a comment.
+* **S** sends the line to Claude and moves on; with no marks Claude looks for the differences itself.
+* **Page re-check** shows a page's lines together with what Claude changed: accept, undo, or mark again.
+
+Fixes run in the background through the `claude` command, which must be installed and signed in
+(run `claude` once and `/login`); until then sent lines wait. Claude may only read the job's folder;
+the app checks its replacement bars (well formed, right length) before writing them into the score.
+Keep the score closed in MuseScore while lines are with Claude. A copy from before the first fix is
+kept as `<score>.before-review.mscz`, progress in `<score>.review.json`, and a line changed after you
+marked it right is flagged. Edits you make in MuseScore are picked up when you save.
+
+Not yet supported: multi-measure rests. Tried on one clean single-staff scan.
+
 ## Score books (every part on each page)
 
 A book of many pieces printed as a score is a collection with a single "book" (the score):
@@ -643,6 +668,7 @@ musicocr/
                        # multirest, measure_normalize
   musicxml/            # shared MusicXML helpers (measure lengths, writing files, page merge)
   scoreops/            # transpose, instruments, retouch, marks (dynamics/hairpin consistency), layout
+  review/              # line-by-line proofreading page, fixes by Claude (`musicocr review`)
   text/                # page text and OCR, count-digit reader (countdigits.py), tempo/expression/technique words -> <direction>
                        # (page_text, ocr_backends, words, classify, layer, lexicon.toml)
   assemble/            # combine parts by printed bar number: combine, alignment/, unnumbered,

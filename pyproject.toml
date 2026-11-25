@@ -29,6 +29,7 @@ packages.find = { include = ["musicocr*"] }
 
 [tool.setuptools.package-data]
 "musicocr.text" = ["vision_ocr.swift", "lexicon.toml", "data/*.npz"]
+"musicocr.review" = ["page.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -230,7 +230,7 @@ def patch_style(style: str, page: PageStyle, spatium_mm: float,
     return style
 
 
-def _read(mscz: Path) -> Tuple[str, str]:
+def read_mscz(mscz: Path) -> Tuple[str, str]:
     with zipfile.ZipFile(mscz) as z:
         score = next((n for n in z.namelist() if n.endswith(".mscx") and "/" not in n), None)
         if score is None or "score_style.mss" not in z.namelist():
@@ -238,7 +238,7 @@ def _read(mscz: Path) -> Tuple[str, str]:
         return z.read(score).decode("utf-8"), z.read("score_style.mss").decode("utf-8")
 
 
-def _write(src: Path, dest: Path, mscx: str, style: str) -> None:
+def write_mscz(src: Path, dest: Path, mscx: str, style: str) -> None:
     with zipfile.ZipFile(src) as zin, zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zout:
         for item in zin.infolist():
             data = zin.read(item.filename)
@@ -288,7 +288,7 @@ def _musescore_layout(tool: str) -> Callable[[Path], List[Tuple[int, int]]]:
 def fit(mscz: Path, dest: Path, target: Target, page: PageStyle,
         layout: Callable[[Path], List[Tuple[int, int]]], log: Callable[[str], None] = print) -> Result:
     """Write ``dest``: ``mscz`` laid out like the original as nearly as MuseScore allows."""
-    mscx, style = _read(mscz)
+    mscx, style = read_mscz(mscz)
     size, floor = page.spatium_mm, page.spatium_mm * _MIN_SIZE
     level: Dict[int, int] = {}            # line -> index into _STRETCH_STEPS
     spacing = 0
@@ -296,7 +296,7 @@ def fit(mscz: Path, dest: Path, target: Target, page: PageStyle,
         trial = Path(t) / "trial.mscz"
         for round_no in range(_MAX_ROUNDS):
             stretch = {i: _STRETCH_STEPS[v] for i, v in level.items()}
-            _write(mscz, trial, patch_mscx(mscx, target, stretch), patch_style(style, page, size, _SPACINGS[spacing]))
+            write_mscz(mscz, trial, patch_mscx(mscx, target, stretch), patch_style(style, page, size, _SPACINGS[spacing]))
             rendered = layout(trial)
             wrapped, moved = compare(target, rendered)
             log(f"  layout: staff space {size:.2f} mm: {len(wrapped)} line(s) wrap, "
@@ -332,7 +332,7 @@ def apply_layout(mscz: Path, dest: Path, page_xmls: Sequence[Path], source_pdf: 
                  pdftoppm: str = "pdftoppm", log: Callable[[str], None] = print) -> Result:
     """Lay ``mscz`` out like ``source_pdf``, writing ``dest`` (which may be ``mscz`` itself)."""
     target = target_from_pages(page_xmls)
-    have = count_measures(_read(mscz)[0])
+    have = count_measures(read_mscz(mscz)[0])
     if have != target.bars:
         raise LayoutError(f"the score has {have} bars, the pages read have {target.bars}")
     pages = sorted({int(m.group(1)) for f in page_xmls

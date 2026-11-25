@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Score review</title>
+<style>
+  body { margin: 0; font: 14px/1.4 -apple-system, system-ui, sans-serif; background: #f2f2f0; color: #222; }
+  header { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid #ccc; padding: 8px 16px; }
+  header div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button { font: inherit; padding: 4px 10px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.on { background: #ddd; }
+  button:disabled { opacity: .45; cursor: default; }
+  #map { margin-top: 6px; gap: 3px; }
+  #map button { min-width: 30px; padding: 1px 4px; font-size: 12px; }
+  #map .gap { width: 10px; }
+  .s-done { background: #cfe9cf !important; } .s-check { background: #ffe2a8 !important; }
+  .s-queued, .s-working { background: #cfdcff !important; } .s-failed, .s-changed { background: #f7c6c6 !important; }
+  .current { outline: 2px solid #222; }
+  main { max-width: 1400px; margin: 0 auto; padding: 12px 16px 60px; }
+  .banner { background: #fff3cd; border: 1px solid #e0c36a; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; }
+  section { background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 10px; margin-bottom: 14px; }
+  h2 { font-size: 15px; margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pill { font-size: 12px; font-weight: normal; border-radius: 10px; padding: 1px 8px; background: #eee; }
+  .label { font-size: 11px; color: #777; margin: 6px 0 0; }
+  .pic { position: relative; cursor: crosshair; }
+  .pic img { display: block; width: 100%; }
+  .pic img.top { position: absolute; left: 0; top: 0; mix-blend-mode: multiply; }
+  .pin { position: absolute; width: 22px; height: 22px; margin: -11px; border: 2px solid #e65000; border-radius: 50%;
+         box-sizing: border-box; color: #e65000; font: bold 11px/18px system-ui; text-align: center; pointer-events: none; }
+  .tags input { font: inherit; width: min(520px, 70%); padding: 3px 6px; }
+  .tags div { margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+  .notes { white-space: pre-wrap; background: #fafafa; border-left: 3px solid #ccc; padding: 6px 10px; margin: 8px 0 0; }
+  .notes.bad { border-color: #c33; }
+  .hint { color: #777; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <strong id="title"></strong><span id="progress" class="hint"></span>
+    <button id="byLine">Line by line</button>
+    <button id="byPage">Page re-check</button>
+    <span id="nav"></span>
+    <label class="hint">ours over original <input type="range" id="fade" min="0" max="100" value="100"></label>
+  </div>
+  <div id="map"></div>
+</header>
+<main id="main"></main>
+<script>
+"use strict";
+let state = null, mode = "line", current = 0, page = 0, blink = false, seen = "";
+const drafts = {};                       // line -> tags not yet sent
+const $ = s => document.querySelector(s);
+
+function el(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  Object.assign(e, props);
+  e.append(...kids.filter(k => k !== null && k !== undefined));
+  return e;
+}
+function button(text, onclick, cls = "", disabled = false) {
+  return el("button", { textContent: text, onclick, className: cls, disabled });
+}
+const LABEL = { unchecked: "not checked", done: "done", queued: "waiting for Claude", working: "Claude is working",
+                check: "re-check", failed: "failed", changed: "changed since checked" };
+const tagsOf = line => drafts[line.i] ?? (drafts[line.i] = line.tags.map(t => ({ ...t })));
+
+async function load() {
+  try {
+    state = await (await fetch("/api/state")).json();
+  } catch { $("#progress").textContent = "server stopped"; return; }
+  const text = JSON.stringify(state);
+  // never redraw under a note being typed
+  if (text !== seen && document.activeElement?.type !== "text") { seen = text; render(); }
+}
+async function act(i, action, body = {}) {
+  const r = await fetch(`/api/line/${i}/${action}`,
+    { method: "POST", headers: { "X-Review": "1", "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const out = await r.json();
+  if (!r.ok) { alert(out.error); return false; }
+  delete drafts[i];
+  state = out; seen = JSON.stringify(out);
+  return true;
+}
+function next() {
+  const n = state.lines.length;
+  for (let k = 1; k < n; k++) {
+    const line = state.lines[(current + k) % n];
+    if (line.status === "unchecked" || line.status === "changed") { current = line.i; break; }
+  }
+}
+async function done(i) { if (await act(i, "done")) { if (mode === "line") next(); render(); } }
+async function send(i) {
+  if (await act(i, "send", { tags: tagsOf(state.lines[i]) })) { if (mode === "line") next(); render(); }
+}
+async function undo(i) { if (await act(i, "undo")) render(); }
+
+function picture(line, s, kind) {
+  const url = k => `/img/${line.i}/${s}/${k}.png?v=${state.rev}`;
+  const box = el("div", { className: "pic" });
+  if (kind === "overlay") {
+    const top = el("img", { src: url("ours_blue"), className: "top fade" });
+    top.style.opacity = $("#fade").value / 100;
+    box.append(el("img", { src: url("orig_red"), alt: "original" }), top);
+  } else {
+    box.append(el("img", { src: url(kind), alt: kind }));
+  }
+  tagsOf(line).forEach((t, n) => {
+    if (t.staff !== s) return;
+    const pin = el("span", { className: "pin", textContent: n + 1 });
+    pin.style.left = t.x * 100 + "%"; pin.style.top = t.y * 100 + "%";
+    box.append(pin);
+  });
+  box.onclick = e => {
+    if (line.status === "queued" || line.status === "working") return;
+    const r = box.getBoundingClientRect();
+    tagsOf(line).push({ staff: s, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, note: "" });
+    render();
+    const inputs = document.querySelectorAll(`#line${line.i} .tags input`);
+    inputs[inputs.length - 1]?.focus();
+  };
+  return box;
+}
+
+function card(line) {
+  const busy = line.status === "queued" || line.status === "working";
+  const tags = tagsOf(line);
+  const s = el("section", { id: "line" + line.i });
+  s.append(el("h2", {}, `Line ${line.i + 1} · bars ${line.first}–${line.last} · original page ${line.page + 1}`,
+    el("span", { className: "pill s-" + line.status, textContent: LABEL[line.status] })));
+
+  line.staves.forEach((part, k) => {
+    const name = line.staves.length > 1 ? `staff ${part.staff}: ` : "";
+    s.append(el("div", { className: "label", textContent: name + (blink ? "blink: ours" : "original") }),
+             picture(line, k, blink ? "ours" : "orig"));
+    if (mode === "line") s.append(el("div", { className: "label", textContent: name + "ours" }), picture(line, k, "ours"));
+    s.append(el("div", { className: "label", textContent: name + "overlay (red: original, blue: ours)" }),
+             picture(line, k, "overlay"));
+  });
+
+  const list = el("div", { className: "tags" });
+  tags.forEach((t, n) => {
+    const input = el("input", { type: "text", value: t.note, disabled: busy,
+      placeholder: "what is wrong? (may be left empty)" });
+    input.oninput = () => { t.note = input.value; };
+    input.onkeydown = e => { if (e.key === "Enter" || e.key === "Escape") input.blur(); };
+    list.append(el("div", {}, el("b", { textContent: n + 1 }), input,
+      button("remove", () => { tags.splice(n, 1); render(); }, "", busy)));
+  });
+  s.append(list);
+
+  const notes = [line.summary, ...line.unresolved.map(u => "not fixed / unsure: " + u)].filter(Boolean).join("\n");
+  if (notes) s.append(el("div", { className: "notes", textContent: notes }));
+  if (line.error) s.append(el("div", { className: "notes bad", textContent: line.error }));
+
+  const row = el("div", {});
+  row.style.cssText = "display:flex;gap:8px;margin-top:8px;flex-wrap:wrap";
+  row.append(
+    button(line.status === "check" ? "Accept (D)" : "Looks right (D)", () => done(line.i), "primary", busy),
+    button(tags.length ? `Send ${tags.length} mark(s) to Claude (S)` : "Have Claude find differences (S)",
+           () => send(line.i), "", busy));
+  if (line.canUndo) row.append(button("Undo Claude's change", () => undo(line.i), "", busy));
+  if (line.status === "done") row.append(button("Mark unchecked", async () => { await act(line.i, "reset"); render(); }));
+  s.append(row);
+  return s;
+}
+
+function render() {
+  if (!state) return;
+  const lines = state.lines;
+  current = Math.min(current, lines.length - 1);
+  const pages = [...new Set(lines.map(l => l.page))];
+  if (!pages.includes(page)) page = pages[0];
+  $("#title").textContent = state.title;
+  document.title = "Review: " + state.title;
+  const count = s => lines.filter(l => l.status === s).length;
+  $("#progress").textContent = `${count("done")}/${lines.length} done · ${count("check")} to re-check · ` +
+    `${count("queued") + count("working")} with Claude`;
+  $("#byLine").className = mode === "line" ? "on" : "";
+  $("#byPage").className = mode === "page" ? "on" : "";
+
+  const step = d => {
+    if (mode === "line") current = Math.max(0, Math.min(lines.length - 1, current + d));
+    else page = pages[Math.max(0, Math.min(pages.length - 1, pages.indexOf(page) + d))];
+    render(); window.scrollTo(0, 0);
+  };
+  $("#nav").replaceChildren(button("←", () => step(-1)), button("→", () => step(1)),
+    el("span", { className: "hint", textContent: mode === "line" ? "" : ` page ${page + 1}` }));
+  window.step = step;
+
+  const map = $("#map");
+  map.replaceChildren();
+  lines.forEach((l, i) => {
+    if (i && lines[i - 1].page !== l.page) map.append(el("span", { className: "gap" }));
+    const b = button(i + 1, () => { current = i; page = l.page; render(); window.scrollTo(0, 0); }, "s-" + l.status);
+    if (mode === "line" ? i === current : l.page === page) b.className += " current";
+    b.title = `bars ${l.first}–${l.last}: ${LABEL[l.status]}`;
+    map.append(b);
+  });
+
+  const main = $("#main"), y = window.scrollY;
+  main.replaceChildren();
+  if (state.problem) main.append(el("div", { className: "banner", textContent:
+    "The pictures could not be redrawn after the last change: " + state.problem }));
+  if (state.claude) main.append(el("div", { className: "banner", textContent:
+    `Sent lines are waiting: ${state.claude}. They are retried every minute.` }));
+  if (lines.some(l => l.status === "queued" || l.status === "working")) main.append(el("div", { className: "banner",
+    textContent: "Claude changes the score file while lines are with it. Keep this score closed in MuseScore until then." }));
+  const shown = mode === "line" ? [lines[current]] : lines.filter(l => l.page === page);
+  shown.forEach(l => main.append(card(l)));
+  main.append(el("div", { className: "hint", textContent:
+    "Click a picture to mark a spot. D: looks right · S: send to Claude · B: swap original and ours in place · ←/→: move" }));
+  window.scrollTo(0, y);
+}
+
+$("#byLine").onclick = () => { mode = "line"; render(); };
+$("#byPage").onclick = () => {
+  mode = "page";
+  const waiting = state.lines.find(l => l.status === "check" || l.status === "failed");
+  page = (waiting ?? state.lines[current]).page;
+  render(); window.scrollTo(0, 0);
+};
+$("#fade").oninput = e => document.querySelectorAll(".fade").forEach(i => { i.style.opacity = e.target.value / 100; });
+document.addEventListener("keydown", e => {
+  if (!state || e.metaKey || e.ctrlKey || e.altKey || e.target.type === "text") return;
+  const k = e.key.toLowerCase();
+  if (k === "b") { blink = !blink; render(); }
+  else if (k === "arrowleft") { e.preventDefault(); window.step(-1); }
+  else if (k === "arrowright") { e.preventDefault(); window.step(1); }
+  else if (mode === "line" && (k === "d" || k === "s")) {
+    const l = state.lines[current];
+    if (l.status !== "queued" && l.status !== "working") (k === "d" ? done : send)(l.i);
+  }
+});
+let first = true;
+load().then(() => {
+  if (first && state) {
+    const l = state.lines.find(l => l.status === "unchecked" || l.status === "changed");
+    if (l) { current = l.i; render(); }
+    first = false;
+  }
+});
+setInterval(load, 3000);
+</script>
+</body>
+</html>

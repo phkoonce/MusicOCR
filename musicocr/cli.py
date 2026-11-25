@@ -232,6 +232,31 @@ def cmd_layout(args) -> int:
     return 0
 
 
+def cmd_review(args) -> int:
+    from musicocr.review.claude import find_claude
+    from musicocr.review.server import serve
+    from musicocr.review.session import Session
+
+    try:
+        config = load_config(args.config)
+    except ConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 2
+    musescore = config.resolve_tool("musescore")
+    mscz = Path(args.input).expanduser()
+    if not musescore or not mscz.is_file():
+        print("need an existing .mscz and MuseScore (config.toml [tools])", file=sys.stderr)
+        return 2
+    try:
+        session = Session(mscz, args.source, musescore, config.resolve_tool("pdftoppm") or "pdftoppm",
+                          find_claude(args.claude), args.model)
+        serve(session, args.port, not args.no_open)
+    except Exception as exc:  # noqa: BLE001 - one line for the user instead of a traceback
+        print(f"review: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_marks(args) -> int:
     from musicocr.scoreops.marks import MarksOptions, normalize_file
 
@@ -494,6 +519,20 @@ def _add_layout_parser(sub) -> None:
     la.set_defaults(func=cmd_layout)
 
 
+def _add_review_parser(sub) -> None:
+    rv = sub.add_parser(
+        "review", help="proofread a score against its original, line by line, with fixes made by Claude",
+        description="Serve a local page comparing the score with the original. Marked lines are corrected by "
+                    "Claude in the background; progress is kept in <score>.review.json.")
+    rv.add_argument("input", help="the .mscz to proofread (it needs the original's line breaks)")
+    rv.add_argument("--source", help="the original PDF (remembered after the first time)")
+    rv.add_argument("--port", type=int, default=8765, help="local port (default 8765)")
+    rv.add_argument("--no-open", action="store_true", help="do not open the page in a browser")
+    rv.add_argument("--claude", help="path of the `claude` command (default: found on PATH)")
+    rv.add_argument("--model", default="", help="model for the fixes (default: Claude Code's)")
+    rv.set_defaults(func=cmd_review)
+
+
 def _add_marks_parser(sub) -> None:
     mk = sub.add_parser(
         "marks", help="dedupe dynamics / extend truncated hairpins / fill section dynamics in a MusicXML file",
@@ -558,6 +597,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_combine_parser(sub)
     _add_collection_parser(sub)
     _add_layout_parser(sub)
+    _add_review_parser(sub)
     _add_marks_parser(sub)
     _add_tuplets_parser(sub)
     _add_transpose_parser(sub)
