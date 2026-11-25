@@ -290,6 +290,7 @@ class StagesConfig:
     tuplets_enabled: bool = True   # rebuild inconsistent tuplets in bars that do not add up (musicocr/fixes/tuplets.py)
     tuplets_flag: bool = True      # colour / annotate the rebuilt runs
     movements_enabled: bool = True # "I." / "II." headings -> final barline, section break (scoreops/movements.py)
+    layout_enabled: bool = True    # convert: line/page breaks and staff size as the original (scoreops/layout.py)
     transpose: TransposeConfig = field(default_factory=TransposeConfig)
     retouch: RetouchConfig = field(default_factory=RetouchConfig)
 
@@ -301,6 +302,7 @@ class StagesConfig:
             tuplets_enabled=bool((d.get("tuplets", {}) or {}).get("enabled", True)),
             tuplets_flag=bool((d.get("tuplets", {}) or {}).get("flag", True)),
             movements_enabled=bool((d.get("movements", {}) or {}).get("enabled", True)),
+            layout_enabled=bool((d.get("layout", {}) or {}).get("enabled", True)),
             transpose=TransposeConfig.from_dict(dict(d.get("transpose", {}) or {})),
             retouch=RetouchConfig.from_dict(dict(d.get("retouch", {}) or {})),
         )

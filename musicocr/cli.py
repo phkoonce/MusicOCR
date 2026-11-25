@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import subprocess
 import sys
 from dataclasses import replace
@@ -196,6 +197,38 @@ def cmd_tuplets(args) -> int:
         print(f"{path}:")
         total += fix_tuplets_file(path, flag=not args.no_flag)
     print(f"{total} tuplet run(s) rebuilt")
+    return 0
+
+
+def cmd_layout(args) -> int:
+    from musicocr.scoreops.layout import LayoutError, apply_layout
+
+    try:
+        config = load_config(args.config)
+    except ConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 2
+    tool = config.resolve_tool("musescore")
+    if not tool:
+        print("MuseScore not found (edit config.toml [tools])", file=sys.stderr)
+        return 2
+    target = Path(args.input).expanduser().resolve()
+    mscz = target / f"{target.name}.mscz" if target.is_dir() else target
+    book, workdir = mscz.stem, mscz.parent
+    pages = sorted(workdir.glob(f"ttl=*/{glob.escape(book)}.p[0-9]*.musicxml"))
+    sources = sorted(workdir.glob("ttl=*/source.pdf"))
+    source = Path(args.source).expanduser() if args.source else (sources[0] if sources else None)
+    dest = Path(args.output).expanduser() if args.output else workdir / f"{book}.layout.mscz"
+    if not mscz.is_file() or not pages or not source:
+        print(f"need {mscz.name}, its per-page MusicXML under {workdir}/ttl=*/ (kept for a while after a run) "
+              "and the original PDF (--source)", file=sys.stderr)
+        return 2
+    try:
+        apply_layout(mscz, dest, pages, source, tool, config.resolve_tool("pdftoppm") or "pdftoppm")
+    except LayoutError as exc:
+        print(f"layout: {exc}", file=sys.stderr)
+        return 1
+    print(f"wrote {dest}")
     return 0
 
 
@@ -450,6 +483,17 @@ def _add_collection_parser(sub) -> None:
     add_parser(sub)
 
 
+def _add_layout_parser(sub) -> None:
+    la = sub.add_parser(
+        "layout", help="give an output .mscz the original's lines per page and bars per line",
+        description="Replace the score's line and page breaks with the original's and set the page style; "
+                    "notes and other hand edits are kept. Writes a copy.")
+    la.add_argument("input", help="an output book folder, or the .mscz in it")
+    la.add_argument("-o", "--output", help="output file (default: <book>.layout.mscz beside it)")
+    la.add_argument("--source", help="the original PDF (default: the copy kept by the run)")
+    la.set_defaults(func=cmd_layout)
+
+
 def _add_marks_parser(sub) -> None:
     mk = sub.add_parser(
         "marks", help="dedupe dynamics / extend truncated hairpins / fill section dynamics in a MusicXML file",
@@ -513,6 +557,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_compare_parser(sub)
     _add_combine_parser(sub)
     _add_collection_parser(sub)
+    _add_layout_parser(sub)
     _add_marks_parser(sub)
     _add_tuplets_parser(sub)
     _add_transpose_parser(sub)

@@ -220,6 +220,12 @@ crop_pad_frac = 0.035  # whitespace to leave above/below the outer staves
 # barline before it, and a section break in the .mscz (bar numbers restart at 1).
 enabled = true
 
+[stages.layout]
+# Lay the .mscz out like the original: its line and page breaks, page size and staff size; a line
+# MuseScore cannot fit gets a lower layout stretch (musicocr/scoreops/layout.py). Needs the
+# system marks the copisteria engine writes. For an existing score: `musicocr layout <folder>`.
+enabled = true
+
 [stages.correct]
 # When true, the pipeline stops after OMR so you can open the saved .omr project
 # in the Audiveris GUI, correct it, and re-run from `extract`. Off for v1.

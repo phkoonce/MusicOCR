@@ -392,6 +392,25 @@ Limits: the headings need a merged score and the engine's page images (not Audiv
 OCR misses is reported and the others are still used. The metronome note is read as dotted or not from
 the image, falling back to the meter; other note symbols in a tempo line (`♪ = ♩`) are left out.
 
+### Layout as the original
+
+`convert` gives a merged `.mscz` the original's bars per line and lines per page: line and page breaks
+from the system marks the engine writes, and page size, margins and staff size from the original page
+(`musicocr/scoreops/layout.py`). MuseScore then lays the score out and the result is checked: a line
+that does not fit gets a lower layout stretch on its bars (smaller staves if many lines wrap), an
+overflowing page tighter system spacing. The log says what still differs. Switch off with
+`[stages.layout] enabled = false`.
+
+For a score made earlier, hand edits included (a copy is written, `<book>.layout.mscz`):
+
+```
+musicocr layout output/<book>
+```
+
+It replaces line and page breaks, keeps section breaks, and refuses a score whose bar count no longer
+matches the pages read. It needs the per-page files under `ttl=*/`, so run it before they are pruned.
+Tried so far on clean 600 dpi and born-digital scans only; it needs the copisteria engine's system marks.
+
 ## Score books (every part on each page)
 
 A book of many pieces printed as a score is a collection with a single "book" (the score):
@@ -623,7 +642,7 @@ musicocr/
                        # (registry.py) and the engine-agnostic repairs: timesig, barrests, tuplets,
                        # multirest, measure_normalize
   musicxml/            # shared MusicXML helpers (measure lengths, writing files, page merge)
-  scoreops/            # transpose, instruments, retouch, marks (dynamics/hairpin consistency)
+  scoreops/            # transpose, instruments, retouch, marks (dynamics/hairpin consistency), layout
   text/                # page text and OCR, count-digit reader (countdigits.py), tempo/expression/technique words -> <direction>
                        # (page_text, ocr_backends, words, classify, layer, lexicon.toml)
   assemble/            # combine parts by printed bar number: combine, alignment/, unnumbered,

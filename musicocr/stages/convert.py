@@ -13,6 +13,7 @@ import shutil
 from musicocr.assemble.mscz_sections import add_section_breaks
 from musicocr.errors import StageError, StageResult
 from musicocr.pipeline import PipelineContext
+from musicocr.scoreops.layout import apply_layout
 from musicocr.stages._common import require_musicxml
 from musicocr.util import run_cmd_lenient
 
@@ -43,6 +44,17 @@ def _convert(tool, src, dst, log):
     return dst
 
 
+def _lay_out(ctx: PipelineContext, mscz, tool: str) -> None:
+    """Give the merged score the original's lines and pages; a failure keeps MuseScore's own layout."""
+    source = ctx.shared_scratch / "source.pdf"
+    try:
+        apply_layout(mscz, mscz, ctx.artifacts.musicxml_pages or [],
+                     source if source.exists() else ctx.input_pdf, tool,
+                     ctx.config.resolve_tool("pdftoppm") or "pdftoppm", ctx.log)
+    except Exception as exc:  # noqa: BLE001 - a layout is never worth losing the score
+        ctx.log(f"  layout: left as MuseScore made it ({exc})")
+
+
 def run(ctx: PipelineContext) -> StageResult:
     xml = require_musicxml(ctx)
 
@@ -70,7 +82,8 @@ def run(ctx: PipelineContext) -> StageResult:
 
     # section breaks go before each movement but the first; only the .mscz can hold them
     ends = [mv["bar"] - 1 for mv in ctx.artifacts.movements if mv["bar"] > 0] if merged else []
-    if ends:
+    lay_out = merged and ctx.config.stages.layout_enabled
+    if ends or lay_out:
         wanted = sorted(wanted, key=lambda f: f != "mscz")
 
     outputs = ctx.artifacts.outputs
@@ -88,6 +101,9 @@ def run(ctx: PipelineContext) -> StageResult:
             if fmt == "mscz" and ends:
                 ctx.log(f"  {add_section_breaks(dst, ends)} section break(s) between movements")
                 from_mscz = dst                    # so the MIDI and QA render show the breaks too
+            if fmt == "mscz" and lay_out:
+                _lay_out(ctx, dst, tool)
+                from_mscz = dst
             if suffix:
                 outputs.setdefault(fmt, []).append(dst)
             else:
