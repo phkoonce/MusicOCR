@@ -244,10 +244,12 @@ default (on). Fixes declare ordering constraints (`after=`), which the registry 
   measure units per system (or per page when the XML has no system marks, as
   Copisteria) are compared with the printed system-start bar numbers minus
   multi-rest counts (`musicocr/barcheck.py`), reporting ghost (extra) or missing bars.
+* **Long hairpins** (`long_hairpins`, `musicocr/text/hairpins.py`): a hairpin running over several bars is too
+  long for the detector; two straight lines between the staves meeting in a point are added to its detections.
 * **Pickup bar** (page 1 only, `fix_pickup`): when Copisteria misses the printed
   opening meter it pads an upbeat bar to a full bar with a hidden rest and hides
   the time signature; the padding is dropped and the meter shown.
-* **Second pass for gaps** (`second_pass`, `second_pass_scale`): the detector
+* **Second pass for gaps** (`second_pass`, `second_pass_scale`; in a score, part by part): the detector
   has blind spots at its default input size (e.g. the first eighth after a
   dotted quarter), but sees those notes at ~1.0 confidence one size up (which in
   turn reads bars worse). For a page whose first reading left gaps, the page is
@@ -378,6 +380,32 @@ so MuseScore shows an irregular bar. `musicocr/fixes/barrests.py` runs inside `e
 meter repair (no config switch): a bar whose only sounding content is one rest longer than the time
 signature's bar is cut to the bar. Shorter rests (pickups) and bars with notes are not touched.
 
+### Movements (any raster engine)
+
+A part or score whose movements are headed by a centred Roman numeral (`I.`, `II`) or "Version A", "Version B" gets, for each one, the
+numeral and tempo mark over its first bar, a final barline before it, and in the `.mscz` a section break
+(new line, bar numbers restart at 1). `musicocr/scoreops/movements.py` OCRs each page image during
+`extract` (a few seconds a page); `retouch` and `convert` write the result. Switch off with
+`--no-movements` or `[stages.movements] enabled = false`.
+
+Limits: the headings need a merged score and the engine's page images (not Audiveris). A numeral the
+OCR misses is reported and the others are still used. The metronome note is read as dotted or not from
+the image, falling back to the meter; other note symbols in a tempo line (`♪ = ♩`) are left out.
+
+## Score books (every part on each page)
+
+A book of many pieces printed as a score is a collection with a single "book" (the score):
+`workflows/ghs-xmas-score/collection.toml` is the example. `musicocr collection split` cuts it into one PDF per
+piece, `musicocr collection batch` writes the batch, and `scripts/batch_run.py` runs it. Each piece comes out as
+one score (`output/<name>/<key>/<key>.mscz`); there is no `combine` step.
+
+* A page whose staves are all joined into systems is read as a score even though the batch names an instrument
+  (`single_staff = "auto"`); several parts of one instrument are numbered ("Horn in F 1" ... "4").
+* Contents lines whose number the OCR lost are still looked for by number on the music pages. Credits such as
+  "Version A (Arr. ...)" move from the title to the composer line.
+* "Version A" / "Version B" headings are treated like movements (below).
+* Dynamics and hairpins between two staves go to the staff above when the page's clear cases sit below their staff.
+
 ## Scanned parts, bar numbers and scenes
 
 `combine` aligns parts by their printed bar numbers. Scanned PDFs have no text layer, so
@@ -492,6 +520,8 @@ pdfimages -list -f 1 -l 1 "input/your.pdf"
      (copyright, URL, logos) — that OMR otherwise turns into junk text symbols.
      It's conservative: it leaves a first page's centred title block in place
      (delete that frame once in MuseScore) rather than risk clipping a system.
+     A strip that holds a staff is never trimmed (a first line under a movement
+     heading looks like a header block).
 
    Tune all of it with:
 

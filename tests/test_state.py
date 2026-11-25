@@ -24,6 +24,7 @@ def _full() -> Artifacts:
         musicxml_pages=[Path("/w/book.1.musicxml")],
         merge_skipped=["/w/skip.mxl"],
         extract_merged=False,
+        movements=[{"bar": 27, "heading": "II."}],
         transpose_stamps={"/w/book.musicxml": 123456789},
         retouch_stamps={"/w/book.musicxml": 987654321},
         validation={"findings": [{"sev": "warn"}], "counts": {"warn": 1}},

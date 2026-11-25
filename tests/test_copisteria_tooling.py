@@ -297,6 +297,27 @@ def test_merge_second_pass_guards(tmp_path):
     assert merge_second_pass(first, d, out)[0] == 0                                   # attributes differ
 
 
+def test_second_pass_fills_gaps_in_every_part_of_a_score(tmp_path):
+    from musicocr.engines.copisteria.second_pass import gap_bars, merge_second_pass
+
+    def score(name, bars_by_part):
+        p = tmp_path / name
+        body = "".join(f'<part id="P{k}">' + "".join(f'<measure number="{i + 1}">{b}</measure>'
+                                                      for i, b in enumerate(bars)) + "</part>"
+                       for k, bars in enumerate(bars_by_part, 1))
+        p.write_text(f"<score-partwise>{body}</score-partwise>")
+        return p
+
+    first = score("a.xml", [[NOTE, NOTE + NOTE], [NOTE + GAP, NOTE]])
+    assert gap_bars(first) == [0]                    # the gap is in the second part
+    second = score("b.xml", [[NOTE, NOTE], [NOTE + NOTE, NOTE]])
+    out = tmp_path / "m.xml"
+    assert merge_second_pass(first, second, out)[0] == 1
+    parts = ET.parse(out).getroot().findall("part")
+    assert [len(m.findall("note")) for m in parts[0].findall("measure")] == [1, 2]    # no gap there: untouched
+    assert [len(m.findall("note")) for m in parts[1].findall("measure")] == [2, 1]
+
+
 def test_union_dets_adds_only_nonoverlapping_notes_and_rests():
     from musicocr.engines.copisteria.detect import union_dets
     box = lambda x: [x, 0, x + 10, 10]  # noqa: E731

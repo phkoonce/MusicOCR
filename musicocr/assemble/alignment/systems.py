@@ -67,7 +67,7 @@ _NUM_ZONE_PT = 60        # width of the strip above a staff's left end that is s
 _LEFT_REF_PT = 50        # scans: staff-left is reported at this x so page_text_layout's left-margin test holds
 
 
-def _staff_systems(img) -> List[Tuple[int, int, int]]:
+def _staff_systems(img, line_frac: float = 0.4) -> List[Tuple[int, int, int]]:
     """(top_row, bottom_row, left_col) of each 5-line staff on a greyscale page image (PIL 'L').
 
     Staff lines are the rows that are dark across a band just right of where staves start (clef and
@@ -78,7 +78,7 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
     h, w = a.shape
     band = a[:, int(w * .21):int(w * .45)].mean(axis=1)
     lines: List[List[int]] = []
-    for y in np.flatnonzero(band > 0.4):
+    for y in np.flatnonzero(band > line_frac):
         if lines and y - lines[-1][-1] <= 2:
             lines[-1].append(int(y))
         else:
@@ -105,6 +105,16 @@ def _staff_systems(img) -> List[Tuple[int, int, int]]:
             i += 1
     common = _common_left(starts, w)
     return [(t, b, common if common is not None else left) for t, b, left in out]
+
+
+def all_staves(img) -> List[Tuple[int, int, int]]:
+    """``_staff_systems`` plus the staves it loses to beams: a row of beams between two staff lines
+    fuses them into one thick "line", so a second pass counts only rows dark almost all the way across."""
+    out = _staff_systems(img)
+    for t, b, left in _staff_systems(img, 0.75):
+        if not any(t < b2 and b > t2 for t2, b2, _ in out):
+            out.append((t, b, left))
+    return sorted(out)
 
 
 def _levelled(img):

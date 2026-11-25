@@ -130,6 +130,9 @@ slur_filter = true
 # a stacked pair (a time signature); with those guards it added nothing wrongly on any Zerberus
 # page tried, and recovers multi-rests the detector misses on scans (Airbender).
 synth_multirest = true
+# Hairpins running over several bars are too long and thin for the detector; find them from the page pixels
+# (two straight lines between the staves meeting in a point) and hand them to the reader.
+long_hairpins = true
 # Read the bold count over each detected multi-rest H-bar from the page pixels (musicocr/text/countdigits.py):
 # glyphs matched against templates from the digits OCR read confidently in the same book + a shipped bank; fills in counts
 # Vision/rapidocr missed and corrects a confident misread (a "9" read as "6"). Counts below 2 and unsure matches are never written.
@@ -211,6 +214,11 @@ deskew = true
 max_skew = 5.0        # only correct rotation within +/- this many degrees
 crop_margins = true
 crop_pad_frac = 0.035  # whitespace to leave above/below the outer staves
+
+[stages.movements]
+# Centred "I." / "II." headings on a part: write the heading and tempo mark, a final
+# barline before it, and a section break in the .mscz (bar numbers restart at 1).
+enabled = true
 
 [stages.correct]
 # When true, the pipeline stops after OMR so you can open the saved .omr project

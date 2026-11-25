@@ -19,6 +19,18 @@ def clean_title(title: str) -> str:
     return re.sub(r"[\s.]+$", "", title).replace('"', "'")
 
 
+_VERSIONS = re.compile(r"\s*(?=\bVersion [A-F]\b|\((?:Arr|arr)\.)")
+
+
+def split_credit(title: str, composer: str) -> tuple:
+    """A table-of-contents entry of several lines leaves the arranger credits in the title ("Deck the Halls Version A
+    (Arr. X)" + "Version B (Arr. Y)"): the title ends where they begin, the rest belongs to the composer line."""
+    head, *rest = _VERSIONS.split(title, maxsplit=1)
+    if not rest or not head.strip():
+        return title, composer
+    return head.strip(), " ".join(x for x in (rest[0].strip(), composer.strip()) if x)
+
+
 def _value(v: Any) -> str:
     if isinstance(v, bool):
         return "true" if v else "false"
@@ -38,10 +50,12 @@ def batch_toml(spec: CollectionSpec, table: Dict[str, Any],
     out.append("")
     for e in table["entries"]:
         override = spec.overrides.get(e["num"], {})
-        title = override.get("title") or clean_title(e["title"])
-        composer = override.get("composer", e["composer"])
-        if composer.startswith("Komponist:") or composer.isdigit():     # a column heading or a page number
-            composer = ""
+        title, composer = clean_title(e["title"]), e["composer"]
+        if composer.startswith("Komponist:") or composer.isdigit() or composer.lower() == "number":
+            composer = ""                                              # a column heading or a page number
+        title, composer = split_credit(title, composer)
+        title = override.get("title") or title
+        composer = override.get("composer", composer)
         for book in spec.books:
             pdf = table["pdfs"][book.id].get(str(e["num"]))
             if pdf is None:                  # split could not find this piece's heading in this book

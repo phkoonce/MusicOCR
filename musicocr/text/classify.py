@@ -52,7 +52,7 @@ class Lexicon:
 
 def norm(s: str) -> str:
     s = s.lower().replace("’", "'")
-    s = re.sub(r"[.\-_]", "", s)
+    s = re.sub(r"[.,\-_]", "", s)
     s = s.replace("à", "a").replace("é", "e").replace("ù", "u").replace("ì", "i")
     s = s.replace("ü", "u").replace("ö", "o")
     return re.sub(r"\s+", " ", s).strip()
@@ -201,6 +201,9 @@ def _plausible_unknown(t: str) -> bool:
             and re.search(r"[aeiouyAEIOUY]", t) is not None)
 
 
+_ON_REPEAT = re.compile(r"^(\d\.?\s?x)\.?\s+(\S.*)$")
+
+
 def classify(text: str, lex: Optional[Lexicon] = None, height_sp: float = 1.5,
              min_unknown_letters: int = 3) -> Marking:
     """Kind (and normalised display text) of one phrase. ``height_sp`` is the phrase's box height
@@ -229,6 +232,11 @@ def classify(text: str, lex: Optional[Lexicon] = None, height_sp: float = 1.5,
             else:
                 mk.leftover = words
         return mk
+    again = _ON_REPEAT.match(t)
+    if again:                                   # "2.x rit.": a marking that holds on one time through the repeat
+        sub = classify(again.group(2), lex, height_sp, min_unknown_letters)
+        if sub.kind in ("tempo_change", "expression", "technique"):
+            return Marking(sub.kind, f"{again.group(1)} {sub.text}")
     if re.fullmatch(r"[A-Z]", t) and height_sp >= 1.8:
         return Marking("rehearsal", t)
     for p in lex.ignore:

@@ -198,6 +198,49 @@ def fix_opening_pickup(path: Path, log: Callable[[str], None] = print) -> int:
     return changed
 
 
+def _section_edge(measure: ET.Element) -> bool:
+    """Does this bar carry a repeat, an ending or a double / final barline?"""
+    for bl in measure.findall("barline"):
+        if bl.find("repeat") is not None or bl.find("ending") is not None \
+                or bl.findtext("bar-style") in ("light-light", "light-heavy"):
+            return True
+    return False
+
+
+def _trailing_gap(measure: ET.Element) -> tuple[int, list[ET.Element]]:
+    """The undrawn time at the end of a bar: ``(duration, elements)``; nothing for a bar without notes before it."""
+    if measure.find("backup") is not None:
+        return 0, []
+    tail: list[ET.Element] = []
+    for el in reversed([k for k in measure if k.tag in ("note", "forward")]):
+        if el.tag != "forward" and not _is_hidden_rest(el):
+            return sum(int(t.findtext("duration") or 0) for t in tail), tail
+        tail.append(el)
+    return 0, []
+
+
+def keep_incomplete_bars(root: ET.Element, log: Callable[[str], None] = print) -> int:
+    """In a score, a bar that every part ends equally short, at a repeat, ending or double barline, is an
+    incomplete bar as printed (a second ending or a section completing an upbeat), not a missed symbol in
+    each part: its trailing gaps are removed. Returns the number of bars."""
+    parts = [p.findall("measure") for p in root.findall("part")]
+    if len(parts) < 2 or len({len(p) for p in parts}) != 1:
+        return 0
+    done = 0
+    for i in range(len(parts[0])):
+        if not any(_section_edge(m) for p in parts for m in p[max(0, i - 1):i + 1]):
+            continue
+        gaps = [_trailing_gap(p[i]) for p in parts]
+        if not gaps[0][0] or len({g[0] for g in gaps}) != 1:
+            continue
+        for p, (_, tail) in zip(parts, gaps):
+            for el in tail:
+                p[i].remove(el)
+        done += 1
+        log(f"  measure {parts[0][i].get('number')}: an incomplete bar in every part, not a gap")
+    return done
+
+
 def reveal_gaps(path: Path, color: str = GAP_COLOR,
                 log: Callable[[str], None] = print) -> int:
     """Turn the gaps Copisteria leaves where it read nothing into visible, coloured rests.
@@ -210,6 +253,7 @@ def reveal_gaps(path: Path, color: str = GAP_COLOR,
     ``<backup>``) are left alone. Returns the number of gaps revealed.
     """
     tree = ET.parse(path)
+    kept = keep_incomplete_bars(tree.getroot(), log)
     revealed = 0
     for part in tree.getroot().findall("part"):
         for measure in part.findall("measure"):
@@ -238,7 +282,7 @@ def reveal_gaps(path: Path, color: str = GAP_COLOR,
                     continue
                 revealed += 1
                 log(f"  measure {measure.get('number')}: gap revealed as a coloured rest")
-    if revealed:
+    if revealed or kept:
         write_tree(tree, path)
     return revealed
 

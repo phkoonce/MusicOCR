@@ -107,8 +107,56 @@ def _install() -> None:
     w._texts_near = _texts_near
     _mark_systems(w)
     _no_binding_systems()
+    _marks_below()
     if "--no-text-tuplets" not in sys.argv:
         w._events = _events
+
+
+def mark_owner(gaps_up: float, gap_down: float) -> bool:
+    """Does a mark between two staves belong to the upper one, on a page whose marks sit below their staves?
+    ``gaps_up``: distance under the upper staff, ``gap_down``: over the lower one. Marks under low notes are
+    pushed down past the middle of the gap, so the lower staff must be much nearer to win."""
+    return gaps_up <= 2.0 * gap_down
+
+
+def reassign_marks(marks: list) -> int:
+    """``marks``: ``[(d_below_upper, d_above_lower, item)]`` of the dynamics and hairpins between two staves.
+    When the page's clear cases (a third nearer one staff than the other) mostly sit below their staff,
+    returns the items that go to the upper staff."""
+    below = sum(1 for up, down, _ in marks if up <= 0.75 * down)
+    above = sum(1 for up, down, _ in marks if down <= 0.75 * up)
+    if below <= 2 * above:
+        return []
+    return [item for up, down, item in marks if mark_owner(up, down)]
+
+
+def _marks_below() -> None:
+    """Instrumental scores print dynamics and hairpins under their staff; copisteria gives each to the nearest
+    staff, so one pushed down by low notes goes to the part below (GHS Xmas score p20: Horn 2 lost all its
+    hairpins to Horn 3)."""
+    from copisteria import front
+    orig = front._assign
+
+    def _assign(syms, staves, only=None):
+        orig(syms, staves, only)
+        marks = []
+        for s in (syms if only is None else only):
+            if s.fam not in ("dynam", "hairpin") or s.staff < 0:
+                continue
+            x = s.cx
+            bands = [front._band(syms, st, x) for st in staves]
+            above = [k for k, (_, y0, y1, _) in enumerate(bands) if y1 <= s.cy]
+            under = [k for k, (_, y0, y1, _) in enumerate(bands) if y0 >= s.cy]
+            if not above or not under:
+                continue
+            k = max(above, key=lambda i: bands[i][2])
+            n = min(under, key=lambda i: bands[i][1])
+            marks.append(((s.cy - bands[k][2]) / bands[k][3], (bands[n][1] - s.cy) / bands[n][3],
+                          (s, k, bands[k][0])))
+        for s, k, bar in reassign_marks(marks):
+            s.staff, s.bar = k, bar
+
+    front._assign = _assign
 
 
 def _no_binding_systems() -> None:  # also: a staff found twice is one

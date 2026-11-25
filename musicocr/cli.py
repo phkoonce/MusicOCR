@@ -50,6 +50,8 @@ def apply_run_overrides(config: Config, args) -> Config:
         pp = replace(pp, enabled=True)
         print("note: --deskew/--crop turn on the [preprocess] pass")
 
+    if g("movements") is not None:
+        config = replace(config, stages=replace(config.stages, movements_enabled=g("movements")))
     tr = config.stages.transpose
     if g("transpose_instrument") is not None:
         tr = replace(tr, enabled=True, instrument=g("transpose_instrument"), semitones=None)
@@ -356,6 +358,9 @@ def _add_run_parser(sub) -> None:
                    help="preprocess: trim the header/footer text band down to the staves")
     r.add_argument("--no-crop", dest="crop", action="store_false",
                    help="preprocess: skip the margin crop")
+    r.add_argument("--movements", dest="movements", action="store_true", default=None,
+                   help="split at centred 'I.' / 'II.' movement headings (config [stages.movements])")
+    r.add_argument("--no-movements", dest="movements", action="store_false")
     r.add_argument("--transpose", dest="transpose", action="store_true", default=None,
                    help="enable the transpose stage (config [stages.transpose])")
     r.add_argument("--no-transpose", dest="transpose", action="store_false",

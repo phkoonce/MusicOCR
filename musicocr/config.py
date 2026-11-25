@@ -96,6 +96,7 @@ class CopisteriaConfig:
     staff_rank: int = 0   # a score page inside a part book: keep staff N of each multi-staff system (0: off; musicocr/scoreops/staffpick.py)
     slur_filter: bool = True   # drop a tall box-shaped curve between two notes across a bar line (a stray curve, not a slur)
     text_tuplets: bool = True   # small "2"/"3" digits from the text layer mark duplets/triplets (copisteria_run.py)
+    long_hairpins: bool = True   # hairpins too long for the detector, found from the pixels (musicocr/text/hairpins.py)
     synth_multirest: bool = True   # synthesise a multiRest where a tall, centred, non-stacked count digit sits over an empty bar
     read_count_digits: bool = True   # read the bold count over each detected multi-rest from the pixels when OCR missed/misread it
     small_graces: bool = False   # before reading: small noteheads the detector called "not grace" become grace notes
@@ -142,6 +143,7 @@ class CopisteriaConfig:
                    text_tuplets=bool(d.get("text_tuplets", True)), single_staff=single,
                    slur_filter=bool(d.get("slur_filter", True)),
                    synth_multirest=bool(d.get("synth_multirest", True)),
+                   long_hairpins=bool(d.get("long_hairpins", True)),
                    small_graces=bool(d.get("small_graces", False)),
                    read_count_digits=bool(d.get("read_count_digits", True)),
                    staff_rank=int(d.get("staff_rank", 0)),
@@ -287,6 +289,7 @@ class StagesConfig:
     normalize_enabled: bool = True
     tuplets_enabled: bool = True   # rebuild inconsistent tuplets in bars that do not add up (musicocr/fixes/tuplets.py)
     tuplets_flag: bool = True      # colour / annotate the rebuilt runs
+    movements_enabled: bool = True # "I." / "II." headings -> final barline, section break (scoreops/movements.py)
     transpose: TransposeConfig = field(default_factory=TransposeConfig)
     retouch: RetouchConfig = field(default_factory=RetouchConfig)
 
@@ -297,6 +300,7 @@ class StagesConfig:
             normalize_enabled=bool((d.get("normalize", {}) or {}).get("enabled", True)),
             tuplets_enabled=bool((d.get("tuplets", {}) or {}).get("enabled", True)),
             tuplets_flag=bool((d.get("tuplets", {}) or {}).get("flag", True)),
+            movements_enabled=bool((d.get("movements", {}) or {}).get("enabled", True)),
             transpose=TransposeConfig.from_dict(dict(d.get("transpose", {}) or {})),
             retouch=RetouchConfig.from_dict(dict(d.get("retouch", {}) or {})),
         )

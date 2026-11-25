@@ -71,6 +71,12 @@ def _on_music(box, boxes, frac: float = 0.3) -> bool:
     return False
 
 
+def is_credit_line(box, width: float) -> bool:
+    """A line set flush right over the page's first staff names the composer or the source ("Deutsches
+    Weihnachtslied", "A. Corelli (1653-1713)"): title furniture, not a mark in the music."""
+    return box[0] > 0.55 * width and box[2] > 0.85 * width
+
+
 def _runs(mask) -> List[Tuple[int, int]]:
     out, start = [], None
     for i, v in enumerate(list(mask) + [False]):
@@ -101,7 +107,7 @@ def is_dotted_beat(ink) -> Optional[bool]:
     for i in range(len(tail) - 1, 0, -1):
         a, b, y0, y1 = tail[i]
         w, h = b - a, y1 - y0
-        if w >= 1.1 * h and h <= 0.45 * tall and w >= 0.25 * tall:           # the '=' sign
+        if w >= 1.1 * h and h <= 0.55 * tall and w >= 0.25 * tall:           # the '=' sign (wide-set in some fonts)
             la, lb, ly0, ly1 = tail[i - 1]
             return (lb - la) <= 0.3 * tall and (ly1 - ly0) <= 0.3 * tall
     return None
@@ -145,6 +151,9 @@ def build_items(words: Sequence[Word], staves: Sequence[Staff], lex: Optional[Le
             continue
         if mk.kind == "unknown" and (cfg.mode != "flag" or not above or d == 0):
             drop("unknown text not above a staff" if cfg.mode == "flag" else "unknown (mode on)")
+            continue
+        if mk.kind == "unknown" and si == 0 and above and img is not None and is_credit_line(p.box, img.width):
+            drop("source / composer line (right-aligned over the first staff)")
             continue
         if mk.kind == "tempo" and mk.bpm is None and not mk.text:
             continue
@@ -197,6 +206,13 @@ def shape_marks(img, staves: Sequence[Staff], cfg: Optional[TextLayerSettings] =
     for c in find_boxes(img, sp):
         if not any(_overlap(c.box, r.box) for r, _ in shapes):          # one frame, one mark
             shapes.append((c, "box"))
+    tops = None                     # on a score page: the staves a mark may sit above (the top one of each system)
+    if staves:
+        import numpy as np
+        from musicocr.scoreops.staffpick import is_score_page, linked_groups
+        groups = linked_groups(np.asarray(img) < 160, staves)
+        if is_score_page(groups, len(staves)):
+            tops = {g[0] for g in groups}
     keep = []
     for c, shape in shapes:
         where = c.box
@@ -205,6 +221,8 @@ def shape_marks(img, staves: Sequence[Staff], cfg: Optional[TextLayerSettings] =
             where = (cx, cy, cx, cy)
         si, d, above = _zone(where, staves) if staves else (0, 1.0, True)   # no staves read: the engine places it
         if d <= 0.3 or d > (cfg.above_sp if above else cfg.below_sp):      # inside a staff or far from every staff
+            continue
+        if tops is not None and not (above and si in tops):   # between the staves of a score system: slurs and flats
             continue
         keep.append((c, shape, si))
     labels: dict = {}
@@ -288,7 +306,9 @@ def write_textlayer_json(png: Path, cfg: TextLayerSettings, log=None, **kw) -> i
     from PIL import Image
     img = Image.open(png).convert("L")
     res = build_items(words, staves, cfg=cfg, dets=dets, img=img)
-    res.items += shape_marks(img, staves, cfg)
+    signs = [d["xyxy"] for d in dets or [] if str(d.get("cls", "")).startswith("repeatMark") and d.get("conf", 0) >= 0.5]
+    res.items += [m for m in shape_marks(img, staves, cfg)
+                  if not (m["text"] == CIRCLE_TEXT and any(_overlap(m["xyxy"], s) for s in signs))]   # a coda sign is a ring
     dropped.write_text(json.dumps(res.dropped, indent=0))
     if not res.items:
         dst.unlink(missing_ok=True)

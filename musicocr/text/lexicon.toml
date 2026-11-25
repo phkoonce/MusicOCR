@@ -12,7 +12,10 @@
 [tempo]
 words = ["Allegro", "Allegretto", "Moderato", "Andante", "Andantino", "Adagio", "Adagietto", "Presto",
          "Prestissimo", "Largo", "Larghetto", "Lento", "Grave", "Vivace", "Vivo", "Moderately", "Slow",
-         "Fast", "Faster", "Slower", "Tempo", "Allegro moderato", "Andante con moto", "Tempo di marcia"]
+         "Fast", "Faster", "Slower", "Tempo", "Allegro moderato", "Andante con moto", "Tempo di marcia",
+         "Ruhig", "Ruhig, empfunden", "Innig, sehr getragen", "Zart bewegt", "Bewegt", "Getragen", "Fließend",
+         "Lässig", "Langsam", "Lebhaft", "Schnell", "Heiter", "Feierlich", "Pastorale", "Rasch", "Langsamer", "Schneller",
+         "Breit", "Wuchtig", "Commodo", "alla breve", "Coda"]
 modifiers = ["Sl.", "Slightly", "Much", "Little", "Poco", "Molto", "Piu", "Meno", "Un poco", "Quasi"]
 
 [tempo_change]
@@ -26,8 +29,9 @@ words = ["dolce", "cantabile", "espr.", "espressivo", "sostenuto", "maestoso", "
          "tranquillo", "grazioso", "giocoso", "agitato", "feroce", "pesante", "leggiero", "leggero",
          "con fuoco", "con brio", "con moto", "con anima", "misterioso", "sonoro", "lontano", "calmo",
          "energico", "marziale", "scherzando", "affettuoso", "appassionato", "cresc.", "dim.",
-         "decresc.", "con forza", "delicato", "mesto"]
-modifiers = ["sempre", "poco", "molto", "piu", "meno", "assai", "sub.", "ancora", "un poco", "quasi"]
+         "decresc.", "con forza", "delicato", "mesto", "empfunden", "innig", "zart", "beruhigen", "steigern",
+         "allmählich steigern", "allmählich sehr steigern", "gehalten", "hervortreten"]
+modifiers = ["sempre", "poco", "molto", "piu", "meno", "assai", "sub.", "ancora", "un poco", "quasi", "sehr", "allmählich", "etwas", "immer"]
 
 [technique]
 words = ["marc.", "marcato", "stacc.", "staccato", "sim.", "simile", "con sord.", "senza sord.", "sord.",
@@ -48,7 +52,8 @@ cue = ["^\\(?\\+?\\s*(?:V[lI1]n|F[lI1]|Hn|Hrn|Tpt|Tbn|Tba|Hps|Hp|Ce[lI1]|Ob|Cl|B
 patterns = ["^[(\\[]?[pmfszr]{1,5}[)\\]]?[-\\u2013\\u2014=<>.~_ ]*$",
             "^[\\W\\d_]*$",
             "\\buntil\\b",
-            "^\\d+[\\s\\-\\u2013\\u2014_]+\\d+$"]
+            "^\\d+[\\s\\-\\u2013\\u2014_]+\\d+$",
+            "^version(\\s+[a-f])?$"]
 
 [confusions]
 # OCR confusion pairs tried (both directions) before the edit-distance-1 test

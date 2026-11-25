@@ -38,7 +38,10 @@ omr-eval/README.md's 2026-09-13 entry.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable
+
+from musicocr.musicxml.io import open_wedges
 
 _TOL = 1e-6
 
@@ -85,8 +88,13 @@ def _rebuild(container, expected: float, actual: float):
     return new_container
 
 
-def normalize_part(part, label: str, log: Callable[[str], None] = print) -> int:
-    """Normalize every irregular measure in `part` in place. Returns count fixed."""
+def normalize_part(part, label: str, log: Callable[[str], None] = print, known_full=frozenset(),
+                   incomplete=frozenset()) -> int:
+    """Normalize every irregular measure in `part` in place. Returns count fixed.
+
+    ``incomplete``: indices of bars that are short as printed (every part of the score, at a section edge).
+    ``known_full``: indices of bars another part of the same score holds at full length; there a short first or
+    last bar is no pickup or incomplete ending but a dropped rest."""
     from music21 import stream
 
     measures = list(part.getElementsByClass(stream.Measure))
@@ -101,9 +109,11 @@ def normalize_part(part, label: str, log: Callable[[str], None] = print) -> int:
             continue
         if abs(actual - expected) <= _TOL:
             continue
-        if i == 0 and actual < expected:
+        if i in incomplete and actual < expected:
+            continue
+        if i == 0 and actual < expected and i not in known_full:
             continue  # legitimate pickup measure
-        if i == last and actual < expected:
+        if i == last and actual < expected and i not in known_full:
             continue  # legitimate incomplete final measure
 
         voices = list(m.getElementsByClass(stream.Voice))
@@ -151,6 +161,7 @@ def normalize_file(path, log: Callable[[str], None] = print) -> int:
     fixed = normalize_score(score, log)
     if fixed:
         score.write("musicxml", fp=str(path))
+        open_wedges(Path(path))
     return fixed
 
 
@@ -160,7 +171,48 @@ def normalize_score(score, log: Callable[[str], None] = print) -> int:
 
     parts = list(score.getElementsByClass(stream.Part)) or [score]
     total = 0
+    full = _full_bars(parts) if len(parts) > 1 else frozenset()
+    short = _incomplete_bars(parts) if len(parts) > 1 else frozenset()
     for i, part in enumerate(parts):
         label = part.partName or f"part {i + 1}"
-        total += normalize_part(part, label, log)
+        total += normalize_part(part, label, log, known_full=full, incomplete=short)
     return total
+
+
+def _full_bars(parts) -> frozenset:
+    """Indices of bars that some part of a score fills with notes and written rests to the bar's length (parts of
+    one score share their bar lengths)."""
+    from music21 import stream
+
+    out = set()
+    for part in parts:
+        for i, m in enumerate(part.getElementsByClass(stream.Measure)):
+            try:
+                if m.duration.quarterLength >= m.barDuration.quarterLength - _TOL:
+                    out.add(i)
+            except Exception:  # noqa: BLE001
+                continue
+    return frozenset(out)
+
+
+def _incomplete_bars(parts) -> frozenset:
+    """Indices of bars every part leaves equally short next to a repeat or a double / final barline: a second
+    ending or a section that completes an upbeat."""
+    from music21 import bar, stream
+
+    def edge(m) -> bool:
+        return any(isinstance(b, bar.Repeat) or (b is not None and b.type in ("final", "double", "light-heavy",
+                   "light-light")) for b in (m.leftBarline, m.rightBarline))
+
+    columns = [list(p.getElementsByClass(stream.Measure)) for p in parts]
+    out = set()
+    for i in range(min(len(c) for c in columns)):
+        try:
+            lengths = {c[i].duration.quarterLength for c in columns}
+            if len(lengths) != 1 or lengths.pop() >= columns[0][i].barDuration.quarterLength - _TOL:
+                continue
+        except Exception:  # noqa: BLE001
+            continue
+        if any(edge(m) for c in columns for m in c[max(0, i - 1):i + 1]):
+            out.add(i)
+    return frozenset(out)

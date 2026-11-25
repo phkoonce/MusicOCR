@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import shutil
 
+from musicocr.assemble.mscz_sections import add_section_breaks
 from musicocr.errors import StageError, StageResult
 from musicocr.pipeline import PipelineContext
 from musicocr.stages._common import require_musicxml
@@ -67,9 +68,15 @@ def run(ctx: PipelineContext) -> StageResult:
         else [(None, xml)]
     )
 
+    # section breaks go before each movement but the first; only the .mscz can hold them
+    ends = [mv["bar"] - 1 for mv in ctx.artifacts.movements if mv["bar"] > 0] if merged else []
+    if ends:
+        wanted = sorted(wanted, key=lambda f: f != "mscz")
+
     outputs = ctx.artifacts.outputs
     produced = []
     for suffix, src in sources:
+        from_mscz = None
         for fmt in wanted:
             if suffix:
                 name = f"render.{suffix}.pdf" if fmt == "qa-pdf" else f"{ctx.book_name}.{suffix}{_EXT[fmt]}"
@@ -77,7 +84,10 @@ def run(ctx: PipelineContext) -> StageResult:
                 name = "render.pdf" if fmt == "qa-pdf" else f"{ctx.book_name}{_EXT[fmt]}"
             # Only the .mscz is a deliverable; MIDI and the QA render are throwaway checks.
             out_dir = ctx.workdir if fmt == "mscz" else ctx.scratch
-            dst = _convert(tool, src, out_dir / name, ctx.log)
+            dst = _convert(tool, from_mscz or src, out_dir / name, ctx.log)
+            if fmt == "mscz" and ends:
+                ctx.log(f"  {add_section_breaks(dst, ends)} section break(s) between movements")
+                from_mscz = dst                    # so the MIDI and QA render show the breaks too
             if suffix:
                 outputs.setdefault(fmt, []).append(dst)
             else:

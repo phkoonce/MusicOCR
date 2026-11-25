@@ -32,6 +32,7 @@ class Artifacts:
     musicxml_pages: List[Path] = field(default_factory=list)
     merge_skipped: List[str] = field(default_factory=list)
     extract_merged: bool = True
+    movements: List[Dict[str, Any]] = field(default_factory=list)  # scoreops.movements
     transpose_stamps: Dict[str, int] = field(default_factory=dict)
     retouch_stamps: Dict[str, int] = field(default_factory=dict)
 

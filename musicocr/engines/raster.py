@@ -40,6 +40,13 @@ def ensure_page_png(ctx: PipelineContext, page: int, dst: Path) -> Path | None:
     return prepare_page(source_pdf, page, dst, ctx.config.preprocess, pdftoppm, ctx.log)
 
 
+def drop_detection_caches(pdir: Path, stem: str) -> None:
+    """Remove the symbol detections cached for a page: they belong to one image. An engine reuses
+    them by file name, so after a change of pre-processing they would be read against the wrong pixels."""
+    for f in [*pdir.glob(f"{stem}.dets_*.json"), pdir / f"{stem}.big_dets.json"]:
+        f.unlink(missing_ok=True)
+
+
 def run_raster_pages(
     ctx: PipelineContext,
     *,
@@ -75,11 +82,14 @@ def run_raster_pages(
 
         pdir.mkdir(parents=True, exist_ok=True)
         img = pdir / f"{stem}.png"
+        before = img.read_bytes() if img.exists() else None
         if not ensure_png(ctx, page, img):
             failed.append(page)
             ctx.log(f"  page {page} ({i}/{len(pages)}): FAILED — could not rasterise page")
             continue
 
+        if before is not None and img.exists() and img.read_bytes() != before:
+            drop_detection_caches(pdir, stem)
         if out_xml.exists():
             out_xml.unlink()
         cmd, cwd = build_cmd(img, pdir)

@@ -1,0 +1,34 @@
+# German Hornsound "the books" Vol. 4 Christmas -- the 4-horn SCORE (500 dpi scan, 82 pages). Same pieces as the
+# four part books (workflows/ghs-xmas), table of contents on pages 1-3, printed page = PDF page.
+name = "ghs-xmas-score"
+title = "the books Vol. 4 Christmas - Score"
+instrument = "horn in f"
+part_name = "Score"
+part_id_prefix = "s"
+key_prefix = "GXS_"
+bar_numbers = true
+toc_pages = "1-3"
+first_page = 4
+input_dir = "input/ghs-xmas-score"
+
+[[books]]
+id = "s"
+pdf = "~/My Drive/Music/Scores/Horn - 04tet/Collections/GHS Xmas/GHS Xmas Score.pdf"
+old_bass_clef = true                # Horn 4 (and low Horn 3) in old bass-clef notation, as in the part books
+
+# Contents lines the OCR misread (checked against the headings on the music pages)
+[overrides.1]
+title = "Concerto grosso op. 6 Nr. 8"
+composer = "A. Corelli (1653-1713), arr. Christoph Eß"
+[overrides.4]
+title = "Don Oíche Úd i mBeithil"
+[overrides.5]
+title = "Es kam ein Engel (Mennyből az angyal)"
+[overrides.19]
+title = "Koppången"
+[overrides.23]
+title = "Lulajże, Jezuniu"
+[overrides.10]
+composer = "(Arr. A.E-Crawford/Christoph Eß)"
+[overrides.41]
+composer = "(Arr. Stephan Schottstädt)"

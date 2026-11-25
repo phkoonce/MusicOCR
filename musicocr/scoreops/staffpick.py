@@ -131,6 +131,15 @@ def staff_groups(img, arr):
     return staves, base
 
 
+def page_is_score(img_path: Path) -> bool:
+    """Is this page image a page of a score (every staff in a joined system of one size >= 2)?"""
+    import numpy as np
+    from PIL import Image
+    img = Image.open(img_path).convert("L")
+    staves, groups = staff_groups(img, np.asarray(img) < 160)
+    return len(staves) >= 2 and is_score_page(groups, len(staves))
+
+
 def part_number(label: str) -> int:
     """The number a part's label ends with ("... - Horn 3" -> 3; 0 when it has none)."""
     import re

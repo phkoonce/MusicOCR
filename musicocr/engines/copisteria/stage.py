@@ -128,6 +128,12 @@ def run(ctx: PipelineContext) -> StageResult:
                     if cfg.synth_multirest:
                         add_missing_multirest_dets(dets, texts, log=ctx.log, rings=_rings(img, dets))
                     boost_multirest_dets(dets, texts, log=ctx.log)
+                if cfg.long_hairpins:
+                    try:
+                        from musicocr.text.hairpins import add_long_hairpins
+                        add_long_hairpins(img, dets, log=ctx.log)
+                    except Exception as exc:  # noqa: BLE001
+                        ctx.log(f"  {img.stem}: long-hairpin search skipped ({type(exc).__name__}: {exc})")
                 if cfg.small_graces:        # after the fill, whose added notes may be small too
                     n = mark_small_graces(dets)
                     if n:
@@ -188,6 +194,21 @@ def run(ctx: PipelineContext) -> StageResult:
         except Exception as exc:  # noqa: BLE001
             ctx.log(f"  {img.stem}: text layer skipped ({type(exc).__name__}: {exc})")
 
+    score_pages: dict = {}
+
+    def _score_page(img: Path) -> bool:
+        """A part names its instrument too: a page whose staves are all joined into systems is a score all the same."""
+        if img.name not in score_pages:
+            try:
+                from musicocr.scoreops.staffpick import page_is_score
+                score_pages[img.name] = page_is_score(img)
+            except Exception as exc:  # noqa: BLE001
+                ctx.log(f"  {img.stem}: score-page check skipped ({type(exc).__name__}: {exc})")
+                score_pages[img.name] = False
+            if score_pages[img.name]:
+                ctx.log(f"  {img.stem}: a score page (joined staves): systems read as printed")
+        return score_pages[img.name]
+
     def _page_cmd(img: Path, pdir: Path) -> list:
         cmd = [py, str(run_script), str(img), "--out", str(pdir)]
         if not ctx.config.omr.copisteria.text_tuplets:
@@ -195,7 +216,8 @@ def run(ctx: PipelineContext) -> StageResult:
         if not ctx.config.omr.copisteria.slur_filter:
             cmd.append("--no-slur-filter")
         single = ctx.config.omr.copisteria.single_staff
-        if single == "yes" or (single == "auto" and ctx.config.stages.transpose.instrument):
+        if single == "yes" or (single == "auto" and ctx.config.stages.transpose.instrument
+                               and not _score_page(img)):
             cmd.append("--single-staff")      # a part: its staves are separate systems, however they look
         return cmd
 

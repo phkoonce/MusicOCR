@@ -7,7 +7,7 @@ import pytest
 music21 = pytest.importorskip("music21")
 from music21 import clef, meter, note, stream  # noqa: E402
 
-from musicocr.fixes.measure_normalize import normalize_part  # noqa: E402
+from musicocr.fixes.measure_normalize import normalize_part, normalize_score  # noqa: E402
 
 
 def _part(measure_lengths: list[float]) -> stream.Part:
@@ -74,3 +74,12 @@ def test_later_measures_are_repositioned_after_a_fix():
     assert measures[0].offset == pytest.approx(0.0)
     assert measures[1].offset == pytest.approx(4.0)
     assert measures[2].offset == pytest.approx(8.0)
+
+
+def test_short_last_bar_of_one_part_is_padded_when_the_score_shows_it_full():
+    score = stream.Score()
+    score.insert(0, _part([4, 4]))
+    score.insert(0, _part([4, 2]))
+    assert normalize_score(score, log=lambda s: None) == 1
+    for part in score.parts:
+        assert list(part.getElementsByClass(stream.Measure))[-1].duration.quarterLength == pytest.approx(4.0)

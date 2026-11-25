@@ -177,6 +177,19 @@ def _name_instrument(score_part: ET.Element, canon: str) -> None:
         prog.text = str(program)
 
 
+def _number_namesakes(root: ET.Element) -> None:
+    """A score with several parts of one instrument: "Horn 1" ... "Horn 4", not four parts of one name."""
+    parts = list(root.iter("score-part"))
+    names = [sp.findtext("part-name") or "" for sp in parts]
+    for name in {n for n in names if n and names.count(n) > 1}:
+        for k, sp in enumerate([sp for sp, n in zip(parts, names) if n == name], 1):
+            for tag in ("part-name", "part-abbreviation", "score-instrument/instrument-name",
+                        "score-instrument/instrument-abbreviation"):
+                el = sp.find(tag)
+                if el is not None and el.text:
+                    el.text = f"{el.text} {k}"
+
+
 def _part_names(root: ET.Element) -> dict:
     return {sp.get("id"): (sp.findtext("part-name") or sp.findtext("part-abbreviation") or "")
             for sp in root.iter("score-part")}
@@ -204,6 +217,7 @@ def transpose_score(
     """
     result = TransposeResult()
     names = _part_names(root)
+    named = []                      # parts this call gave an instrument's name
     for part in root.findall("part"):
         pid = part.get("id", "")
         name = names.get(pid, "")
@@ -226,6 +240,7 @@ def transpose_score(
             score_part = next((sp for sp in root.iter("score-part") if sp.get("id") == pid), None)
             if canon in INFO and score_part is not None:
                 _name_instrument(score_part, canon)
+                named.append(pid)
         else:
             res = transpose_part(part, n)
         res.name = name
@@ -237,6 +252,8 @@ def transpose_score(
                     f"{pid} ({name}): clef changes mid-part; transposition was chosen from "
                     f"the first clef ({part_clef})"
                 )
+    if len(named) > 1:
+        _number_namesakes(root)
     return result
 
 

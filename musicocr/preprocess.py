@@ -19,6 +19,7 @@ config.toml.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
@@ -160,6 +161,9 @@ def _staff_band(im, pad_frac: float) -> tuple[int, int] | None:
       up, with clear blank space between it and the music below;
     * a **stranded footer block** — short, hard against the bottom edge.
 
+    Neither is trimmed if it holds a staff: a first line under a heading (a new
+    movement's "II." and tempo) reads as one short block high on the page.
+
     The big centred title *frame* on a first page is deliberately left alone:
     it often abuts the first system with no real gap, and clipping a system to
     save a ten-second manual delete is a bad trade. The cut is also hard-clamped
@@ -197,7 +201,45 @@ def _staff_band(im, pad_frac: float) -> tuple[int, int] | None:
         return None
 
     scale = im.height / h
-    return round(top * scale), round(bot * scale)
+    top, bot = round(top * scale), round(bot * scale)
+    top, bot = _keep_staves(im, top, bot)
+    if top and _heads_a_section(im, top):
+        top = 0
+    if (bot - top) / im.height > 0.97:
+        return None
+    return top, bot
+
+
+def _heads_a_section(im, top: int) -> bool:
+    """Is a movement / version heading ("II.", "Version B") in (or cut through by) the strip above row ``top``? A section that opens a
+    page has its heading just where a running header would be."""
+    import tempfile
+
+    from musicocr.scoreops.movements import is_heading_text
+    from musicocr.text.ocr_backends import ocr_words
+
+    try:
+        with tempfile.TemporaryDirectory() as t:
+            png = Path(t) / "top.png"
+            im.crop((int(0.25 * im.width), 0, int(0.75 * im.width), min(im.height, top + int(0.02 * im.height)))).convert("L").save(png)
+            words = ocr_words(png, "vision", log=lambda s: None)
+    except Exception:  # noqa: BLE001 - no OCR: trim as before
+        return False
+    text = " ".join(w["text"] for w in words)
+    return any(is_heading_text(w["text"]) for w in words) or bool(re.search(r"\bVersion [A-F]\b", text))
+
+
+def _keep_staves(im, top: int, bot: int) -> tuple[int, int]:
+    """``(top, bot)`` with a trim cancelled when any staff lies (partly) in the strip it would remove."""
+    from musicocr.assemble.alignment.systems import all_staves
+
+    half = im.convert("L").resize((max(1, im.width // 2), max(1, im.height // 2)))
+    staves = [(t * 2, b * 2) for t, b, _ in all_staves(half)]
+    if any(t < top for t, _ in staves):
+        top = 0
+    if any(b > bot for _, b in staves):
+        bot = im.height
+    return top, bot
 
 
 def prepare_page(pdf: Path, page: int, dst_png: Path, opts: PreprocessOpts,

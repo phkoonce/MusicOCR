@@ -2,7 +2,7 @@
 ``musicocr.scoreops.retouch`` -- old-notation bass clefs, and the piece's title and composer.
 
 Off unless ``--old-bass-clef``, ``--title`` or ``--composer`` is given (or ``[stages.retouch]`` sets
-them). Re-runnable like transpose: the untouched file is kept under ``<scratch>/pre-retouch/`` and
+them), or the extract stage found movement headings, which are written into the merged score here. Re-runnable like transpose: the untouched file is kept under ``<scratch>/pre-retouch/`` and
 every run starts from that copy.
 """
 from __future__ import annotations
@@ -11,13 +11,15 @@ import shutil
 
 from musicocr.errors import StageResult
 from musicocr.pipeline import PipelineContext
+from musicocr.scoreops.movements import apply_movements_file
 from musicocr.scoreops.retouch import retouch_file
 from musicocr.stages._common import disabled, require_musicxml
 
 
 def run(ctx: PipelineContext) -> StageResult:
     cfg = ctx.config.stages.retouch
-    if not cfg.active:
+    movements = ctx.artifacts.movements
+    if not cfg.active and not movements:
         return disabled("retouch", "retouch")
 
     xml = require_musicxml(ctx)
@@ -33,6 +35,8 @@ def run(ctx: PipelineContext) -> StageResult:
         if not (stamps.get(str(path)) == path.stat().st_mtime_ns and backup.exists()):
             shutil.copy2(path, backup)
         res = retouch_file(backup, path, cfg, log=lambda s, n=path.name: ctx.log(f"  {n}: {s}"))
+        if movements and path == xml and ctx.artifacts.extract_merged:
+            apply_movements_file(path, movements)      # bar numbers are those of the merged score
         stamps[str(path)] = path.stat().st_mtime_ns
         moved += res["octavized"]
         dropped += res["dropped"]
@@ -41,4 +45,6 @@ def run(ctx: PipelineContext) -> StageResult:
         bits.append(f"{moved} note(s) under old-notation bass clefs raised an octave")
     if cfg.title or cfg.composer:
         bits.append(f"title/composer set, {dropped} misread direction(s) dropped")
+    if movements:
+        bits.append(f"{len(movements)} movement heading(s) written")
     return StageResult("retouch", "ok", "; ".join(bits))

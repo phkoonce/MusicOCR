@@ -28,6 +28,8 @@ OUT_DPI = 300
 _DOTS = re.compile(r"^[.…·•\s]+$")
 _NUM = re.compile(r"^(\d{1,3})\.?$")
 _MATCH = 0.78
+# letters OCR reads for a digit of a piece number ("З." for "3.": a Cyrillic ze)
+_DIGIT_LOOKALIKES = str.maketrans({"З": "3", "з": "3", "О": "0", "о": "0", "б": "6"})
 
 
 @dataclass
@@ -105,7 +107,8 @@ def toc_entries(pdf: Path, pages: Sequence[int], tmp: Path, cache: Optional[Path
             ws = [w for w in ln["words"] if not _DOTS.match(w["text"]) and w["xyxy"][0] < 0.8 * width]
             if not ws:
                 continue
-            m = _NUM.match(ws[0]["text"])
+            first = ws[0]["text"]
+            m = _NUM.match(first.translate(_DIGIT_LOOKALIKES) if first.endswith(".") else first)
             if m and len(ws) > 1:
                 entries.append([int(m.group(1)), [" ".join(w["text"] for w in ws[1:])]])
             elif entries:
@@ -115,6 +118,16 @@ def toc_entries(pdf: Path, pages: Sequence[int], tmp: Path, cache: Optional[Path
         title = " ".join(ls[:-1]) if len(ls) > 1 else ls[0]
         out.append(Entry(num, re.sub(r"\s+", " ", title).strip(), ls[-1] if len(ls) > 1 else ""))
     return out
+
+
+def fill_number_gaps(entries: List[Entry]) -> List[Entry]:
+    """Numbered pieces the table of contents was not read for (its number lost by the OCR): an entry with no title
+    for each, so that its heading is still searched for by number on the music pages."""
+    have = {e.num for e in entries}
+    if not have:
+        return entries
+    return sorted([*entries, *(Entry(n, "", "") for n in range(1, max(have) + 1) if n not in have)],
+                  key=lambda e: e.num)
 
 
 _HEADING = re.compile(r"^(\d{1,3})\.\s+([^\d\s].*)$")
@@ -166,18 +179,26 @@ def _strip_page_number(ln: dict) -> Tuple[str, float]:
     return t, ln["x0"]
 
 
+def _segments(ln: dict, width: float, gap: float = 0.08) -> List[Tuple[str, float]]:
+    """Later pieces of a line that a wide gap divides, as ``(text, left edge)``: a title the OCR put on one line with a
+    word far to its left at the same height ("Partitur        1. Concerto grosso")."""
+    words = ln.get("words") or []
+    cuts = [k for k in range(1, len(words)) if words[k]["xyxy"][0] - words[k - 1]["xyxy"][2] > gap * width]
+    return [(" ".join(w["text"] for w in words[k:]), words[k]["xyxy"][0]) for k in cuts]
+
+
 def _heading(lines: List[dict], i: int, e: Entry, width: int, by_title: bool = True) -> Optional[int]:
     """Index of the line (from ``i``) that opens entry ``e``: its printed number alone on a centred line
     or in front of the title, else (``by_title``) a line that starts with its title."""
     want = _norm(e.title)
     for idx in range(i, len(lines)):
-        t, x0 = _strip_page_number(lines[idx])
-        m = _NUM.match(t) or _NUM_TITLE.match(t)
-        # A number alone on a line is a heading only when centred: at the left margin (x0 ~ 0.1) it is the bar
-        # number opening a system ("13" above a staff), which used to pose as the heading of piece 13.
-        lo = _BARE_MIN_X if _NUM.match(t) else 0.1
-        if m and int(m.group(1)) == e.num and lo * width < x0 < 0.7 * width:
-            return idx
+        for t, x0 in [_strip_page_number(lines[idx]), *_segments(lines[idx], width)]:
+            m = _NUM.match(t) or _NUM_TITLE.match(t)
+            # A number alone on a line is a heading only when centred: at the left margin (x0 ~ 0.1) it is the bar
+            # number opening a system ("13" above a staff), which used to pose as the heading of piece 13.
+            lo = _BARE_MIN_X if _NUM.match(t) else 0.1
+            if m and int(m.group(1)) == e.num and lo * width < x0 < 0.7 * width:
+                return idx
     if not by_title:
         return None
     for idx in range(i, len(lines)):
@@ -217,6 +238,10 @@ def find_pieces(pdf: Path, entries: Sequence[Entry], first_page: int, last_page:
                         and top - lines[hit - 1]["y0"] < 0.12 * h and lines[hit - 1]["x0"] > _BARE_MIN_X * w:
                     top = lines[hit - 1]["y0"]          # "4." printed on a line of its own above the title
                 found.append(Found(e.num, pg, top / h))
+                if not e.title:                                  # a number the table of contents did not give
+                    own = [t for t, _ in _segments(lines[hit], w) if t.startswith(f"{e.num}.")]
+                    t = own[0] if own else _strip_page_number(lines[hit])[0]
+                    e.title = re.sub(r"^\d{1,3}\.?\s*", "", t) or f"No. {e.num}"
                 i, k, got = hit + 1, k + skip + 1, True
             if got or len(lines) > 12:
                 break
@@ -375,13 +400,15 @@ def split_collection(spec: CollectionSpec, toc_pages: Optional[Tuple[int, int]] 
             log(f"book {book.id}: {len(tab)} TOC entries")
         entries = consensus(tables)
         log(f"{len(entries)} pieces in the consensus table")
-        table = {"entries": [asdict(e) for e in entries], "found": {}, "pdfs": {}}
+        if not spec.headings:
+            entries = fill_number_gaps(entries)
         all_found = {}
         for book in spec.books:
             n = pdf_page_count(str(book.pdf))
             all_found[book.id] = find_pieces(book.pdf, entries, first, n, tmp,
                                              log=lambda s, i=book.id: log(f"book {i}{s}"), cache=spec.cache_dir)
         all_found = fill_from_peers(all_found, log)
+        table = {"entries": [asdict(e) for e in entries], "found": {}, "pdfs": {}}      # after: headings name blank titles
         for book in spec.books:
             n = pdf_page_count(str(book.pdf))
             found = all_found[book.id]

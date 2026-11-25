@@ -18,6 +18,7 @@ from musicocr.errors import StageError, StageResult
 from musicocr.fixes import PAGE_FIXES, FixContext, run_fixes
 from musicocr.musicxml.merge import merge_pages
 from musicocr.pipeline import PipelineContext
+from musicocr.scoreops.movements import detect
 
 
 def _unzip_mxl(mxl: Path, dest: Path) -> Path:
@@ -38,6 +39,21 @@ def _page_musicxml(src: Path, dest: Path) -> Path:
         return _unzip_mxl(src, dest)
     dest.write_bytes(src.read_bytes())
     return dest
+
+
+def _find_movements(ctx: PipelineContext, page_files: list[Path], images: dict[Path, Path]) -> None:
+    """Note where movements start; the retouch and convert stages write them into the score."""
+    if not ctx.config.stages.movements_enabled:
+        return
+    try:
+        found = detect([(images.get(p, p.with_suffix(".png")), p) for p in page_files], log=ctx.log,
+                       python=ctx.config.resolve_tool("homr_python"))
+    except Exception as exc:  # noqa: BLE001 - a heading is never worth losing the score
+        ctx.log(f"  movements: detection failed ({type(exc).__name__}: {exc})")
+        return
+    ctx.artifacts.movements = found
+    for mv in found:
+        ctx.log(f"  movement {mv['heading']} starts at bar {mv['bar'] + 1}")
 
 
 def run(ctx: PipelineContext) -> StageResult:
@@ -78,12 +94,16 @@ def run(ctx: PipelineContext) -> StageResult:
 
     # Per-page mode.
     page_files: list[Path] = []
+    images: dict[Path, Path] = {}           # page file -> the page image the engine read
+    ctx.artifacts.movements = []
     for page in sorted(by_page):
         for k, mxl in enumerate(by_page[page]):
             suffix = f".p{page:03d}" + (f".{k + 1}" if len(by_page[page]) > 1 else "")
             t = out / f"{ctx.book_name}{suffix}.musicxml"
             _page_musicxml(mxl, t)
             page_files.append(t)
+            if len(by_page[page]) == 1:
+                images[t] = mxl.with_suffix(".png")
             ctx.log(f"  extracted {t.name}")
     ctx.artifacts.musicxml_pages = page_files
 
@@ -95,6 +115,7 @@ def run(ctx: PipelineContext) -> StageResult:
         master.write_bytes(page_files[0].read_bytes())
         ctx.artifacts.musicxml = master
         ctx.artifacts.extract_merged = True
+        _find_movements(ctx, page_files, images)
         return StageResult("extract", "ok", f"{master.name} (1 page)")
 
     merged, skipped = (merge_pages(page_files, master, ctx.log)
@@ -103,6 +124,7 @@ def run(ctx: PipelineContext) -> StageResult:
     ctx.artifacts.musicxml = merged or page_files[0]
     ctx.artifacts.extract_merged = bool(merged)
     if merged:
+        _find_movements(ctx, [p for p in page_files if p not in skipped], images)
         kept = len(page_files) - len(skipped)
         detail = f"{master.name} (merged {kept}/{len(page_files)} page files)"
         if skipped:
