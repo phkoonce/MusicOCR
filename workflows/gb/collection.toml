@@ -18,16 +18,16 @@ input_dir = "input/gb"
 
 [[books]]
 id = "1"
-pdf = "~/Library/CloudStorage/GoogleDrive-philip.koonce@gmail.com/My Drive/GB/GB H1 - unlocked.pdf"
+pdf = "~/My Drive/GB/GB H1 - unlocked.pdf"
 [[books]]
 id = "2"
-pdf = "~/Library/CloudStorage/GoogleDrive-philip.koonce@gmail.com/My Drive/GB/GB H2 - unlocked.pdf"
+pdf = "~/My Drive/GB/GB H2 - unlocked.pdf"
 [[books]]
 id = "3"
-pdf = "~/Library/CloudStorage/GoogleDrive-philip.koonce@gmail.com/My Drive/GB/GB H3 - unlocked.pdf"
+pdf = "~/My Drive/GB/GB H3 - unlocked.pdf"
 [[books]]
 id = "4"
-pdf = "~/Library/CloudStorage/GoogleDrive-philip.koonce@gmail.com/My Drive/GB/GB H4 - unlocked.pdf"
+pdf = "~/My Drive/GB/GB H4 - unlocked.pdf"
 old_bass_clef = true      # Horn 4 is in the old notation (bass clefs an octave low), see scoreops/retouch.py
 
 # Table-of-contents lines the OCR got wrong or merged (checked against the printed Inhalt)
