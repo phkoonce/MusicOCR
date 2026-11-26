@@ -136,8 +136,12 @@ class Session:
                             "ours_blue": images.tint(ours_img, (20, 70, 220))}
                     for kind in _KINDS:
                         made[kind].save(self.image_path(i, s, kind))
+                    # what to cut off top and bottom (as fractions) to show the staves as one system
+                    above = images.seam(page, orig[s - 1], o) - o.crop_top if s else 0
+                    below = o.crop_bottom - images.seam(page, o, orig[s + 1]) if s + 1 < len(orig) else 0
+                    trim = [max(0, above) / orig_img.height, max(0, below) / orig_img.height]
                     parts.append({"staff": ids[s], "width": orig_img.width, "height": orig_img.height,
-                                  "edges": there})
+                                  "edges": there, "trim": trim})
                 for sid, part in zip(ids, parts):
                     part["hash"] = score.digest(mscx, spans, [(sid, k) for k in numbers])
                 table.append({"page": orig[0].page, "bars": numbers, "cells": cells, "staves": parts})
@@ -173,7 +177,8 @@ class Session:
                 units.append({"i": u, "line": n, "s": s, "page": line["page"], "first": line["bars"][0] + 1,
                               "last": line["bars"][-1] + 1,
                               "rests": [[c[0] + 1, c[-1] + 1] for c in line["cells"] if len(c) > 1],
-                              "width": part["width"], "height": part["height"], "status": status,
+                              "width": part["width"], "height": part["height"], "trim": part["trim"],
+                              "status": status,
                               "tags": e.get("tags", []), "summary": e.get("summary", ""),
                               "unresolved": e.get("unresolved", []), "error": e.get("error", ""),
                               "canUndo": bool(e.get("undo"))})

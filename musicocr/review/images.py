@@ -136,6 +136,17 @@ def _with_margins(staves: List[Staff], height: int) -> List[Staff]:
     return staves
 
 
+def seam(page: Image.Image, upper: Staff, lower: Staff) -> int:
+    """The row where the pictures of two staves of a system meet: the emptiest one between them,
+    the nearest to halfway among equals, within what both pictures show."""
+    a, b = max(upper.bottom, lower.crop_top), min(lower.top, upper.crop_bottom)
+    middle = (upper.bottom + lower.top) // 2
+    if b <= a:
+        return middle
+    ink = (np.asarray(page)[a:b] < 128).sum(axis=1)
+    return min(range(a, b), key=lambda y: (int(ink[y - a]), abs(y - middle)))
+
+
 def render_original(pdf: Path, out: Path, pdftoppm: str = "pdftoppm") -> Tuple[List[Image.Image], List[Staff]]:
     """Page images of the original and every staff on them, in reading order."""
     out.mkdir(parents=True, exist_ok=True)

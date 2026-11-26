@@ -37,6 +37,8 @@
   .notes { white-space: pre-wrap; background: #fafafa; border-left: 3px solid #ccc; padding: 6px 10px; margin: 8px 0 0; }
   .notes.bad { border-color: #c33; }
   .hint { color: #777; font-size: 12px; }
+  .slice { overflow: hidden; }
+  .partname { font-size: 12px; font-weight: bold; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -44,6 +46,7 @@
   <div>
     <strong id="title"></strong><span id="progress" class="hint"></span>
     <button id="byLine">Line by line</button>
+    <button id="byWhole">Whole line</button>
     <button id="byPage">Page re-check</button>
     <label class="hint" id="orderBox">order <select id="order"><option value="system">system by system</option>
       <option value="part">part by part</option></select></label>
@@ -96,6 +99,14 @@ async function act(i, action, body = {}) {
   return true;
 }
 function next() {
+  if (mode === "whole") {
+    const here = state.units[current].line;
+    // any line not yet accepted, including those waiting for a re-check
+    const open = u => u.status !== "done" && !busy(u);
+    const unit = [...state.units.filter(u => u.line > here), ...state.units].find(open);
+    if (unit) current = lineUnits(unit.line)[0].i;
+    return;
+  }
   const list = sequence(), at = list.findIndex(u => u.i === current);
   for (let k = 1; k < list.length; k++) {
     const unit = list[(at + k) % list.length];
@@ -107,6 +118,26 @@ async function send(i) {
   if (await act(i, "send", { tags: tagsOf(state.units[i]) })) { if (mode === "line") next(); render(); }
 }
 async function undo(i) { if (await act(i, "undo")) render(); }
+
+const lineUnits = n => state.units.filter(u => u.line === n);
+const marked = units => units.filter(u => !busy(u) && tagsOf(u).length);
+// all parts of the shown line at once
+async function acceptLine() {
+  const units = lineUnits(state.units[current].line);
+  if (marked(units).length) return;                     // never drop marks that were not sent
+  for (const u of units) if (!busy(u) && u.status !== "done" && !await act(u.i, "done")) return render();
+  next(); render();
+}
+async function sendLine() {
+  const units = lineUnits(state.units[current].line), wrong = marked(units).map(u => u.i);
+  if (!wrong.length) return;
+  for (const u of units) {
+    if (busy(u) || (u.status === "done" && !wrong.includes(u.i))) continue;
+    const ok = wrong.includes(u.i) ? await act(u.i, "send", { tags: tagsOf(u) }) : await act(u.i, "done");
+    if (!ok) return render();
+  }
+  next(); render();
+}
 
 // one staff of one line; without a unit it is only there for context
 function picture(line, s, kind, unit) {
@@ -130,7 +161,7 @@ function picture(line, s, kind, unit) {
     const r = box.getBoundingClientRect();
     tagsOf(unit).push({ x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, note: "" });
     render();
-    const inputs = document.querySelectorAll(`#unit${unit.i} .tags input`);
+    const inputs = document.querySelectorAll(`#unit${unit.i} .tags input, #unit${unit.i}.tags input`);
     inputs[inputs.length - 1]?.focus();
   };
   return box;
@@ -156,15 +187,8 @@ function card(unit) {
   s.append(el("div", { className: "label", textContent: "overlay (red: original, blue: ours)" }),
            picture(unit.line, unit.s, "overlay", unit));
 
-  const list = el("div", { className: "tags" });
-  tags.forEach((t, n) => {
-    const input = el("input", { type: "text", value: t.note, disabled: waiting,
-      placeholder: "what is wrong? (may be left empty)" });
-    input.oninput = () => { t.note = input.value; };
-    input.onkeydown = e => { if (e.key === "Enter" || e.key === "Escape") input.blur(); };
-    list.append(el("div", {}, el("b", { textContent: n + 1 }), input,
-      button("remove", () => { tags.splice(n, 1); render(); }, "", waiting)));
-  });
+  const list = tagList(unit, "");
+  list.removeAttribute("id");                          // the card has it
   s.append(list);
 
   const notes = [unit.summary, ...unit.unresolved.map(u => "not fixed / unsure: " + u)].filter(Boolean).join("\n");
@@ -183,12 +207,67 @@ function card(unit) {
   return s;
 }
 
+function tagList(unit, label) {
+  const tags = tagsOf(unit), waiting = busy(unit);
+  const list = el("div", { className: "tags", id: "unit" + unit.i });
+  tags.forEach((t, n) => {
+    const input = el("input", { type: "text", value: t.note, disabled: waiting,
+      placeholder: "what is wrong? (may be left empty)" });
+    input.oninput = () => { t.note = input.value; };
+    input.onkeydown = e => { if (e.key === "Enter" || e.key === "Escape") input.blur(); };
+    list.append(el("div", {}, el("b", { textContent: label + (n + 1) }), input,
+      button("remove", () => { tags.splice(n, 1); render(); }, "", waiting)));
+  });
+  return list;
+}
+
+// a staff's picture cut where it meets its neighbours, so that the staves read as one system
+function slice(unit, kind) {
+  const box = picture(unit.line, unit.s, kind, unit);
+  const share = f => -(f * unit.height / unit.width * 100) + "%";      // margins are relative to the width
+  box.style.marginTop = share(unit.trim[0]); box.style.marginBottom = share(unit.trim[1]);
+  return el("div", { className: "slice", title: state.parts[unit.s] }, box);
+}
+
+function wholeCard(units) {
+  const first = units[0], wrong = marked(units), s = el("section");
+  s.append(el("h2", {}, `line ${first.line + 1} · bars ${first.first}–${first.last} · original page ${first.page + 1}`,
+    ...units.map(u => el("span", { className: "pill s-" + u.status,
+                                   textContent: `${state.parts[u.s]}: ${LABEL[u.status]}` }))));
+  s.append(el("div", { className: "label", textContent: blink ? "blink: original" : "overlay (red: original, blue: ours)" }));
+  units.forEach(u => s.append(slice(u, blink ? "orig" : "overlay")));
+  units.forEach(u => s.append(tagList(u, state.parts[u.s] + " · ")));
+
+  const row = el("div", {});
+  row.style.cssText = "display:flex;gap:8px;margin-top:8px;flex-wrap:wrap";
+  row.append(
+    button("All parts look right (D)", acceptLine, "primary", wrong.length > 0 || units.every(busy)),
+    button(`Send ${wrong.reduce((n, u) => n + tagsOf(u).length, 0)} mark(s), accept the other parts (S)`,
+           sendLine, "", !wrong.length));
+  s.append(row);
+
+  units.forEach(u => {
+    const news = u.status === "check" && !u.summary.startsWith("No change made");
+    if (!news && !u.error && !(u.status === "check" && u.unresolved.length)) return;
+    s.append(el("div", { className: "partname" }, state.parts[u.s] + " ",
+      u.canUndo ? button("Undo Claude's change", () => undo(u.i), "", busy(u)) : null));
+    const notes = [u.summary, ...u.unresolved.map(t => "not fixed / unsure: " + t)].filter(Boolean).join("\n");
+    if (notes) s.append(el("div", { className: "notes", textContent: notes }));
+    if (u.error) s.append(el("div", { className: "notes bad", textContent: u.error }));
+  });
+  return s;
+}
+
 const go = unit => { current = unit.i; page = unit.page; render(); window.scrollTo(0, 0); };
 // the lines of the shown page: of every part, or of the current one when working part by part
 const onPage = () => sequence().filter(u => u.page === page && (order !== "part" || u.s === state.units[current].s));
 
 function step(d) {
-  if (mode === "line") {
+  if (mode === "whole") {
+    const lines = [...new Set(state.units.map(u => u.line))];
+    const at = lines.indexOf(state.units[current].line);
+    go(lineUnits(lines[Math.max(0, Math.min(lines.length - 1, at + d))])[0]);
+  } else if (mode === "line") {
     const list = sequence(), at = list.findIndex(u => u.i === current);
     go(list[Math.max(0, Math.min(list.length - 1, at + d))]);
   } else {
@@ -201,6 +280,22 @@ function step(d) {
 function drawMap() {
   const map = $("#map"), scroll = map.scrollTop;
   map.replaceChildren();
+  if (mode === "whole") {
+    const row = el("div", { className: "row" });
+    const lines = [...new Set(state.units.map(u => u.line))];
+    lines.forEach((n, k) => {
+      const units = lineUnits(n);
+      if (k && lineUnits(lines[k - 1])[0].page !== units[0].page) row.append(el("span", { className: "gap" }));
+      const worst = ["failed", "changed", "check", "working", "queued", "unchecked", "done"]
+        .find(s => units.some(u => u.status === s));
+      const b = button(n + 1, () => go(units[0]), "s-" + worst);
+      if (n === state.units[current].line) b.className += " current";
+      b.title = `bars ${units[0].first}–${units[0].last}: ${LABEL[worst]}`;
+      row.append(b);
+    });
+    map.append(row);
+    return;
+  }
   state.parts.forEach((name, s) => {
     const row = el("div", { className: "row" });
     if (several()) row.append(el("span", { className: "name", textContent: name, title: name }));
@@ -230,9 +325,11 @@ function render() {
     `${count("queued") + count("working")} with Claude`;
   $("#byLine").className = mode === "line" ? "on" : "";
   $("#byPage").className = mode === "page" ? "on" : "";
-  $("#orderBox").hidden = $("#contextBox").hidden = !several();
+  $("#byWhole").className = mode === "whole" ? "on" : "";
+  $("#byWhole").hidden = !several();
+  $("#orderBox").hidden = $("#contextBox").hidden = !several() || mode === "whole";
   $("#nav").replaceChildren(button("←", () => step(-1)), button("→", () => step(1)),
-    el("span", { className: "hint", textContent: mode === "line" ? "" : ` page ${page + 1}` }));
+    el("span", { className: "hint", textContent: mode === "page" ? ` page ${page + 1}` : "" }));
   drawMap();
 
   const main = $("#main"), y = window.scrollY;
@@ -243,13 +340,15 @@ function render() {
     `Sent lines are waiting: ${state.claude}. They are retried every minute.` }));
   if (units.some(busy)) main.append(el("div", { className: "banner",
     textContent: "Claude changes the score file while lines are with it. Keep this score closed in MuseScore until then." }));
-  (mode === "line" ? [units[current]] : onPage()).forEach(u => main.append(card(u)));
-  main.append(el("div", { className: "hint", textContent:
-    "Click a picture to mark a spot. D: looks right · S: send to Claude · B: swap original and ours in place · ←/→: move" }));
+  if (mode === "whole") main.append(wholeCard(lineUnits(units[current].line)));
+  else (mode === "line" ? [units[current]] : onPage()).forEach(u => main.append(card(u)));
+  main.append(el("div", { className: "hint", textContent: "Click a picture to mark a spot. D: looks right · " +
+    `S: send to Claude · B: ${mode === "whole" ? "show the original alone" : "swap original and ours in place"} · ←/→: move` }));
   window.scrollTo(0, y);
 }
 
-$("#byLine").onclick = () => { mode = "line"; render(); };
+$("#byLine").onclick = () => { mode = "line"; remember(); render(); };
+$("#byWhole").onclick = () => { mode = "whole"; remember(); render(); };
 $("#byPage").onclick = () => {
   mode = "page";
   const waiting = sequence().find(u => u.status === "check" || u.status === "failed") ?? state.units[current];
@@ -259,8 +358,14 @@ $("#byPage").onclick = () => {
 $("#order").onchange = e => { order = e.target.value; remember(); e.target.blur(); render(); };
 $("#context").onchange = e => { context = e.target.checked; e.target.blur(); render(); };
 $("#fade").oninput = e => document.querySelectorAll(".fade").forEach(i => { i.style.opacity = e.target.value / 100; });
-function remember() { try { localStorage.setItem("order", order); } catch { /* private window */ } }
-try { order = localStorage.getItem("order") || order; } catch { /* private window */ }
+function remember() {
+  try { localStorage.setItem("order", order); localStorage.setItem("whole", mode === "whole" ? "1" : ""); }
+  catch { /* private window */ }
+}
+try {
+  order = localStorage.getItem("order") || order;
+  if (localStorage.getItem("whole")) mode = "whole";
+} catch { /* private window */ }
 $("#order").value = order;
 document.addEventListener("keydown", e => {
   if (!state || e.metaKey || e.ctrlKey || e.altKey || e.target.type === "text") return;
@@ -268,6 +373,7 @@ document.addEventListener("keydown", e => {
   if (k === "b") { blink = !blink; render(); }
   else if (k === "arrowleft") { e.preventDefault(); step(-1); }
   else if (k === "arrowright") { e.preventDefault(); step(1); }
+  else if (mode === "whole" && (k === "d" || k === "s")) { if (!e.repeat) (k === "d" ? acceptLine : sendLine)(); }
   else if (mode === "line" && (k === "d" || k === "s")) {
     const unit = state.units[current];
     if (!busy(unit)) (k === "d" ? done : send)(unit.i);

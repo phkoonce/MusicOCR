@@ -429,6 +429,9 @@ breaks (see above).
   part**, and tick **show other parts** to see the rest of the system.
 * A multi-measure rest is one block; marks and fixes inside it use its real bar numbers. A wrong rest
   *count* means adding or removing bars, which the tool cannot do: fix that in MuseScore.
+* **Whole line** (scores with several parts) shows only the overlay, all parts of a line stacked as one
+  system. Click a part to mark it. **D** accepts every part; **S** sends only the marked parts to Claude
+  and accepts the others. **B** shows the original alone.
 * **Page re-check** shows a page's lines together with what Claude changed: accept, undo, or mark again.
 
 Fixes run in the background through the `claude` command, which must be installed and signed in

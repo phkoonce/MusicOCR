@@ -58,6 +58,15 @@ def test_match_barlines_prefers_near_columns_and_fills_a_missing_one():
     assert images.match_barlines([100, 200, 300], [20, 108, 150, 297], sp=5) == [108, 200, 297]
 
 
+def test_seam_between_two_staves_avoids_ink():
+    page = Image.new("L", (200, 300), 255)
+    upper, lower = images.Staff(0, 20, 60, 10, 190), images.Staff(0, 160, 200, 10, 190)
+    upper.crop_top, upper.crop_bottom, lower.crop_top, lower.crop_bottom = 0, 135, 85, 260
+    assert images.seam(page, upper, lower) == 110                       # blank: halfway
+    ImageDraw.Draw(page).rectangle((50, 100, 70, 120), fill=0)          # something in the middle
+    assert images.seam(page, upper, lower) in (99, 121)
+
+
 def test_rendered_staves_ignore_a_beam_between_lines():
     img = page_with_staves([100, 300])
     ImageDraw.Draw(img).rectangle((200, 104, 420, 110), fill=0)
