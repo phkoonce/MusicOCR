@@ -1,4 +1,6 @@
-"""One score under review: its lines, their status, and the fixes queued for them.
+"""One score under review: its part-lines, their status, and the fixes queued for them.
+
+A part-line (``unit``) is one staff of one line of the original: ``unit = line * staves + staff``.
 
 Progress lives in ``<score>.review.json`` beside the score. Images and job folders are regenerable and
 go under ``ttl=30d/review/``. The score is changed only by applying a fix; the first time, a copy is
@@ -12,10 +14,10 @@ import shutil
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from musicocr.review import claude, images, score
-from musicocr.scoreops.layout import read_mscz, write_mscz
+from musicocr.scoreops.layout import displayed_bars, read_mscz, without_rest_placeholders, write_mscz
 
 _KINDS = ("orig", "ours", "orig_red", "ours_blue", "overlay")
 _RETRY = 60.0          # seconds before trying a missing or signed-out `claude` again
@@ -48,6 +50,7 @@ class Session:
         self.lock = threading.RLock()          # guards state and the line table
         self.render_lock = threading.Lock()    # one MuseScore at a time
         self.lines: List[dict] = []
+        self.parts: List[dict] = []             # one per staff: {"staff": id, "name": ...}
         self.rev = 0                           # changes whenever the images do
         self.stamp = 0.0
         self.problem = ""                      # why the images may be out of date
@@ -71,8 +74,22 @@ class Session:
         tmp.write_text(json.dumps(self.state, indent=1), "utf-8")
         os.replace(tmp, self.state_path)
 
-    def entry(self, i: int) -> dict:
-        return self.state["lines"].setdefault(str(i), {"status": "unchecked", "tags": []})
+    def units(self) -> int:
+        return len(self.lines) * len(self.parts)
+
+    def locate(self, u: int):
+        """``(line, staff index)`` of a unit."""
+        return divmod(u, len(self.parts))
+
+    def key(self, u: int) -> str:
+        line, s = self.locate(u)
+        return str(line) if len(self.parts) == 1 else f"{line}.{self.parts[s]['staff']}"
+
+    def entry(self, u: int) -> dict:
+        return self.state["lines"].setdefault(self.key(u), {"status": "unchecked", "tags": []})
+
+    def set_entry(self, u: int, value: dict) -> None:
+        self.state["lines"][self.key(u)] = value
 
     # --- images --------------------------------------------------------------
 
@@ -91,23 +108,27 @@ class Session:
             ids = sorted(spans)
             bars_total = len(spans[ids[0]])
             pages, staves, bars = self.renderer(self.mscz, self.cache, self.musescore)
-            if len(bars) != bars_total:
-                raise ReviewError(f"MuseScore reports {len(bars)} bars for a score of {bars_total} "
-                                  "(multi-measure rests are not supported yet)")
+            # the bars each drawn bar stands for: several for a multi-measure rest
+            shown = displayed_bars(self.mscz, len(bars), self.musescore, self.cache)
+            names = score.part_names(mscx)
+            parts_now = [{"staff": sid, "name": names.get(sid, f"staff {sid}")} for sid in ids]
             ours = images.systems(staves, len(ids))
             theirs = images.systems(self.orig_staves, len(ids))
             lines = images.rendered_lines(bars)
+            assert sum(map(len, shown)) == bars_total
             if not (len(lines) == len(ours) == len(theirs)):
                 raise ReviewError(
                     f"the original has {len(theirs)} lines, the score {len(lines)}. Give the score the "
                     "original's line breaks first (`musicocr layout`, or add them in MuseScore).")
             rev = self.rev + 1
             table = []
-            for i, (mine, orig, numbers) in enumerate(zip(ours, theirs, lines)):
+            for i, (mine, orig, drawn) in enumerate(zip(ours, theirs, lines)):
+                cells = [shown[k] for k in drawn]
+                numbers = [k for cell in cells for k in cell]
                 parts = []
                 for s, (o, r) in enumerate(zip(orig, mine)):
                     page = self.orig_pages[o.page]
-                    here, there = images.bar_edges(page, o, r, [bars[k] for k in numbers])
+                    here, there = images.bar_edges(page, o, r, [bars[k] for k in drawn])
                     orig_img = page.crop((0, o.crop_top, page.width, o.crop_bottom))
                     ours_img = images.warp(pages[r.page], page, o, r, here, there)
                     made = {"orig": orig_img, "ours": ours_img, "overlay": images.overlay(orig_img, ours_img),
@@ -117,11 +138,11 @@ class Session:
                         made[kind].save(self.image_path(i, s, kind))
                     parts.append({"staff": ids[s], "width": orig_img.width, "height": orig_img.height,
                                   "edges": there})
-                keys = [(sid, k) for sid in ids for k in numbers]
-                table.append({"page": orig[0].page, "bars": numbers, "staves": parts,
-                              "hash": score.digest(mscx, spans, keys)})
+                for sid, part in zip(ids, parts):
+                    part["hash"] = score.digest(mscx, spans, [(sid, k) for k in numbers])
+                table.append({"page": orig[0].page, "bars": numbers, "cells": cells, "staves": parts})
             with self.lock:
-                self.lines, self.rev, self.stamp, self.problem = table, rev, stamp, ""
+                self.lines, self.parts, self.rev, self.stamp, self.problem = table, parts_now, rev, stamp, ""
 
     def image_path(self, line: int, staff: int, kind: str) -> Path:
         if kind not in _KINDS:
@@ -140,47 +161,54 @@ class Session:
 
     def view(self) -> dict:
         with self.lock:
-            lines = []
-            for i, line in enumerate(self.lines):
-                e = self.entry(i)
+            units = []
+            for u in range(self.units()):
+                n, s = self.locate(u)
+                line = self.lines[n]
+                part = line["staves"][s]
+                e = self.entry(u)
                 status = e["status"]
-                if status == "done" and e.get("hash") != line["hash"]:
+                if status == "done" and e.get("hash") != part["hash"]:
                     status = "changed"
-                lines.append({"i": i, "page": line["page"], "first": line["bars"][0] + 1,
-                              "last": line["bars"][-1] + 1, "staves": line["staves"], "status": status,
+                units.append({"i": u, "line": n, "s": s, "page": line["page"], "first": line["bars"][0] + 1,
+                              "last": line["bars"][-1] + 1,
+                              "rests": [[c[0] + 1, c[-1] + 1] for c in line["cells"] if len(c) > 1],
+                              "width": part["width"], "height": part["height"], "status": status,
                               "tags": e.get("tags", []), "summary": e.get("summary", ""),
                               "unresolved": e.get("unresolved", []), "error": e.get("error", ""),
                               "canUndo": bool(e.get("undo"))})
             return {"title": self.mscz.name, "rev": self.rev, "problem": self.problem,
-                    "claude": self.claude_problem, "lines": lines}
+                    "claude": self.claude_problem, "parts": [p["name"] for p in self.parts], "units": units}
 
     # --- what the page does --------------------------------------------------
 
-    def done(self, i: int) -> None:
+    def _hash(self, u: int) -> str:
+        n, s = self.locate(u)
+        return self.lines[n]["staves"][s]["hash"]
+
+    def done(self, u: int) -> None:
         with self.lock:
-            self.state["lines"][str(i)] = {"status": "done", "tags": [], "hash": self.lines[i]["hash"]}
+            self.set_entry(u, {"status": "done", "tags": [], "hash": self._hash(u)})
             self._save()
 
-    def reset(self, i: int) -> None:
+    def reset(self, u: int) -> None:
         with self.lock:
-            e = self.entry(i)
-            self.state["lines"][str(i)] = {"status": "unchecked", "tags": e.get("tags", [])}
+            self.set_entry(u, {"status": "unchecked", "tags": self.entry(u).get("tags", [])})
             self._save()
 
-    def send(self, i: int, tags: List[dict]) -> None:
-        """Queue line ``i`` for Claude. Without tags Claude looks for the differences itself."""
+    def send(self, u: int, tags: List[dict]) -> None:
+        """Queue a part-line for Claude. Without tags Claude looks for the differences itself."""
         with self.lock:
-            if self.entry(i)["status"] in ("queued", "working"):
+            if self.entry(u)["status"] in ("queued", "working"):
                 raise ReviewError("that line is already with Claude")
-            clean = [{"staff": int(t.get("staff", 0)), "x": float(t["x"]), "y": float(t["y"]),
-                      "note": str(t.get("note", ""))[:500]} for t in tags]
-            self.state["lines"][str(i)] = {"status": "queued", "tags": clean, "queued": time.time()}
+            clean = [{"x": float(t["x"]), "y": float(t["y"]), "note": str(t.get("note", ""))[:500]} for t in tags]
+            self.set_entry(u, {"status": "queued", "tags": clean, "queued": time.time()})
             self._save()
 
-    def undo(self, i: int) -> None:
-        """Put back the bars as they were before line ``i``'s fix."""
+    def undo(self, u: int) -> None:
+        """Put back the bars as they were before this part-line's fix."""
         with self.lock:
-            e = self.entry(i)
+            e = self.entry(u)
             changes = e.get("undo")
             if not changes:
                 raise ReviewError("nothing to undo")
@@ -192,10 +220,18 @@ class Session:
                 if score.canonical(score.get_measure(mscx, spans, key)) != score.canonical(c["after"]):
                     raise ReviewError(f"bar {c['bar'] + 1} has changed since the fix; undo it in MuseScore")
                 back[key] = c["before"]
-            self._write(score.replace_measures(mscx, back), style)
-            self.state["lines"][str(i)] = {"status": "unchecked", "tags": e.get("tags", [])}
+            self._write(self._replaced(mscx, back, [c["after"] for c in changes]), style)
+            self.set_entry(u, {"status": "unchecked", "tags": e.get("tags", [])})
             self._save()
         self.try_refresh()
+
+    @staticmethod
+    def _replaced(mscx: str, new: dict, old: List[str]) -> str:
+        """``mscx`` with the new bars; when a bar that was or becomes empty changes, the multi-measure
+        rests are left for MuseScore to make again."""
+        rests = any("<Chord>" not in text for text in [*old, *new.values()])
+        out = score.replace_measures(mscx, new)
+        return without_rest_placeholders(out) if rests else out
 
     def _write(self, mscx: str, style: str) -> None:
         keep = self.mscz.with_suffix(".before-review.mscz")
@@ -209,19 +245,22 @@ class Session:
 
     def next_queued(self) -> Optional[int]:
         with self.lock:
-            waiting = [(e.get("queued", 0), int(k)) for k, e in self.state["lines"].items()
-                       if e["status"] in ("queued", "working")]
+            waiting = [(e.get("queued", 0), u) for u in range(self.units())
+                       if (e := self.state["lines"].get(self.key(u))) and e["status"] in ("queued", "working")]
             return min(waiting)[1] if waiting else None
 
-    def prepare(self, i: int) -> Path:
-        """Write the job folder for line ``i`` (or keep the one already waiting)."""
+    def prepare(self, u: int) -> Path:
+        """Write the job folder for a part-line (or keep the one already waiting)."""
         with self.lock:
-            e = self.entry(i)
-            line = self.lines[i]
+            e = self.entry(u)
+            n, s = self.locate(u)
+            line = self.lines[n]
+            part = line["staves"][s]
+            sid = part["staff"]
             old = Path(e["job"]) if e.get("job") else None
-            if old and (old / "prompt.md").exists() and e.get("hash") == line["hash"]:
+            if old and (old / "prompt.md").exists() and e.get("hash") == part["hash"]:
                 return old
-            job = self.cache / "jobs" / f"line{i:03d}-{int(time.time() * 1000)}"
+            job = self.cache / "jobs" / f"line{n:03d}-{s}-{int(time.time() * 1000)}"
             job.mkdir(parents=True)
             mscx = read_mscz(self.mscz)[0]
             spans = score.measure_spans(mscx)
@@ -229,56 +268,51 @@ class Session:
             total = len(next(iter(spans.values())))
             near = [k for k in range(numbers[0] - 1, numbers[-1] + 2) if 0 <= k < total]
 
-            listing, sent = [], []
-            for s, part in enumerate(line["staves"]):
-                sid = part["staff"]
-                orig = images.Image.open(self.image_path(i, s, "orig"))
-                ours = images.Image.open(self.image_path(i, s, "ours"))
-                over = images.Image.open(self.image_path(i, s, "overlay"))
-                name = f"staff{sid}.png"
-                images.stack([orig, ours, over]).save(job / name)
-                listing.append(f"- {name}: staff {sid}; top the original, middle our version, bottom the overlay")
-                half = orig.width // 2
-                for n, (a, b) in enumerate(((0, half + 40), (half - 40, orig.width)), 1):
-                    crops = [im.crop((a, 0, b, orig.height)) for im in (orig, ours, over)]
-                    zoom = images.stack(crops)
-                    zname = f"staff{sid}-zoom{n}.png"
-                    zoom.resize((zoom.width * 2, zoom.height * 2), images.Image.LANCZOS).save(job / zname)
-                    listing.append(f"- {zname}: the {'left' if n == 1 else 'right'} half, enlarged")
-                points = [(t["x"], t["y"]) for t in e["tags"] if t["staff"] == s]
-                if points:
-                    mname = f"staff{sid}-tags.png"
-                    images.marked(orig, points).save(job / mname)
-                    listing.append(f"- {mname}: the original with the user's numbered marks")
+            orig = images.Image.open(self.image_path(n, s, "orig"))
+            ours = images.Image.open(self.image_path(n, s, "ours"))
+            over = images.Image.open(self.image_path(n, s, "overlay"))
+            images.stack([orig, ours, over]).save(job / "line.png")
+            listing = ["- line.png: top the original, middle our version, bottom the overlay"]
+            half = orig.width // 2
+            for z, (a, b) in enumerate(((0, half + 40), (half - 40, orig.width)), 1):
+                zoom = images.stack([im.crop((a, 0, b, orig.height)) for im in (orig, ours, over)])
+                zoom.resize((zoom.width * 2, zoom.height * 2), images.Image.LANCZOS).save(job / f"zoom{z}.png")
+                listing.append(f"- zoom{z}.png: the {'left' if z == 1 else 'right'} half, enlarged")
+            if e["tags"]:
+                images.marked(orig, [(t["x"], t["y"]) for t in e["tags"]]).save(job / "tags.png")
+                listing.append("- tags.png: the original with the user's numbered marks")
 
-            xml = []
-            for part in line["staves"]:
-                for k in near:
-                    text = score.get_measure(mscx, spans, (part["staff"], k))
-                    xml.append(f"<!-- staff {part['staff']}, bar {k + 1} -->\n      {text}")
-                    sent.append({"staff": part["staff"], "bar": k, "xml": text})
+            xml, sent = [], []
+            for k in near:
+                text = score.get_measure(mscx, spans, (sid, k))
+                xml.append(f"<!-- staff {sid}, bar {k + 1} -->\n      {text}")
+                sent.append({"staff": sid, "bar": k, "xml": text})
             (job / "measures.xml").write_text("\n".join(xml) + "\n", "utf-8")
             (job / "sent.json").write_text(json.dumps(sent), "utf-8")
 
             marks = []
-            counts: Dict[int, int] = {}
-            for t in e["tags"]:
-                part = line["staves"][t["staff"]]
-                counts[t["staff"]] = n = counts.get(t["staff"], 0) + 1
-                bar, across = images.bar_at(t["x"], part["width"], part["edges"])
-                marks.append(f"- mark {n} on staff {part['staff']}, bar {numbers[min(bar, len(numbers) - 1)] + 1}, "
-                             f"about {across}% across it: {t['note'] or '(no comment: find what differs there)'}")
+            for m, t in enumerate(e["tags"], 1):
+                cell, across = images.bar_at(t["x"], part["width"], part["edges"])
+                bars = line["cells"][min(cell, len(line["cells"]) - 1)]
+                where = (f"the multi-measure rest at bars {bars[0] + 1}-{bars[-1] + 1}" if len(bars) > 1
+                         else f"bar {bars[0] + 1}")
+                marks.append(f"- mark {m} on {where}, about {across}% across it: "
+                             f"{t['note'] or '(no comment: find what differs there)'}")
             if marks:
                 tags = ("The user marked these places as wrong. Fix them; also mention in 'unresolved' any other "
                         "difference you notice, without changing it.\n" + "\n".join(marks) + "\n")
             else:
                 tags = "The user did not mark anything: find every difference yourself.\n"
-            context = "; ".join(f"staff {p['staff']}: {score.context_at(mscx, spans, p['staff'], numbers[0])}"
-                                for p in line["staves"])
+            context = f"staff {sid} ({self.parts[s]['name']}): {score.context_at(mscx, spans, sid, numbers[0])}"
+            rests = [f"bars {c[0] + 1}-{c[-1] + 1}" for c in line["cells"] if len(c) > 1]
+            if rests:
+                context += (". Drawn as multi-measure rests in our version (each a run of empty bars in the XML): "
+                            + ", ".join(rests) + ". You can only replace bars, not add or remove them: if the "
+                            "original's rest count differs, report it in 'unresolved'")
             (job / "prompt.md").write_text(claude.PROMPT.format(
                 images="\n".join(listing), first=numbers[0] + 1, last=numbers[-1] + 1,
                 context=context, tags=tags), "utf-8")
-            e.update(job=str(job), hash=line["hash"])
+            e.update(job=str(job), hash=part["hash"])
             self._save()
             return job
 
@@ -288,6 +322,11 @@ class Session:
         with self.lock:
             mscx, style = read_mscz(self.mscz)
             spans = score.measure_spans(mscx)
+            # bar lengths follow the time signatures as they will be: a fix may correct a misread one
+            offered = {(c["staff"], c["bar"] - 1): c["measure"].strip() for c in reply["changes"]
+                       if (c["staff"], c["bar"] - 1) in sent and score.is_measure(c["measure"])}
+            after = score.replace_measures(mscx, offered)
+            after_spans = score.measure_spans(after)
             new, refused = {}, []
             for c in reply["changes"]:
                 key = c["staff"], c["bar"] - 1
@@ -298,7 +337,7 @@ class Session:
                 if score.canonical(now) != score.canonical(sent[key]):
                     raise ReviewError(f"bar {c['bar']} changed while Claude was working; send the line again")
                 why = score.check_replacement(now, c["measure"].strip(),
-                                              score.time_at(mscx, spans, key[0], key[1]))
+                                              score.time_at(after, after_spans, key[0], key[1]))
                 if why:
                     refused.append(f"bar {c['bar']}: {why}")
                 elif score.canonical(c["measure"]) != score.canonical(now):
@@ -309,7 +348,7 @@ class Session:
             undo = [{"staff": s, "bar": k, "before": score.get_measure(mscx, spans, (s, k)), "after": t}
                     for (s, k), t in new.items()]
             if new:
-                self._write(score.replace_measures(mscx, new), style)
+                self._write(self._replaced(mscx, new, [c["before"] for c in undo]), style)
         # redraw before reporting the line, so "re-check" never shows the old pictures
         if new:
             self.try_refresh()
@@ -325,7 +364,7 @@ class Session:
     def work_once(self) -> bool:
         """Do the oldest queued fix. False when there is nothing that can be done now."""
         i = self.next_queued()
-        if i is None or i >= len(self.lines):
+        if i is None:
             return False
         try:
             job = self.prepare(i)

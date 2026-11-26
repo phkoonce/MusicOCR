@@ -73,7 +73,7 @@ def make_server(session: Session, port: int) -> ThreadingHTTPServer:
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 line, action = int(m.group(1)), m.group(2)
-                if line >= len(session.lines):
+                if line >= session.units():
                     raise ReviewError("no such line")
                 if action == "send":
                     session.send(line, body.get("tags", []))

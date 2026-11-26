@@ -419,12 +419,16 @@ A local page that compares a `.mscz` with its original line by line, independent
 musicocr review score.mscz --source original.pdf
 ```
 
-Each line shows the original, the score as MuseScore draws it (stretched so the bar lines meet) and an
+Each part's line (one staff of one line of the original) shows the original, the score as MuseScore draws it (stretched so the bar lines meet) and an
 overlay (red: original, blue: score). `--source` is remembered. The score needs the original's line
 breaks (see above).
 
 * **D** marks a line as right. Click a picture to mark a spot, with or without a comment.
 * **S** sends the line to Claude and moves on; with no marks Claude looks for the differences itself.
+* In a score, each part's lines are checked and sent separately: work **system by system** or **part by
+  part**, and tick **show other parts** to see the rest of the system.
+* A multi-measure rest is one block; marks and fixes inside it use its real bar numbers. A wrong rest
+  *count* means adding or removing bars, which the tool cannot do: fix that in MuseScore.
 * **Page re-check** shows a page's lines together with what Claude changed: accept, undo, or mark again.
 
 Fixes run in the background through the `claude` command, which must be installed and signed in
@@ -434,7 +438,8 @@ Keep the score closed in MuseScore while lines are with Claude. A copy from befo
 kept as `<score>.before-review.mscz`, progress in `<score>.review.json`, and a line changed after you
 marked it right is flagged. Edits you make in MuseScore are picked up when you save.
 
-Not yet supported: multi-measure rests. Tried on one clean single-staff scan.
+The original must show every part on every line (no hidden empty staves, and no one-line percussion
+staves). Tried on clean scans only.
 
 ## Score books (every part on each page)
 

@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw
 from musicocr.review import claude, images, score
 from musicocr.review.server import make_server
 from musicocr.review.session import ReviewError, Session
+from musicocr.scoreops import layout
 
 
 def note(pitch, value="quarter"):
@@ -40,6 +41,8 @@ def test_check_replacement():
     assert score.check_replacement(old, old.replace("<pitch>62<", "<pitch>63<"), bar) is None
     assert "add up" in score.check_replacement(old, measure(*FOUR[:3], extra=BREAK), bar)
     assert "LayoutBreak" in score.check_replacement(old, measure(*FOUR), bar)
+    spread = old.replace("<subtype>", "\n  <subtype>").replace("</subtype>", "</subtype>\n  ")
+    assert spread != old and score.check_replacement(spread, old, bar) is None
     assert "well-formed" in score.check_replacement(old, "<Measure>", bar)
 
 
@@ -129,25 +132,25 @@ def bars_of(session):
 
 
 def test_send_fix_undo(session):
-    assert [(line["first"], line["last"]) for line in session.view()["lines"]] == [(1, 2), (3, 4)]
+    assert [(line["first"], line["last"]) for line in session.view()["units"]] == [(1, 2), (3, 4)]
     original = bars_of(session)
-    session.send(0, [{"staff": 0, "x": 0.8, "y": 0.5, "note": "wrong note"}])
+    session.send(0, [{"x": 0.8, "y": 0.5, "note": "wrong note"}])
     assert not session.work_once()                      # no `claude`: the line waits
-    assert session.view()["lines"][0]["status"] == "queued"
+    assert session.view()["units"][0]["status"] == "queued"
     job = session.prepare(0)
     prompt = (job / "prompt.md").read_text()
-    assert "mark 1 on staff 1, bar 2" in prompt and "wrong note" in prompt
-    assert (job / "staff1.png").exists() and (job / "staff1-tags.png").exists()
+    assert "mark 1 on bar 2" in prompt and "wrong note" in prompt
+    assert (job / "line.png").exists() and (job / "tags.png").exists()
 
     (job / "result.json").write_text(json.dumps(reply_for(job, 2, "<pitch>62<", "<pitch>63<")))
     assert session.work_once()
-    line = session.view()["lines"][0]
+    line = session.view()["units"][0]
     assert line["status"] == "check" and line["canUndo"] and line["summary"] == "fixed"
     assert "<pitch>63<" in bars_of(session)[1]
     assert session.mscz.with_suffix(".before-review.mscz").exists()
 
     session.done(0)
-    assert session.view()["lines"][0]["status"] == "done"
+    assert session.view()["units"][0]["status"] == "done"
     session.reset(0)
     session.state["lines"]["0"]["undo"] = [{"staff": 1, "bar": 1, "before": original[1], "after": bars_of(session)[1]}]
     session.undo(0)
@@ -160,7 +163,7 @@ def test_bad_or_stale_replies_change_nothing(session):
     job = session.prepare(0)
     (job / "result.json").write_text(json.dumps(reply_for(job, 1, note(65), "")))
     session.work_once()
-    line = session.view()["lines"][0]
+    line = session.view()["units"][0]
     assert line["status"] == "failed" and "add up" in line["error"]
     assert bars_of(session) == original
 
@@ -184,7 +187,7 @@ def test_done_line_that_changes_is_flagged_and_progress_survives(session):
         z.writestr("tune.mscx", head + "<pitch>67<" + tail)
         z.writestr("score_style.mss", "<museScore><Style></Style></museScore>")
     session.try_refresh()
-    assert session.view()["lines"][1]["status"] == "changed"
+    assert session.view()["units"][1]["status"] == "changed"
     assert json.loads(session.state_path.read_text())["lines"]["1"]["status"] == "done"
 
 
@@ -210,3 +213,109 @@ def test_server_serves_and_refuses_outsiders(session):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def rest_bar(extra=""):
+    return f"<Measure>{extra}<voice><Rest><durationType>measure</durationType><duration>4/4</duration></Rest></voice></Measure>"
+
+
+PLACEHOLDER = rest_bar("<multiMeasureRest>3</multiMeasureRest>")
+# bar 1 notes; bars 2-4 a multi-measure rest, saved after its first bar; bar 5 notes
+WITH_REST = [measure(*FOUR), rest_bar(), PLACEHOLDER, rest_bar(), rest_bar(extra=BREAK), measure(*FOUR)]
+
+
+def test_rest_placeholders_are_not_bars(tmp_path):
+    mscx = f'<museScore><Score><Staff id="1">{"".join(WITH_REST)}</Staff></Score></museScore>'
+    assert layout.count_measures(mscx) == 5
+    assert len(score.measure_spans(mscx)[1]) == 5
+    assert layout.shown_bars(mscx) == [[0], [1, 2, 3], [4]]
+    assert "multiMeasureRest" not in layout.without_rest_placeholders(mscx)
+    assert layout.count_measures(layout.without_rest_placeholders(mscx)) == 5
+
+
+def two_parts(tmp_path, monkeypatch, staves):
+    """A score of ``staves`` (bar lists), two lines, drawn without pdftoppm or MuseScore."""
+    parts = "".join(f"<Part><Staff><x/></Staff><trackName>Horn {n}</trackName></Part>"
+                    for n in range(1, len(staves) + 1))
+    body = "".join(f'<Staff id="{n}">{"".join(bars)}</Staff>' for n, bars in enumerate(staves, 1))
+    mscz = tmp_path / "duo.mscz"
+    with zipfile.ZipFile(mscz, "w") as z:
+        z.writestr("duo.mscx", f"<museScore><Score>{parts}{body}</Score></museScore>")
+        z.writestr("score_style.mss", "<museScore><Style></Style></museScore>")
+    (tmp_path / "duo.pdf").write_bytes(b"%PDF")
+    tops = [60 + 100 * k for k in range(2 * len(staves))]
+    page = page_with_staves(tops)
+    monkeypatch.setattr(images, "render_original", lambda *a: ([page], images._find_staves(page, 0)))
+
+    def renderer(*a):
+        bars = [images.RenderedBar(0, y, x, x + 450) for y in (tops[0], tops[len(staves)]) for x in (50, 500)]
+        return [page], images._find_staves(page, 0), bars
+
+    return Session(mscz, tmp_path / "duo.pdf", "musescore", renderer=renderer)
+
+
+def test_each_part_line_is_checked_and_fixed_on_its_own(tmp_path, monkeypatch):
+    plain = [measure(*FOUR), measure(*FOUR, extra=BREAK), measure(*FOUR), measure(*FOUR)]
+    session = two_parts(tmp_path, monkeypatch, [plain, plain])
+    view = session.view()
+    assert view["parts"] == ["Horn 1", "Horn 2"]
+    assert [(u["line"], u["s"]) for u in view["units"]] == [(0, 0), (0, 1), (1, 0), (1, 1)]
+    session.done(0)
+    session.send(1, [])
+    job = session.prepare(1)
+    assert {m["staff"] for m in json.loads((job / "sent.json").read_text())} == {2}
+    assert "Horn 2" in (job / "prompt.md").read_text()
+    reply = reply_for(job, 2, "<pitch>62<", "<pitch>63<")
+    reply["changes"][0]["staff"] = 2
+    (job / "result.json").write_text(json.dumps(reply))
+    session.work_once()
+    assert [u["status"] for u in session.view()["units"]] == ["done", "check", "unchecked", "unchecked"]
+    assert set(session.state["lines"]) >= {"0.1", "0.2"}
+
+
+def test_multi_measure_rest_is_one_block_and_a_fix_inside_it_drops_the_placeholder(tmp_path, monkeypatch):
+    mscz = tmp_path / "rest.mscz"
+    make_mscz(mscz, WITH_REST)
+    (tmp_path / "rest.pdf").write_bytes(b"%PDF")
+    page = page_with_staves([100, 300], bars=2)
+    monkeypatch.setattr(images, "render_original", lambda *a: ([page], images._find_staves(page, 0)))
+
+    def renderer(path, *a):
+        # MuseScore draws the rest as one bar: line 1 is bar 1 and the rest, line 2 is bar 5
+        bars = [images.RenderedBar(0, 100, 50, 500), images.RenderedBar(0, 100, 500, 950),
+                images.RenderedBar(0, 300, 50, 950)]
+        return [page], images._find_staves(page, 0), bars
+
+    session = Session(mscz, tmp_path / "rest.pdf", "musescore", renderer=renderer)
+    first = session.view()["units"][0]
+    assert (first["first"], first["last"], first["rests"]) == (1, 4, [[2, 4]])
+    session.send(0, [{"x": 0.75, "y": 0.5}])
+    job = session.prepare(0)
+    assert "the multi-measure rest at bars 2-4" in (job / "prompt.md").read_text()
+    reply = reply_for(job, 3, rest_bar(), measure(*FOUR))
+    (job / "result.json").write_text(json.dumps(reply))
+    monkeypatch.setattr(session, "try_refresh", lambda: None)    # the drawing would change with it
+    session.work_once()
+    with zipfile.ZipFile(mscz) as z:
+        mscx = z.read("rest.mscx").decode()
+    assert "multiMeasureRest" not in mscx and layout.count_measures(mscx) == 5
+
+
+def test_a_fix_may_correct_a_misread_time_signature(session):
+    sig = "<TimeSig><sigN>{}</sigN><sigD>4</sigD></TimeSig>"
+    with zipfile.ZipFile(session.mscz) as z:
+        mscx, style = z.read("tune.mscx").decode(), z.read("score_style.mss").decode()
+    with zipfile.ZipFile(session.mscz, "w") as z:
+        z.writestr("tune.mscx", mscx.replace("<voice>", "<voice>" + sig.format(4), 1))
+        z.writestr("score_style.mss", style)
+    session.try_refresh()
+    session.send(0, [])
+    job = session.prepare(0)
+    sent = {m["bar"]: m["xml"] for m in json.loads((job / "sent.json").read_text())}
+    six = note(60) + note(62) + note(64) + note(65) + note(67) + note(69)
+    changes = [{"staff": 1, "bar": 1, "measure": measure(sig.format(6), six)},
+               {"staff": 1, "bar": 2, "measure": measure(six, extra=BREAK)}]
+    assert sent[1]
+    (job / "result.json").write_text(json.dumps({"changes": changes}))
+    session.work_once()
+    assert session.view()["units"][0]["status"] == "check", session.view()["units"][0]["error"]

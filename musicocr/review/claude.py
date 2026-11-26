@@ -25,7 +25,7 @@ between a red and a blue copy of the same symbol are not differences. Compare sy
 pitches, accidentals, note values, dots, rests, tuplets, beams, ties, which note each slur starts and
 ends on, hairpins and where they start and end, dynamics, articulations, text.
 
-This line holds bars {first} to {last}. At its start: {context}.
+The images and XML show one part only. This line holds bars {first} to {last}. At its start: {context}.
 {tags}
 `measures.xml` holds the MuseScore XML of these bars and their neighbours, each preceded by a comment
 naming its staff and bar. Rules for your replacement bars:
@@ -36,7 +36,8 @@ naming its staff and bar. Rules for your replacement bars:
   <location> giving the offset to the other end in <measures> and <fractions> (of a whole note; omit
   whichever is zero). Moving either end means updating both, so return both bars.
 - <pitch> is the sounding MIDI pitch and <tpc> its spelling; follow how the existing notes encode them.
-- The notes of a bar must add up to its time signature.
+- The notes of a bar must add up to its time signature. If the time signature itself was misread,
+  correct it in the bar where it appears and return every bar it governs among those given.
 - The only bars you may change are those in measures.xml.
 
 If you cannot tell what the original shows, leave it and say so. If our version already matches, change

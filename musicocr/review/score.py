@@ -9,6 +9,7 @@ from xml.etree import ElementTree as ET
 
 Key = Tuple[int, int]                  # (staff id, 0-based bar)
 
+_PART = re.compile(r"<Part(?:\s[^>]*)?>.*?</Part>", re.S)
 _STAFF = re.compile(r'<Staff id="(\d+)">.*?</Staff>', re.S)
 _MEASURE = re.compile(r"<Measure(?:\s[^>]*)?>.*?</Measure>", re.S)
 _EID = re.compile(r"[ \t]*<eid>[^<]*</eid>\n?")
@@ -23,10 +24,11 @@ class ScoreError(Exception):
 
 
 def measure_spans(mscx: str) -> Dict[int, List[Tuple[int, int]]]:
-    """``staff id -> [(start, end) of each bar]`` in ``mscx``."""
+    """``staff id -> [(start, end) of each real bar]`` in ``mscx`` (rest placeholders are not bars)."""
     out: Dict[int, List[Tuple[int, int]]] = {}
     for staff in _STAFF.finditer(mscx):
-        spans = [(staff.start() + m.start(), staff.start() + m.end()) for m in _MEASURE.finditer(staff.group())]
+        spans = [(staff.start() + m.start(), staff.start() + m.end()) for m in _MEASURE.finditer(staff.group())
+                 if "<multiMeasureRest>" not in m.group()]
         if spans:
             out[int(staff.group(1))] = spans
     if not out:
@@ -34,6 +36,21 @@ def measure_spans(mscx: str) -> Dict[int, List[Tuple[int, int]]]:
     if len({len(v) for v in out.values()}) != 1:
         raise ScoreError("the staves have different numbers of bars")
     return out
+
+
+def part_names(mscx: str) -> Dict[int, str]:
+    """``staff id -> instrument name``; the staves of a part are numbered in the order of the parts."""
+    names: Dict[int, str] = {}
+    sid = 0
+    for part in _PART.finditer(mscx):
+        text = part.group()
+        m = re.search(r"<trackName>([^<]+)</trackName>", text) or re.search(r"<longName>([^<]+)</longName>", text)
+        staves = len(re.findall(r"<Staff(?:\s[^>]*)?>", text.split("<Instrument", 1)[0]))
+        for n in range(staves):
+            sid += 1
+            name = m.group(1) if m else f"staff {sid}"
+            names[sid] = f"{name} ({n + 1})" if staves > 1 else name
+    return names
 
 
 def get_measure(mscx: str, spans, key: Key) -> str:
@@ -132,6 +149,17 @@ def context_at(mscx: str, spans, staff: int, bar: int) -> str:
     return f"clef {clef}, key signature {key} fifths (concert), time {time}"
 
 
+def is_measure(text: str) -> bool:
+    """Is ``text`` one well-formed bar (safe to splice into a score)?"""
+    text = text.strip()
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return False
+    return root.tag == "Measure" and len(_MEASURE.findall(text)) == 1 and _MEASURE.fullmatch(text) is not None \
+        and "<multiMeasureRest>" not in text
+
+
 def check_replacement(old: str, new: str, bar: Fraction) -> Optional[str]:
     """Why ``new`` must not replace ``old`` -- or ``None`` if it may."""
     try:
@@ -142,7 +170,9 @@ def check_replacement(old: str, new: str, bar: Fraction) -> Optional[str]:
         return "not a <Measure> with a <voice>"
     before = ET.fromstring(old)
     for tag in ("LayoutBreak", "stretch"):
-        if [ET.tostring(e).split() for e in before.findall(tag)] != [ET.tostring(e).split() for e in root.findall(tag)]:
+        # indentation says nothing: a reply may write the element on one line
+        if [b"".join(ET.tostring(e).split()) for e in before.findall(tag)] != \
+                [b"".join(ET.tostring(e).split()) for e in root.findall(tag)]:
             return f"the bar's <{tag}> was changed"
     if before.get("len") != root.get("len"):
         return "the bar's actual length attribute was changed"

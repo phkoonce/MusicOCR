@@ -166,14 +166,29 @@ def _first_staff(text: str) -> Tuple[int, int]:
     return m.start(), text.index("</Staff>", m.start())
 
 
+_REST_PLACEHOLDER = "<multiMeasureRest>"
+
+
+def without_rest_placeholders(text: str) -> str:
+    """``text`` without the extra bar MuseScore saves for each multi-measure rest.
+
+    A saved score holds the real bars plus, after the first bar of every multi-measure rest, a
+    placeholder spanning it. MuseScore makes them again when it opens a score without them.
+    """
+    return re.sub(r"[ \t]*<Measure(?:\s[^>]*)?>(?:(?!</Measure>).)*?</Measure>\n?",
+                  lambda m: "" if _REST_PLACEHOLDER in m.group() else m.group(), text, flags=re.S)
+
+
 def count_measures(text: str) -> int:
+    """Real bars of the score (a multi-measure rest counts as the bars it stands for)."""
     a, b = _first_staff(text)
-    return len(_MEASURE.findall(text[a:b]))
+    return sum(_REST_PLACEHOLDER not in m for m in _MEASURE.findall(text[a:b]))
 
 
 def patch_mscx(text: str, target: Target, stretch: Dict[int, float]) -> str:
     """``text`` with the target's line/page breaks, and ``stretch`` (line index -> factor) on the
     bars of those lines. Section breaks stay; other bars' own stretch is left alone."""
+    text = without_rest_placeholders(text)      # breaks go on real bars; MuseScore redoes the rests
     a, b = _first_staff(text)
     block = text[a:b]
     spans = [m.span() for m in _MEASURE.finditer(block)]
@@ -249,10 +264,58 @@ def write_mscz(src: Path, dest: Path, mscx: str, style: str) -> None:
             zout.writestr(item, data)
 
 
+# --- multi-measure rests ---------------------------------------------------------
+
+def shown_bars(mscx: str) -> List[List[int]]:
+    """The real bars behind each bar MuseScore draws, from a score saved with its rest placeholders."""
+    a, b = _first_staff(mscx)
+    groups: List[List[int]] = []
+    bar = covered = 0
+    for m in _MEASURE.findall(mscx[a:b]):
+        rest = re.search(r"<multiMeasureRest>(\d+)<", m)
+        if rest:
+            if not groups:
+                raise LayoutError("a multi-measure rest placeholder with no bar before it")
+            covered = int(rest.group(1)) - 1           # further real bars it stands for
+            groups[-1] += range(bar, bar + covered)
+        else:
+            if covered:
+                covered -= 1
+            else:
+                groups.append([bar])
+            bar += 1
+    return groups
+
+
+def displayed_bars(mscz: Path, positions: int, musescore: str, workdir: Path) -> List[List[int]]:
+    """``shown_bars`` matching ``positions`` measure positions that MuseScore reported for ``mscz``.
+
+    A score written by us may lack the placeholders; MuseScore's own re-save has them.
+    """
+    mscx = read_mscz(mscz)[0]
+    bars = count_measures(mscx)
+    if positions == bars:
+        return [[k] for k in range(bars)]
+    groups = shown_bars(mscx)
+    if len(groups) != positions:
+        saved = workdir / "resaved.mscz"
+        saved.unlink(missing_ok=True)
+        run_cmd_lenient([musescore, "-f", "-o", str(saved), str(mscz)], timeout=300)
+        if not saved.exists():
+            raise LayoutError("MuseScore did not re-save the score")
+        groups = shown_bars(read_mscz(saved)[0])
+    if len(groups) != positions:
+        raise LayoutError(f"MuseScore shows {positions} bars; the score's {bars} bars make {len(groups)}")
+    return groups
+
+
 # --- checking with MuseScore -----------------------------------------------------
 
 def rendered_systems(mpos: Path) -> List[Tuple[int, int]]:
-    """``(page, first bar)`` of each system, from MuseScore's measure-position export."""
+    """``(page, first shown bar)`` of each system, from MuseScore's measure-position export.
+
+    A multi-measure rest is one shown bar; ``displayed_bars`` turns these into real bar indices.
+    """
     out: List[Tuple[int, int]] = []
     last = None
     for k, e in enumerate(ET.parse(mpos).getroot().find("elements")):
@@ -279,7 +342,9 @@ def _musescore_layout(tool: str) -> Callable[[Path], List[Tuple[int, int]]]:
         run_cmd_lenient([tool, "-f", "-o", str(out), str(mscz)], timeout=300)
         if not out.exists() or not out.stat().st_size:       # MuseScore may crash on exit; judge by the file
             raise LayoutError("MuseScore did not export the measure positions")
-        return rendered_systems(out)
+        positions = len(ET.parse(out).getroot().find("elements"))
+        shown = displayed_bars(mscz, positions, tool, mscz.parent)
+        return [(page, shown[k][0]) for page, k in rendered_systems(out)]
     return run
 
 
