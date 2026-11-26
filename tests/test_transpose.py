@@ -120,6 +120,7 @@ def test_unknown_part_name_is_skipped_not_guessed():
 
 def test_instrument_lookup():
     assert semitones_for("French Horn") == -7
+    assert [semitones_for(n) for n in ("Horn in E", "Horn in E♭ 2", "D Horn")] == [-8, -9, -10]
     assert semitones_for("Horn in F 3") == -7
     assert semitones_for("Trumpet in B♭") == -2
     assert semitones_for("Baritone Horn", "treble") == -14

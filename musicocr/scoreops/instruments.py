@@ -24,6 +24,9 @@ Semitones = Union[int, Dict[str, int]]
 
 TRANSPOSITIONS: Dict[str, Semitones] = {
     "french horn": -7,
+    "horn in e": -8,
+    "horn in eb": -9,
+    "horn in d": -10,
     "baritone horn": {"treble": -14, "bass": 0},
     "tenor horn": {"treble": -14, "bass": 0},
     "euphonium": {"treble": -14, "bass": 0},   # same convention as baritone horn
@@ -43,6 +46,9 @@ ALIASES: Dict[str, str] = {
     "horn": "french horn",
     "horn in f": "french horn",
     "f horn": "french horn",
+    "e horn": "horn in e",
+    "eb horn": "horn in eb",
+    "d horn": "horn in d",
     "baritone": "baritone horn",
     "bb baritone horn": "baritone horn",
     "tenor horn in bb": "tenor horn",
@@ -62,6 +68,9 @@ ALIASES: Dict[str, str] = {
 # <transpose> element, its transposition). Keyed like ``TRANSPOSITIONS``.
 INFO: Dict[str, Tuple[str, str, str, int]] = {
     "french horn": ("Horn in F", "Hn.", "brass.french-horn", 61),
+    "horn in e": ("Horn in E", "Hn.", "brass.french-horn", 61),
+    "horn in eb": ("Horn in Eb", "Hn.", "brass.french-horn", 61),
+    "horn in d": ("Horn in D", "Hn.", "brass.french-horn", 61),
     "baritone horn": ("Baritone Horn", "Bar.", "brass.euphonium", 59),
     "tenor horn": ("Tenor Horn", "T. Hn.", "brass.euphonium", 59),
     "euphonium": ("Euphonium", "Euph.", "brass.euphonium", 59),
