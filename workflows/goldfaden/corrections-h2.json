@@ -1,0 +1,171 @@
+{
+ "version": 1,
+ "corrections": [
+  {
+   "staff": 1,
+   "bar": 126,
+   "before": [
+    "9ed37506b49de08d",
+    "816f61d878de7904"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <Chord>\n            <BeamMode>no</BeamMode>\n            <durationType>eighth</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Chord>\n            <BeamMode>no</BeamMode>\n            <durationType>eighth</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          </voice>\n        </Measure>",
+    "<Measure>\n        <voice>\n          <StaffText>\n            <color r=\"123\" g=\"31\" b=\"162\" a=\"255\"/>\n            <text>check: bar cleared (unreadable tuplet)</text>\n            </StaffText>\n          <Chord>\n            <BeamMode>no</BeamMode>\n            <durationType>eighth</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Chord>\n            <BeamMode>no</BeamMode>\n            <durationType>eighth</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "20eece40a1184176",
+   "next": "9aee0f017d1fbc5b"
+  },
+  {
+   "staff": 1,
+   "bar": 163,
+   "before": [
+    "816f61d878de7904"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <StaffText>\n            <color r=\"123\" g=\"31\" b=\"162\" a=\"255\"/>\n            <text>check: bar cleared (unreadable tuplet)</text>\n            </StaffText>\n          <Chord>\n            <dots>1</dots>\n            <durationType>quarter</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>53</pitch>\n              <tpc>13</tpc>\n              <tpc2>14</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <dots>1</dots>\n            <durationType>quarter</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <Accidental>\n                <subtype>accidentalNatural</subtype>\n                </Accidental>\n              <pitch>50</pitch>\n              <tpc>16</tpc>\n              <tpc2>17</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "6fa830d419e62d71",
+   "next": "ea7c1ddfaeb8eabb"
+  },
+  {
+   "staff": 1,
+   "bar": 194,
+   "before": [
+    "87695146ded22b25"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Expression>\n            <direction>down</direction>\n            <text><i>cresc. ____.</i></text>\n            </Expression>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>51</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Spanner type=\"Ottava\">\n            <Ottava>\n              <subtype>8vb</subtype>\n              </Ottava>\n            <next>\n              <location>\n                <measures>5</measures>\n                <fractions>-1/4</fractions>\n                </location>\n              </next>\n            </Spanner>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>53</pitch>\n              <tpc>13</tpc>\n              <tpc2>14</tpc2>\n              </Note>\n            </Chord>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Spanner type=\"Slur\">\n              <Slur>\n                </Slur>\n              <next>\n                <location>\n                  <fractions>1/8</fractions>\n                  </location>\n                </next>\n              </Spanner>\n            <Note>\n              <pitch>55</pitch>\n              <tpc>15</tpc>\n              <tpc2>16</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <BeamMode>mid</BeamMode>\n            <durationType>eighth</durationType>\n            <Spanner type=\"Slur\">\n              <prev>\n                <location>\n                  <fractions>-1/8</fractions>\n                  </location>\n                </prev>\n              </Spanner>\n            <Note>\n              <pitch>58</pitch>\n              <tpc>12</tpc>\n              <tpc2>13</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>56</pitch>\n              <tpc>10</tpc>\n              <tpc2>11</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "8ebaf73a796d55cb",
+   "next": "8fefaed20536dc54"
+  },
+  {
+   "staff": 1,
+   "bar": 198,
+   "before": [
+    "4368d6b1467ea902"
+   ],
+   "after": [
+    "<Measure><voice><Chord><dots>1</dots><durationType>quarter</durationType><StemDirection>up</StemDirection><Note><pitch>58</pitch><tpc>12</tpc><tpc2>13</tpc2></Note></Chord><Chord><dots>1</dots><durationType>quarter</durationType><Spanner type=\"Slur\"><Slur></Slur><next><location><measures>1</measures><fractions>-3/8</fractions></location></next></Spanner><StemDirection>up</StemDirection><Note><pitch>56</pitch><tpc>10</tpc><tpc2>11</tpc2></Note></Chord></voice></Measure>"
+   ],
+   "prev": "97cf56e569521192",
+   "next": "71dc5fe5ea173a86"
+  },
+  {
+   "staff": 1,
+   "bar": 361,
+   "before": [
+    "af7c9c85ce7b81f3"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <StaffText>\n            <color r=\"123\" g=\"31\" b=\"162\" a=\"255\"/>\n            <text>check: bar cleared (unreadable tuplet)</text>\n            </StaffText>\n          <Rest>\n            <durationType>16th</durationType>\n            </Rest>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>16th</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <Note>\n              <pitch>53</pitch>\n              <tpc>13</tpc>\n              <tpc2>14</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <BeamMode>mid</BeamMode>\n            <durationType>16th</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <Note>\n              <pitch>53</pitch>\n              <tpc>13</tpc>\n              <tpc2>14</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>16th</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <Note>\n              <pitch>53</pitch>\n              <tpc>13</tpc>\n              <tpc2>14</tpc2>\n              </Note>\n            </Chord>\n          <Rest>\n            <durationType>16th</durationType>\n            </Rest>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>16th</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <Note>\n              <pitch>58</pitch>\n              <tpc>12</tpc>\n              <tpc2>13</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <BeamMode>mid</BeamMode>\n            <durationType>16th</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <Note>\n              <pitch>58</pitch>\n              <tpc>12</tpc>\n              <tpc2>13</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>16th</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <Note>\n              <pitch>58</pitch>\n              <tpc>12</tpc>\n              <tpc2>13</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "0b63839e4a62a8a2",
+   "next": "99a15dd26805c4dc"
+  },
+  {
+   "staff": 1,
+   "bar": 367,
+   "before": [
+    "eaff27f862b82b00",
+    "704682c8a7c3ad5b"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <Dynamic>\n            <subtype>p</subtype>\n            <velocity>40</velocity>\n            <direction>down</direction>\n            </Dynamic>\n          <Chord>\n            <BeamMode>no</BeamMode>\n            <durationType>eighth</durationType>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <pitch>65</pitch>\n              <tpc>13</tpc>\n              <tpc2>14</tpc2>\n              </Note>\n            </Chord>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Chord>\n            <BeamMode>no</BeamMode>\n            <durationType>eighth</durationType>\n            <StemDirection>down</StemDirection>\n            <Note><Accidental>\n                <subtype>accidentalNatural</subtype>\n                </Accidental>\n              <pitch>64</pitch>\n              <tpc>18</tpc>\n              <tpc2>19</tpc2>\n              </Note>\n            </Chord>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <BarLine>\n            <subtype>double</subtype>\n            </BarLine>\n          </voice>\n        </Measure>",
+    "<Measure>\n        <voice>\n          <StaffText>\n            <color r=\"123\" g=\"31\" b=\"162\" a=\"255\"/>\n            <text>check: bar cleared (unreadable tuplet)</text>\n            </StaffText>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Dynamic>\n            <subtype>p</subtype>\n            <velocity>40</velocity>\n            <direction>down</direction>\n            </Dynamic>\n          <Chord>\n            <BeamMode>no</BeamMode>\n            <durationType>eighth</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>56</pitch>\n              <tpc>10</tpc>\n              <tpc2>11</tpc2>\n              </Note>\n            </Chord>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>58</pitch>\n              <tpc>12</tpc>\n              <tpc2>13</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>58</pitch>\n              <tpc>12</tpc>\n              <tpc2>13</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "62ee311491b41785",
+   "next": "82fae67f015dc8bd"
+  },
+  {
+   "staff": 1,
+   "bar": 417,
+   "before": [
+    "72988ef81b82185d"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <Rest>\n            <durationType>eighth</durationType>\n            </Rest>\n          <Dynamic>\n            <subtype>p</subtype>\n            <velocity>40</velocity>\n            <direction>down</direction>\n            </Dynamic>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>16th</durationType>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>16th</durationType>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <BeamMode>begin16</BeamMode>\n            <durationType>16th</durationType>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>16th</durationType>\n            <Note>\n              <pitch>57</pitch>\n              <tpc>17</tpc>\n              <tpc2>18</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "8912f1e986b46861",
+   "next": "511cb29395cce112"
+  },
+  {
+   "staff": 1,
+   "bar": 476,
+   "before": [
+    "aca3f05f984e164e"
+   ],
+   "after": [
+    "<Measure>\n        <startRepeat/>\n        <voice>\n          <KeySig>\n            <concertKey>-3</concertKey>\n            <actualKey>-2</actualKey>\n            </KeySig>\n          <TimeSig>\n            <sigN>3</sigN>\n            <sigD>4</sigD>\n            </TimeSig>\n          <StaffText>\n            <text><font size=\"14\"/><b>III<br/></b><b>Allegretto</b></text>\n            </StaffText>\n          <Dynamic>\n            <subtype>p</subtype>\n            <velocity>40</velocity>\n            <direction>down</direction>\n            </Dynamic>\n          <Chord>\n            <durationType>quarter</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>55</pitch>\n              <tpc>15</tpc>\n              <tpc2>16</tpc2>\n              </Note>\n            </Chord>\n          <Rest>\n            <durationType>quarter</durationType>\n            </Rest>\n          <Chord>\n            <durationType>quarter</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>55</pitch>\n              <tpc>15</tpc>\n              <tpc2>16</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "b230af76acc7301e",
+   "next": "6c75f39c1101f726"
+  },
+  {
+   "staff": 1,
+   "bar": 503,
+   "before": [
+    "ffa2832e4ad13404"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <dots>1</dots>\n            <durationType>eighth</durationType>\n            <Spanner type=\"Slur\">\n              <Slur>\n                </Slur>\n              <next>\n                <location>\n                  <fractions>1/4</fractions>\n                  </location>\n                </next>\n              </Spanner>\n            <Note>\n              <pitch>60</pitch>\n              <tpc>14</tpc>\n              <tpc2>15</tpc2>\n              </Note>\n            </Chord>\n          <StaffText>\n            <text><sym>coda</sym></text>\n            </StaffText>\n          <Chord>\n            <durationType>16th</durationType>\n            <Note>\n              <Accidental>\n                <subtype>accidentalSharp</subtype>\n                </Accidental>\n              <pitch>59</pitch>\n              <tpc>19</tpc>\n              <tpc2>20</tpc2>\n              </Note>\n            </Chord>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Spanner type=\"Slur\">\n              <prev>\n                <location>\n                  <fractions>-1/4</fractions>\n                  </location>\n                </prev>\n              </Spanner>\n            <Note>\n              <pitch>60</pitch>\n              <tpc>14</tpc>\n              <tpc2>15</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Articulation>\n              <subtype>articStaccatoBelow</subtype>\n              </Articulation>\n            <Note><Accidental>\n                <subtype>accidentalFlat</subtype>\n                </Accidental>\n              <pitch>61</pitch>\n              <tpc>9</tpc>\n              <tpc2>10</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>quarter</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>60</pitch>\n              <tpc>14</tpc>\n              <tpc2>15</tpc2>\n              </Note>\n            </Chord>\n          <BarLine>\n            <subtype>double</subtype>\n            </BarLine>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "b2944b0579dc92df",
+   "next": "8687dece53c4c5c7"
+  },
+  {
+   "staff": 1,
+   "bar": 564,
+   "before": [
+    "0a1f4b12ab2d8991",
+    "4c98c821353598ee"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <Dynamic>\n            <subtype>p</subtype>\n            <velocity>40</velocity>\n            <direction>down</direction>\n            </Dynamic>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Spanner type=\"Slur\">\n              <Slur>\n                </Slur>\n              <next>\n                <location>\n                  <fractions>7/8</fractions>\n                  </location>\n                </next>\n              </Spanner>\n            <Note>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <Accidental>\n                <subtype>accidentalNatural</subtype>\n                </Accidental>\n              <pitch>62</pitch>\n              <tpc>16</tpc>\n              <tpc2>17</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>quarter</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <Accidental>\n                <subtype>accidentalFlat</subtype>\n                </Accidental>\n              <LaissezVib>\n                </LaissezVib>\n              <pitch>61</pitch>\n              <tpc>9</tpc>\n              <tpc2>10</tpc2>\n              </Note>\n            </Chord>\n          <StaffText>\n            <text><b><i>accel.</i></b></text>\n            </StaffText>\n          <Spanner type=\"Ottava\">\n            <Ottava>\n              <subtype>8va</subtype>\n              </Ottava>\n            <next>\n              <location>\n                <measures>2</measures>\n                <fractions>-1/2</fractions>\n                </location>\n              </next>\n            </Spanner>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>61</pitch>\n              <tpc>9</tpc>\n              <tpc2>10</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>60</pitch>\n              <tpc>14</tpc>\n              <tpc2>15</tpc2>\n              </Note>\n            </Chord>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>58</pitch>\n              <tpc>12</tpc>\n              <tpc2>13</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Spanner type=\"Slur\">\n              <prev>\n                <location>\n                  <fractions>-7/8</fractions>\n                  </location>\n                </prev>\n              </Spanner>\n            <Note>\n              <pitch>56</pitch>\n              <tpc>10</tpc>\n              <tpc2>11</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>",
+    "<Measure>\n        <voice>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Spanner type=\"Slur\">\n              <Slur>\n                </Slur>\n              <next>\n                <location>\n                  <measures>1</measures>\n                  </location>\n                </next>\n              </Spanner>\n            <Note>\n              <pitch>55</pitch>\n              <tpc>15</tpc>\n              <tpc2>16</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>53</pitch>\n              <tpc>13</tpc>\n              <tpc2>14</tpc2>\n              </Note>\n            </Chord>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>51</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <Accidental>\n                <subtype>accidentalNatural</subtype>\n                </Accidental>\n              <pitch>50</pitch>\n              <tpc>16</tpc>\n              <tpc2>17</tpc2>\n              </Note>\n            </Chord>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>51</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>50</pitch>\n              <tpc>16</tpc>\n              <tpc2>17</tpc2>\n              </Note>\n            </Chord>\n          <Beam>\n            <StemDirection>up</StemDirection>\n            </Beam>\n          <Chord>\n            <BeamMode>begin</BeamMode>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>51</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>eighth</durationType>\n            <Note>\n              <pitch>50</pitch>\n              <tpc>16</tpc>\n              <tpc2>17</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "69c9646c483e067b",
+   "next": "de42565dc8bb8fd1"
+  },
+  {
+   "staff": 1,
+   "bar": 604,
+   "before": [
+    "5d5543538a6f972b",
+    "b165cde367e57fdf"
+   ],
+   "after": [
+    "<Measure><voice><Chord><durationType>quarter</durationType><Articulation><subtype>articStaccatoAbove</subtype></Articulation><StemDirection>down</StemDirection><Note><Accidental><subtype>accidentalFlat</subtype></Accidental><pitch>64</pitch><tpc>6</tpc><tpc2>7</tpc2></Note></Chord><Chord><durationType>quarter</durationType><Articulation><subtype>articStaccatoAbove</subtype></Articulation><StemDirection>down</StemDirection><Note><pitch>64</pitch><tpc>6</tpc><tpc2>7</tpc2></Note></Chord><Chord><durationType>quarter</durationType><Articulation><subtype>articStaccatoAbove</subtype></Articulation><StemDirection>down</StemDirection><Note><pitch>64</pitch><tpc>6</tpc><tpc2>7</tpc2></Note></Chord><Chord><durationType>quarter</durationType><Articulation><subtype>articStaccatoAbove</subtype></Articulation><StemDirection>down</StemDirection><Note><Spanner type=\"Tie\"><Tie></Tie><next><location><measures>1</measures><fractions>-5/8</fractions></location></next></Spanner><pitch>64</pitch><tpc>6</tpc><tpc2>7</tpc2></Note></Chord></voice></Measure>",
+    "<Measure>\n        <voice>\n          <Chord>\n            <durationType>quarter</durationType>\n            <Articulation>\n              <subtype>articStaccatoAbove</subtype>\n              </Articulation>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>quarter</durationType>\n            <Articulation>\n              <subtype>articStaccatoAbove</subtype>\n              </Articulation>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <Spanner type=\"Tie\">\n                <prev>\n                  <location>\n                    <measures>-1</measures>\n                    <fractions>5/8</fractions>\n                    </location>\n                  </prev>\n                </Spanner>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>quarter</durationType>\n            <Articulation>\n              <subtype>articStaccatoAbove</subtype>\n              </Articulation>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>quarter</durationType>\n            <Articulation>\n              <subtype>articStaccatoAbove</subtype>\n              </Articulation>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "b3c14fdef7111387",
+   "next": "e00eb2e9e8d64419"
+  },
+  {
+   "staff": 1,
+   "bar": 605,
+   "before": [
+    "b165cde367e57fdf"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <Chord>\n            <durationType>quarter</durationType>\n            <Articulation>\n              <subtype>articStaccatoAbove</subtype>\n              </Articulation>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>quarter</durationType>\n            <Articulation>\n              <subtype>articStaccatoAbove</subtype>\n              </Articulation>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <Spanner type=\"Tie\">\n                <prev>\n                  <location>\n                    <measures>-1</measures>\n                    <fractions>5/8</fractions>\n                    </location>\n                  </prev>\n                </Spanner>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>quarter</durationType>\n            <Articulation>\n              <subtype>articStaccatoAbove</subtype>\n              </Articulation>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          <Chord>\n            <durationType>quarter</durationType>\n            <Articulation>\n              <subtype>articStaccatoAbove</subtype>\n              </Articulation>\n            <StemDirection>down</StemDirection>\n            <Note>\n              <pitch>63</pitch>\n              <tpc>11</tpc>\n              <tpc2>12</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "5d5543538a6f972b",
+   "next": "e00eb2e9e8d64419"
+  },
+  {
+   "staff": 1,
+   "bar": 838,
+   "before": [
+    "899caafc63747f7d",
+    "899caafc63747f7d"
+   ],
+   "after": [
+    "<Measure>\n        <voice>\n          <Rest>\n            <durationType>half</durationType>\n            </Rest>\n          <Chord>\n            <durationType>half</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>61</pitch>\n              <tpc>9</tpc>\n              <tpc2>10</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>",
+    "<Measure>\n        <voice>\n          <Rest>\n            <durationType>half</durationType>\n            </Rest>\n          <Chord>\n            <durationType>half</durationType>\n            <StemDirection>up</StemDirection>\n            <Note>\n              <pitch>61</pitch>\n              <tpc>9</tpc>\n              <tpc2>10</tpc2>\n              </Note>\n            </Chord>\n          </voice>\n        </Measure>"
+   ],
+   "prev": "0bf7a4eae9d065c9",
+   "next": "ed84f27792f8a4cb"
+  }
+ ]
+}
