@@ -11,6 +11,7 @@ import pytest
 from PIL import Image, ImageDraw
 
 from musicocr.review import claude, images, score
+from musicocr.review.library import Library
 from musicocr.review.server import make_server
 from musicocr.review.session import ReviewError, Session
 from musicocr.scoreops import layout
@@ -219,6 +220,40 @@ def test_server_serves_and_refuses_outsiders(session):
         assert status("/api/line/0/done", data=b"{}") == 403
         assert status("/api/line/0/done", {"X-Review": "1"}, b"{}") == 200
         assert status("/api/line/9/done", {"X-Review": "1"}, b"{}") == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_library_lists_pieces_and_serves_each(session):
+    broken = session.mscz.with_name("broken.mscz")
+
+    def open_session(path):
+        if path == broken:
+            raise ReviewError("no original")
+        return session
+
+    server = make_server(Library([session.mscz, broken], open_session), 0)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def get(path, **kw):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(base + path, **kw)) as r:
+                return r.status, r.read()
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read()
+
+    try:
+        assert b'href="/s/0/">tune<' in get("/")[1]
+        state = json.loads(get("/s/0/api/state")[1])
+        assert (state["title"], state["piece"], state["pieces"]) == ("1. tune", 0, 2)
+        assert get("/s/0")[0] == 200 and get("/s/0/img/0/0/overlay.png")[0] == 200
+        assert get("/s/0/api/line/0/done", data=b"{}", headers={"X-Review": "1"})[0] == 200
+        assert b"1/2 done" in get("/")[1]
+        assert get("/s/1/api/state") == (400, b'{"error": "no original"}')
+        assert b"no original" in get("/")[1]
+        assert get("/s/2/")[0] == 404
     finally:
         server.shutdown()
         server.server_close()

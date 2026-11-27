@@ -44,6 +44,7 @@
 <body>
 <header>
   <div>
+    <span id="pieces"></span>
     <strong id="title"></strong><span id="progress" class="hint"></span>
     <button id="byLine">Line by line</button>
     <button id="byWhole">Whole line</button>
@@ -83,14 +84,17 @@ const sequence = () => order === "part" ? [...state.units].sort((a, b) => a.s - 
 
 async function load() {
   try {
-    state = await (await fetch("/api/state")).json();
+    const out = await (await fetch("api/state")).json();
+    if (out.error) { $("#main").replaceChildren(el("div", { className: "banner", textContent: out.error }),
+      el("a", { href: "/", textContent: "All pieces" })); return; }
+    state = out;
   } catch { $("#progress").textContent = "server stopped"; return; }
   const text = JSON.stringify(state);
   // never redraw under a note being typed
   if (text !== seen && document.activeElement?.type !== "text") { seen = text; render(); }
 }
 async function act(i, action, body = {}) {
-  const r = await fetch(`/api/line/${i}/${action}`,
+  const r = await fetch(`api/line/${i}/${action}`,
     { method: "POST", headers: { "X-Review": "1", "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const out = await r.json();
   if (!r.ok) { alert(out.error); return false; }
@@ -141,7 +145,7 @@ async function sendLine() {
 
 // one staff of one line; without a unit it is only there for context
 function picture(line, s, kind, unit) {
-  const url = k => `/img/${line}/${s}/${k}.png?v=${state.rev}`;
+  const url = k => `img/${line}/${s}/${k}.png?v=${state.rev}`;
   const box = el("div", { className: unit ? "pic" : "context" });
   if (kind === "overlay") {
     const top = el("img", { src: url("ours_blue"), className: "top fade" });
@@ -319,6 +323,12 @@ function render() {
   const pages = [...new Set(units.map(u => u.page))];
   if (!pages.includes(page)) page = pages[0];
   $("#title").textContent = state.title;
+  if (state.pieces) {                              // one of several scores
+    const open = k => () => { location.href = `/s/${k}/`; };
+    $("#pieces").replaceChildren(button("All pieces", () => { location.href = "/"; }), " ",
+      button("« piece", open(state.piece - 1), "", state.piece === 0), " ",
+      button("piece »", open(state.piece + 1), "", state.piece === state.pieces - 1));
+  }
   document.title = "Review: " + state.title;
   const count = s => units.filter(u => u.status === s).length;
   $("#progress").textContent = `${count("done")}/${units.length} done · ${count("check")} to re-check · ` +

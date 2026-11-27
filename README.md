@@ -423,6 +423,13 @@ Each part's line (one staff of one line of the original) shows the original, the
 overlay (red: original, blue: score). `--source` is remembered. The score needs the original's line
 breaks (see above).
 
+Give several scores to get one server with a list of pieces and previous/next buttons (each score must
+already have its `--source` remembered, or the run's copy of the original):
+
+```
+musicocr review output/book/*/*.layout.mscz
+```
+
 * **D** marks a line as right. Click a picture to mark a spot, with or without a comment.
 * **S** sends the line to Claude and moves on; with no marks Claude looks for the differences itself.
 * In a score, each part's lines are checked and sent separately: work **system by system** or **part by

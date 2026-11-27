@@ -234,6 +234,7 @@ def cmd_layout(args) -> int:
 
 def cmd_review(args) -> int:
     from musicocr.review.claude import find_claude
+    from musicocr.review.library import Library
     from musicocr.review.server import serve
     from musicocr.review.session import Session
 
@@ -243,14 +244,21 @@ def cmd_review(args) -> int:
         print(f"config error: {exc}", file=sys.stderr)
         return 2
     musescore = config.resolve_tool("musescore")
-    mscz = Path(args.input).expanduser()
-    if not musescore or not mscz.is_file():
+    scores = [Path(p).expanduser() for p in args.input]
+    if not musescore or not all(p.is_file() for p in scores):
         print("need an existing .mscz and MuseScore (config.toml [tools])", file=sys.stderr)
         return 2
     try:
-        session = Session(mscz, args.source, musescore, config.resolve_tool("pdftoppm") or "pdftoppm",
-                          find_claude(args.claude), args.model)
-        serve(session, args.port, not args.no_open)
+        if args.source and len(scores) > 1:
+            print("--source is for a single score; review each once with it to remember it", file=sys.stderr)
+            return 2
+
+        def open_session(mscz):
+            return Session(mscz, args.source, musescore, config.resolve_tool("pdftoppm") or "pdftoppm",
+                           find_claude(args.claude), args.model)
+
+        source = open_session(scores[0]) if len(scores) == 1 else Library(scores, open_session)
+        serve(source, args.port, not args.no_open)
     except Exception as exc:  # noqa: BLE001 - one line for the user instead of a traceback
         print(f"review: {exc}", file=sys.stderr)
         return 1
@@ -524,7 +532,8 @@ def _add_review_parser(sub) -> None:
         "review", help="proofread a score against its original, line by line, with fixes made by Claude",
         description="Serve a local page comparing the score with the original. Marked lines are corrected by "
                     "Claude in the background; progress is kept in <score>.review.json.")
-    rv.add_argument("input", help="the .mscz to proofread (it needs the original's line breaks)")
+    rv.add_argument("input", nargs="+", help="the .mscz to proofread (it needs the original's line breaks); "
+                    "several get a list of pieces, each using its remembered source")
     rv.add_argument("--source", help="the original PDF (remembered after the first time)")
     rv.add_argument("--port", type=int, default=8765, help="local port (default 8765)")
     rv.add_argument("--no-open", action="store_true", help="do not open the page in a browser")
