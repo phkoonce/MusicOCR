@@ -1,0 +1,27 @@
+[
+ {
+  "id": 9,
+  "v": "C#4s E4s G4s A4s Bb4e. A4s G4s F#4s G4s E5s",
+  "fix": ""
+ },
+ {
+  "id": 10,
+  "v": "N",
+  "fix": "grace:C#3e G4e. F4s E4s D4s C#4s B3s A3s G3s F3s E3s"
+ },
+ {
+  "id": 13,
+  "v": "N",
+  "fix": "A4e Bb4s A4s G4s F4s E4s D4s D4s C#4s D4s E4s A3e Bb3s G3s"
+ },
+ {
+  "id": 36,
+  "v": "A4s E4s C#4s E4s A3s C#4s E4s G#4s A4e.",
+  "fix": "The final A4 is a dotted eighth with no rest after it. The 16th E5 after the repeat sign completes the 3/4 bar and is not included here."
+ },
+ {
+  "id": 41,
+  "v": "A4e G4e A4e F4e D5q",
+  "fix": "A4e G4e A4e F4e D5q"
+ }
+]

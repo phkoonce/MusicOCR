@@ -1,0 +1,200 @@
+{
+ "changed": [
+  {
+   "bar": 2,
+   "page": 1,
+   "was": "G3s E4s C5s B4s C5s E4s C5s E4s rh",
+   "now": "G3s E4s C5s B4s C5s E4s C5s E4s G3s E4s C5s B4s C5s E4s C5s E4s"
+  },
+  {
+   "bar": 3,
+   "page": 1,
+   "was": "G3s F#4s C5s rs C5s F#4s C5s F#4s rh",
+   "now": "G3s F#4s C5s B4s C5s F#4s C5s F#4s G3s F#4s C5s B4s C5s F#4s C5s F#4s"
+  },
+  {
+   "bar": 6,
+   "page": 1,
+   "was": "C#4s G4s A4s G4s A4s G4s A4s G4s rh",
+   "now": "C#4s G4s A4s G4s A4s G4s A4s G4s C#4s G4s A4s G4s A4s G4s A4s G4s"
+  },
+  {
+   "bar": 8,
+   "page": 1,
+   "was": "E3s B3s G4s F#4s G4s B3s G4s B3s rh",
+   "now": "E3s B3s G4s F#4s G4s B3s G4s B3s E3s B3s G4s F#4s G4s B3s G4s B3s"
+  },
+  {
+   "bar": 13,
+   "page": 1,
+   "was": "D#4s F#4s D#4s F#4s A4s F#4s A4s F#4s rh",
+   "now": "D#4s F#4s D#4s F#4s A4s F#4s A4s F#4s D#4s F#4s D#4s F#4s A4s F#4s A4s F#4s"
+  },
+  {
+   "bar": 14,
+   "page": 1,
+   "was": "rw",
+   "now": "G4s F#4s E4s G4s F#4s G4s A4s F#4s G4s F#4s E4s D4s C4s B3s A3s G3s"
+  },
+  {
+   "bar": 15,
+   "page": 1,
+   "was": "F#3s C#4s D4s C4s D4s C4s D4s C4s rh",
+   "now": "F#3s C4s D4s C4s D4s C4s D4s C4s F#3s C4s D4s C4s D4s C4s D4s C4s"
+  },
+  {
+   "bar": 16,
+   "page": 1,
+   "was": "G3s B3s F4s E4s F4s B3s F4s B3s rh",
+   "now": "G3s B3s F4s E4s F4s B3s F4s B3s G3s B3s F4s E4s F4s B3s F4s B3s"
+  },
+  {
+   "bar": 17,
+   "page": 1,
+   "was": "G3s C4s E4s D4s E4s C4s E4s C4s rh",
+   "now": "G3s C4s E4s D4s E4s C4s E4s C4s G3s C4s E4s D4s E4s C4s E4s C4s"
+  },
+  {
+   "bar": 18,
+   "page": 1,
+   "was": "G3s F4s C5s B4s C5s F4s C5s F4s rh",
+   "now": "G3s F#4s C5s B4s C5s F#4s C5s F#4s G3s F#4s C5s B4s C5s F#4s C5s F#4s"
+  },
+  {
+   "bar": 19,
+   "page": 1,
+   "was": "rw",
+   "now": "G3s D4s B4s A4s B4s G4s F#4s E4s D4s C4s B3s A3s G3s F#3s E3s D3s"
+  },
+  {
+   "bar": 20,
+   "page": 1,
+   "was": "C#3s A3s E4s F#4s G4s E4s F#4s G4s rh",
+   "now": "C#3s A3s E4s F#4s G4s E4s F#4s G4s C#3s A3s E4s F#4s G4s E4s F#4s G4s"
+  },
+  {
+   "bar": 32,
+   "page": 2,
+   "was": "F#4s A4s D4s A4s G4s A4s E4s A4s rh",
+   "now": "F#4s A4s D4s A4s G4s A4s E4s A4s F#4s A4s D4s A4s G4s A4s E4s A4s"
+  },
+  {
+   "bar": 40,
+   "page": 2,
+   "was": "G5e D4s A4s G5s A4s G5s A4s G5s A4s D4s A4s G5s A4s G5s A4s",
+   "now": "G5e D4s A4s G5s A4s G5s A4s G5s A4s D4s A4s G5s A4s G5s A4s"
+  },
+  {
+   "bar": 42,
+   "page": 2,
+   "was": "G5s B4s D5s B4s G5s B4s G5s B4s rh",
+   "now": "G5s B4s D5s B4s G5s B4s G5s B4s G5s B4s D5s B4s G5s B4s G5s B4s"
+  },
+  {
+   "bar": 43,
+   "page": 2,
+   "was": "G5s A4s D5s A4s G5s A4s G5s A4s rh",
+   "now": "G5s A4s D5s A4s G5s A4s G5s A4s G5s A4s D5s A4s G5s A4s G5s A4s"
+  },
+  {
+   "bar": 47,
+   "page": 2,
+   "was": "F#5s C5s D5s C5s F#5s C5s F#5s C5s rq rq",
+   "now": "F#5s C5s D5s C5s F#5s C5s F#5s C5s F#5s C5s D5s C5s F#5s C5s F#5s C5s"
+  },
+  {
+   "bar": 48,
+   "page": 2,
+   "was": "G5s D5s B4s D5s B4s G4s D5s B4s G4s B4s G4s D4s G4s D4s B3s D4s",
+   "now": "G5s D5s B4s D5s B4s G4s D5s B4s G4s B4s G4s D4s G4s D4s B3s D4s"
+  },
+  {
+   "bar": 49,
+   "page": 2,
+   "was": "G3h. rq",
+   "now": "G3h. rq"
+  },
+  {
+   "bar": 50,
+   "page": 2,
+   "was": "B4s rh...",
+   "now": "B4s"
+  },
+  {
+   "bar": 66,
+   "page": 2,
+   "was": "D3e. A3s D4s F#4s A4s C#5s D5s A4s F#4s D4s D3e. rs",
+   "now": "D3e. A3s D4s F#4s A4s C#5s D5s A4s F#4s D4s D3e."
+  },
+  {
+   "bar": 67,
+   "page": 3,
+   "was": "rw",
+   "now": "A4s"
+  },
+  {
+   "bar": 68,
+   "page": 3,
+   "was": "B3s D4s G4s F4s G4s A4s B4s C5s D5s B4s A4s G4s F4s E4s F4s D5s",
+   "now": "B3s D4s G4s F#4s G4s A4s B4s C5s D5s B4s A4s G4s F4s E4s F4s D5s"
+  },
+  {
+   "bar": 82,
+   "page": 3,
+   "was": "G4s G3s B3s D4s G4s B4s D5s F#5s G5s D5s B4s G4s G3e. rs",
+   "now": "G4s G3s B3s D4s G4s B4s D5s F#5s G5s D5s B4s G4s G3e."
+  },
+  {
+   "bar": 83,
+   "page": 3,
+   "was": "G4e rh re",
+   "now": "G4e"
+  },
+  {
+   "bar": 102,
+   "page": 4,
+   "was": "A4e rh re",
+   "now": "A4e"
+  },
+  {
+   "bar": 183,
+   "page": 6,
+   "was": "B3e D4e F4e A4e G4e F4e",
+   "now": "B3e D4e F4e Ab4e G4e F4e"
+  },
+  {
+   "bar": 191,
+   "page": 6,
+   "was": "D4e rh re",
+   "now": "D4e"
+  },
+  {
+   "bar": 204,
+   "page": 6,
+   "was": "A4e~ rh re",
+   "now": "A4e~"
+  },
+  {
+   "bar": 214,
+   "page": 6,
+   "was": "G4e E4e F#4e B4s C5s D5e E4e~",
+   "now": "G4e E4e F4e B4s C5s D5e E4e~"
+  }
+ ],
+ "confirmed": 52,
+ "left": [
+  "bar 33 (page 2): not settled (F#4s A4s D4s A4s E4s A4s F#4s A4s G4s A4s A4s A4s B4s A4s D4s A4s)",
+  "bar 44 (page 2): not settled (F#5e grace:C5e D4s C5s F#5s C5s F#5s C5s F#5s C5s D4s C5s F#5s C5s F#5s C5s)",
+  "bar 45 (page 2): not settled (G5s D5s B4s D5s B4s G4s D5s B4s G4s B4s G4s D4s G4s D4s B3s D4s)",
+  "bar 79 (page 3): not settled (N)",
+  "bar 104 (page 4): not settled (D5e F#4e C4e B3s C4s D4s C4s B3s A3s)"
+ ],
+ "homr_only": [
+  {
+   "after_bar": 190,
+   "homr": [
+    "rw"
+   ]
+  }
+ ]
+}

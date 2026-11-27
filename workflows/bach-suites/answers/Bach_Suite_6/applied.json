@@ -1,0 +1,431 @@
+{
+ "changed": [
+  {
+   "bar": 16,
+   "page": 1,
+   "was": "A4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet) A4e(3-tuplet) E4e(3-tuplet) G4e(3-tuplet) A4e(3-tuplet) D4e(3-tuplet) F4e(3-tuplet) A4e(3-tuplet) C4e(3-tuplet) F4e(3-tuplet) rh",
+   "now": "A4e F4e G4e A4e E4e G4e A4e D4e F4e A4e C4e F4e"
+  },
+  {
+   "bar": 17,
+   "page": 1,
+   "was": "Ab4e(3-tuplet) B3e(3-tuplet) Ab4e(3-tuplet) G4e(3-tuplet) Ab4e(3-tuplet) F4e(3-tuplet) D5e(3-tuplet) F4e(3-tuplet) Ab4e(3-tuplet) G4e(3-tuplet) Ab4e(3-tuplet) F4e(3-tuplet) rh",
+   "now": "Ab4e B3e Ab4e G4e Ab4e F4e D5e F4e Ab4e G4e Ab4e F4e"
+  },
+  {
+   "bar": 18,
+   "page": 1,
+   "was": "Eb4e(3-tuplet) C4e(3-tuplet) Eb4e(3-tuplet) G4e(3-tuplet) A4e(3-tuplet) B4e(3-tuplet) C5e(3-tuplet) Eb4e(3-tuplet) G4e(3-tuplet) B4e(3-tuplet) C5e(3-tuplet) D5e(3-tuplet) rh",
+   "now": "Eb4e C4e Eb4e G4e A4e B4e C5e Eb4e G4e B4e C5e D5e"
+  },
+  {
+   "bar": 20,
+   "page": 1,
+   "was": "C6e C5e D5e Eb5e G5e D5e Eb5e C5e D5e Eb5e G5e Eb5e",
+   "now": "C5+C6e C5e D5e Eb5e G5e D5e Eb5e C5e D5e Eb5e G5e Eb5e"
+  },
+  {
+   "bar": 21,
+   "page": 1,
+   "was": "rw",
+   "now": "C5e C5+C6e D5e Eb5e G5e D5e Eb5e C5e D5e Eb5e G5e Eb5e"
+  },
+  {
+   "bar": 38,
+   "page": 2,
+   "was": "Bb3e D4e G4e F4e Eb4e D4e Eb4e(3-tuplet) C4e(3-tuplet) Bb3e(3-tuplet) re A3e Bb3e C4e",
+   "now": "Bb3e D4e G4e F4e Eb4e D4e Eb4e C4e Bb3e A3e Bb3e C4e"
+  },
+  {
+   "bar": 39,
+   "page": 2,
+   "was": "rw",
+   "now": "F#3e A3e D4e C4e Bb3e A3e Bb3e G3e F3e E3e F3e G3e"
+  },
+  {
+   "bar": 40,
+   "page": 2,
+   "was": "rw",
+   "now": "C#3e G3e Bb3e C#3e G3e Bb3e G4e A4e Bb4e A4e F#4e G4e"
+  },
+  {
+   "bar": 41,
+   "page": 2,
+   "was": "D3e(3-tuplet) G3e(3-tuplet) Bb3e(3-tuplet) re D3e G3e Bb3e G4e A4e Bb4e A4e F#4e G4e",
+   "now": "D3e G3e Bb3e D3e G3e Bb3e G4e A4e Bb4e A4e F#4e G4e"
+  },
+  {
+   "bar": 42,
+   "page": 2,
+   "was": "Eb3e(3-tuplet) G3e(3-tuplet) C4e(3-tuplet) G4e(3-tuplet) A4e(3-tuplet) Bb4e(3-tuplet) A4e(3-tuplet) F#4e(3-tuplet) G4e(3-tuplet) C#5e(3-tuplet) F#4e(3-tuplet) G4e(3-tuplet) rh",
+   "now": "Eb3e G3e C4e G4e A4e Bb4e A4e F#4e G4e C#5e F#4e G4e"
+  },
+  {
+   "bar": 43,
+   "page": 2,
+   "was": "D5e(3-tuplet) A4e(3-tuplet) Bb4e(3-tuplet) G5e(3-tuplet) F5e(3-tuplet) Eb5e(3-tuplet) D5e(3-tuplet) C5e(3-tuplet) Bb4e(3-tuplet) Ab4e(3-tuplet) C5e(3-tuplet) G4e(3-tuplet) rh",
+   "now": "D5e A4e Bb4e G5e F5e Eb5e D5e C5e Bb4e Ab4e C5e G4e"
+  },
+  {
+   "bar": 45,
+   "page": 2,
+   "was": "rw",
+   "now": "G4e D4e C4e Bb3e D4e A3e Bb3e G3e Bb3e D4e G4e D4e"
+  },
+  {
+   "bar": 48,
+   "page": 2,
+   "was": "A3e(3-tuplet) Eb4e(3-tuplet) C4e(3-tuplet) A3e(3-tuplet) C4e(3-tuplet) G3e(3-tuplet) A3e(3-tuplet) F3e(3-tuplet) A3e(3-tuplet) C4e rq. D4e Eb4e",
+   "now": "A3e Eb4e C4e A3e C4e G3e A3e F3e A3e C4e D4e Eb4e"
+  },
+  {
+   "bar": 56,
+   "page": 3,
+   "was": "rw",
+   "now": "Ab3e F3e G3e Ab3e F3e Eb3e D3e F3e G3e Ab3e F3e D3e"
+  },
+  {
+   "bar": 57,
+   "page": 3,
+   "was": "rw",
+   "now": "Bb3e +Bb2e D3e F3e Ab3e Bb3e D4e F4e Bb4e F4e D4e Bb3e F3e"
+  },
+  {
+   "bar": 58,
+   "page": 3,
+   "was": "G3e(3-tuplet) Eb3e(3-tuplet) F3e(3-tuplet) G3e(3-tuplet) Bb3e(3-tuplet) F3e(3-tuplet) G3e(3-tuplet) Eb3e(3-tuplet) F3e(3-tuplet) G3e(3-tuplet) Eb4e(3-tuplet) F3e(3-tuplet) rh",
+   "now": "G3e Eb3e F3e G3e Bb3e F3e G3e Eb3e F3e G3e Eb4e F3e"
+  },
+  {
+   "bar": 59,
+   "page": 3,
+   "was": "G3e(3-tuplet) Eb3e(3-tuplet) F3e(3-tuplet) G3e(3-tuplet) Bb3e(3-tuplet) F3e(3-tuplet) G3e(3-tuplet) Eb3e(3-tuplet) F3e(3-tuplet) G3e(3-tuplet) Eb4e(3-tuplet) C4e(3-tuplet) rh",
+   "now": "G3e Eb3e F3e G3e Bb3e F3e G3e Eb3e F3e G3e Eb4e C4e"
+  },
+  {
+   "bar": 60,
+   "page": 3,
+   "was": "A3e(3-tuplet) F3e(3-tuplet) G3e(3-tuplet) A3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) Eb4e(3-tuplet) C4e(3-tuplet) Bb3e(3-tuplet) rq A3e(3-tuplet) C4e(3-tuplet) G3e(3-tuplet) rq",
+   "now": "A3e F3e G3e A3e C4e D4e Eb4e C4e Bb3e A3e C4e G3e"
+  },
+  {
+   "bar": 61,
+   "page": 3,
+   "was": "rw",
+   "now": "A3e F3e G3e A3e C4e D4e Eb4e F4e G4e A4e Bb4e C5e"
+  },
+  {
+   "bar": 62,
+   "page": 3,
+   "was": "D4e(3-tuplet) Bb3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) F4e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) Bb3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) Bb4e(3-tuplet) C4e(3-tuplet) rh",
+   "now": "D4e Bb3e C4e D4e F4e C4e D4e Bb3e C4e D4e Bb4e C4e"
+  },
+  {
+   "bar": 63,
+   "page": 3,
+   "was": "D4e(3-tuplet) Bb3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) F4e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) Bb3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) Bb4e(3-tuplet) G4e(3-tuplet) rh",
+   "now": "D4e Bb3e C4e D4e F4e C4e D4e Bb3e C4e D4e Bb4e G4e"
+  },
+  {
+   "bar": 64,
+   "page": 3,
+   "was": "E4e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) E4e(3-tuplet) G4e(3-tuplet) A4e(3-tuplet) Bb4e(3-tuplet) G4e(3-tuplet) F4e(3-tuplet) E4e(3-tuplet) G4e(3-tuplet) D4e(3-tuplet) rh",
+   "now": "E4e C4e D4e E4e G4e A4e Bb4e G4e F4e E4e G4e D4e"
+  },
+  {
+   "bar": 66,
+   "page": 3,
+   "was": "A4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet) A4e(3-tuplet) C5e(3-tuplet) D5e(3-tuplet) Eb5e(3-tuplet) C5e(3-tuplet) Bb4e(3-tuplet) A4e(3-tuplet) C5e(3-tuplet) G4e(3-tuplet) rh",
+   "now": "A4e F4e G4e A4e C5e D5e Eb5e C5e Bb4e A4e C5e G4e"
+  },
+  {
+   "bar": 67,
+   "page": 3,
+   "was": "A4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet) A4e(3-tuplet) C5e(3-tuplet) D5e(3-tuplet) Eb5e(3-tuplet) F5e(3-tuplet) G5e(3-tuplet) rq. A5e Bb5e C6e",
+   "now": "A4e F4e G4e A4e C5e D5e Eb5e F5e G5e A5e Bb5e C6e"
+  },
+  {
+   "bar": 68,
+   "page": 3,
+   "was": "F4e(3-tuplet) +F5e(3-tuplet) D5e(3-tuplet) F5e(3-tuplet) D5e(3-tuplet) Bb4e(3-tuplet) C5e(3-tuplet) D5e(3-tuplet) F5e(3-tuplet) C5e(3-tuplet) D5e rq. F5e Bb4e",
+   "now": "F5e +F4e D5e F5e D5e Bb4e C5e D5e F5e C5e D5e F5e Bb4e"
+  },
+  {
+   "bar": 69,
+   "page": 3,
+   "was": "rw",
+   "now": "F4e Eb5e G5e Eb5e C5e D5e Eb5e G5e D5e Eb5e G5e C5e"
+  },
+  {
+   "bar": 70,
+   "page": 3,
+   "was": "rw",
+   "now": "F4e F5e A5e F5e D5e Eb5e F5e A5e Eb5e F5e A5e D5e"
+  },
+  {
+   "bar": 73,
+   "page": 3,
+   "was": "rw",
+   "now": "F4e D5e C5e D5e Eb4e D4e Eb4e C5e Bb4e C5e D4e C4e"
+  },
+  {
+   "bar": 75,
+   "page": 3,
+   "was": "Bb3e G4e F4e G4e Eb4e C4e A3e F4e Eb4e F4e D4e Bb3e",
+   "now": "Bb3e G4e F4e G4e Eb4e C4e A3e F4e Eb4e F4e D4e Bb3e"
+  },
+  {
+   "bar": 76,
+   "page": 3,
+   "was": "rw",
+   "now": "G3e Eb4e D4e Eb4e C4e A3e F3e. G4s A4t Bb4t C5t D5t Eb5e C5e A4e"
+  },
+  {
+   "bar": 77,
+   "page": 3,
+   "was": "F4e D5e C5e D5e Bb4e G4e Eb4e. F4t rt A4x Bb4x rs. C5e A4e F4e",
+   "now": "F4e D5e C5e D5e Bb4e G4e Eb4e. F4t G4t A4s Bb4s C5e A4e F4e"
+  },
+  {
+   "bar": 78,
+   "page": 3,
+   "was": "D4e Bb4e A4e Bb4e G4e Eb4e C4e. D4t rt Eb4x F4x G4x rs rx A4e F4e D4e",
+   "now": "D4e Bb4e A4e Bb4e G4e Eb4e C4e. D4t Eb4t F4s G4s A4e F4e D4e"
+  },
+  {
+   "bar": 82,
+   "page": 4,
+   "was": "F5s Eb5s D5s C5s Bb4s A4s D5s C5s Bb4s A4s G4s F4s Bb4s(3-tuplet) A4s(3-tuplet) G4s(3-tuplet) F4s(3-tuplet) E4s(3-tuplet) D4s(3-tuplet) G4s F4s rq(6-tuplet) E4s(3-tuplet) D4s(3-tuplet) C4s(3-tuplet) Bb3s(3-tuplet)",
+   "now": "F5s Eb5s D5s C5s Bb4s A4s D5s C5s Bb4s A4s G4s F4s Bb4s A4s G4s F4s E4s D4s G4s F4s E4s D4s C4s Bb3s"
+  },
+  {
+   "bar": 83,
+   "page": 4,
+   "was": "A3s C4s F4s A4s C5s F5s C5s A4s F4s C4s A3s F3s rh.",
+   "now": "A3s C4s F4s A4s C5s F5s C5s A4s F4s C4s A3s F3s A3s C4s F4s A4s C5s F5s C5s A4s F4s C4s A3s F3s"
+  },
+  {
+   "bar": 84,
+   "page": 4,
+   "was": "Eb3s C4s F4s Ab4s re. F5s C5s Ab4s F4s re C4s A3s Fb3s rh",
+   "now": "Eb3s C4s F4s A4s C5s F5s C5s A4s F4s C4s A3s F3s Eb3s C4s F4s A4s C5s F5s C5s A4s F4s C4s A3s F3s"
+  },
+  {
+   "bar": 85,
+   "page": 4,
+   "was": "D3s(6-tuplet) F4s(6-tuplet) G4s(6-tuplet) Ab4s(6-tuplet) G4s(6-tuplet) F4s(6-tuplet) Bb3s(6-tuplet) F4s(6-tuplet) G4s(6-tuplet) Ab4s(6-tuplet) G4s(6-tuplet) F4s(6-tuplet) D4s(6-tuplet) F4s(6-tuplet) G4s(6-tuplet) Ab4s(6-tuplet) G4s(6-tuplet) F4s(6-tuplet) D5s(6-tuplet) F4s(6-tuplet) G4s(6-tuplet) Ab4s(6-tuplet) G4s(6-tuplet) F4s(6-tuplet) rh",
+   "now": "D3s F4s G4s Ab4s G4s F4s Bb3s F4s G4s Ab4s G4s F4s D4s F4s G4s Ab4s G4s F4s D5s F4s G4s Ab4s G4s F4s"
+  },
+  {
+   "bar": 86,
+   "page": 4,
+   "was": "rw",
+   "now": "G4s Bb4s Ab4s G4s F4s Eb4s G4s F4s Eb4s D4s C4s Bb3s Eb4s D4s C4s Bb3s Ab3s G3s C4s Bb3s Ab3s G3s F3s Eb3s"
+  },
+  {
+   "bar": 87,
+   "page": 4,
+   "was": "Db4s(3-tuplet) C4s(3-tuplet) Bb3s(6-tuplet) C4s(6-tuplet) Db4s(6-tuplet) Bb3s(6-tuplet) E3s(3-tuplet) Bb3s(3-tuplet) C4s(6-tuplet) Db4s(6-tuplet) C4s(6-tuplet) Bb3s(6-tuplet) G4s(3-tuplet) Bb3s(6-tuplet) C4s(6-tuplet) Db4s(3-tuplet) C4s(3-tuplet) Bb3s(3-tuplet) Bb4s(3-tuplet)~ Bb4t(3-tuplet) Bb3s(3-tuplet)~ Bb3t(3-tuplet) re. C4s Db4s(3-tuplet) C4s(3-tuplet) Bb3s(3-tuplet)~ Bb3t(3-tuplet) rs(3-tuplet) re.",
+   "now": "Db4s C4s Bb3s C4s Db4s Bb3s E3s Bb3s C4s Db4s C4s Bb3s G4s Bb3s C4s Db4s C4s Bb3s Bb4s Bb3s C4s Db4s C4s Bb3s"
+  },
+  {
+   "bar": 100,
+   "page": 4,
+   "was": "A4e(3-tuplet) C5e(3-tuplet) Bb4e(3-tuplet) C5e(3-tuplet) Eb5e(3-tuplet) D5e(3-tuplet) Eb5e(3-tuplet) G5e(3-tuplet) F5e(3-tuplet) G5e(3-tuplet) Bb5e(3-tuplet) A5e(3-tuplet) rh",
+   "now": "A4e C5e Bb4e C5e Eb5e D5e Eb5e G5e F5e G5e Bb5e A5e"
+  },
+  {
+   "bar": 101,
+   "page": 4,
+   "was": "Bb5e(3-tuplet) F5e(3-tuplet) D5e(3-tuplet) F5e(3-tuplet) D5e(3-tuplet) Bb4e(3-tuplet) D5e(3-tuplet) Bb4e(3-tuplet) F4e(3-tuplet) Bb4e(3-tuplet) F4e(3-tuplet) D4e(3-tuplet) rh",
+   "now": "Bb5e F5e D5e F5e D5e Bb4e D5e Bb4e F4e Bb4e F4e D4e"
+  },
+  {
+   "bar": 102,
+   "page": 4,
+   "was": "F4e(3-tuplet) D4e(3-tuplet) Bb3e(3-tuplet) D4e(3-tuplet) Bb3e(3-tuplet) F3e(3-tuplet) Bb3q F4e Bb4q. rq rh Bb2e(3-tuplet) F3e D4e rw(3-tuplet)",
+   "now": "F4e D4e Bb3e D4e Bb3e F3e Bb2+Bb3e F3e D4+F4e Bb4q."
+  },
+  {
+   "bar": 103,
+   "page": 5,
+   "was": "D5e rh..",
+   "now": "D5e"
+  },
+  {
+   "bar": 111,
+   "page": 5,
+   "was": "F5e rs E4s F4s G4s A4s F4s B3e. F5s G5s F5s E5s F5s",
+   "now": "F5e. E4s F4s G4s A4s F4s B3e. F5s G5s F5s E5s F5s"
+  },
+  {
+   "bar": 117,
+   "page": 5,
+   "was": "rw",
+   "now": "Bb3s D5s C5s Bb4s A4s E4s F4s Bb4s grace:A4e G4q G4e F4e"
+  },
+  {
+   "bar": 119,
+   "page": 5,
+   "was": "F5e. C5s A4e G4s F4s F3q. re",
+   "now": "F5e. C5s A4e G4s F4s F3q."
+  },
+  {
+   "bar": 120,
+   "page": 5,
+   "was": "C5e rh..",
+   "now": "C5e"
+  },
+  {
+   "bar": 123,
+   "page": 5,
+   "was": "rw",
+   "now": "D4e F4s(3-tuplet) G4s(3-tuplet) A4s(3-tuplet) Bb4s G4s Eb4s D4s C4e Eb5s D5s Eb5s C5s A4s F4s"
+  },
+  {
+   "bar": 129,
+   "page": 6,
+   "was": "rw",
+   "now": "Bb4e. A4s G4s F4s Eb4s F4t D4t Eb4e. Bb3t(3-tuplet) C4t(3-tuplet) D4t(3-tuplet) Eb4s F4s G4s A4t Bb4t"
+  },
+  {
+   "bar": 134,
+   "page": 6,
+   "was": "grace:D4e grace:C4e Eb5q. F5s G5s F5s Eb5s D5s C5s Bb4s A4s C5s B4s",
+   "now": "grace:C4e Eb5q. F5s G5s F5s Eb5s D5s C5s Bb4s A4s C5s Bb4s"
+  },
+  {
+   "bar": 141,
+   "page": 6,
+   "was": "Bb3s G3s A3s C4s F4s A4s C5s E5s F5e D3s F4s Eb4s D4s C4s Bb3s",
+   "now": "Bb3s G3s A3s C4s F4s A4s C5s E5s F5e F2s F4s Eb4s D4s C4s Bb3s"
+  },
+  {
+   "bar": 144,
+   "page": 6,
+   "was": "Bb4e. F4s D4e C4s Bb3s Bb3q. re",
+   "now": "Bb4e. F4s D4e C4s Bb3s Bb3q."
+  },
+  {
+   "bar": 145,
+   "page": 7,
+   "was": "rw",
+   "now": "Bb4e Bb3s C4s D4e Bb3e F4e D4e"
+  },
+  {
+   "bar": 146,
+   "page": 7,
+   "was": "B4e F4e D5e B4e F5e Ab4e",
+   "now": "Bb4e F4e D5e Bb4e F5e Ab4e"
+  },
+  {
+   "bar": 147,
+   "page": 7,
+   "was": "G4e C5s D5s E5e C5e G5e B4e",
+   "now": "G4e C5s D5s Eb5e C5e G5e Bb4e"
+  },
+  {
+   "bar": 148,
+   "page": 7,
+   "was": "A4e F4s G4s A4e F4e C5e E4e",
+   "now": "A4e F4s G4s A4e F4e C5e Eb4e"
+  },
+  {
+   "bar": 151,
+   "page": 7,
+   "was": "D3e F3e G3e Eb3e F3e A3e",
+   "now": "D3e F3e Bb3e Eb3e F3e A3e"
+  },
+  {
+   "bar": 158,
+   "page": 7,
+   "was": "Bb4e G4e C3e A4s Bb4s C5s Bb4s A4s G4s",
+   "now": "Bb4e G4e C3e A4s Bb4s C5s Bb4s A4s G4s"
+  },
+  {
+   "bar": 172,
+   "page": 7,
+   "was": "F3h re re",
+   "now": "F3h re"
+  },
+  {
+   "bar": 173,
+   "page": 7,
+   "was": "F5e rh re",
+   "now": "F5e"
+  },
+  {
+   "bar": 216,
+   "page": 0,
+   "was": "rh re D4e Bb2h Bb3s C4s rh F3e re",
+   "now": "D4e Bb3s C4s D4e F3e A3e Eb3e"
+  },
+  {
+   "bar": 217,
+   "page": 9,
+   "was": "F5e rh re",
+   "now": "F5e"
+  },
+  {
+   "bar": 219,
+   "page": 9,
+   "was": "D5e Bb4e F5e F5s Eb5s D5s Eb5s F5e",
+   "now": "D5e Bb4e F5e F5s Eb5s D5s Eb5s F5e"
+  },
+  {
+   "bar": 232,
+   "page": 9,
+   "was": "E3s grace:E4s G3s C4s E4s G4s Bb4s G5s F5s E5s F5s G5s C5s",
+   "now": "E3+E4s G3s C4s E4s G4s Bb4s G5s F5s E5s F5s G5s C5s"
+  },
+  {
+   "bar": 244,
+   "page": 9,
+   "was": "A3s grace:A2s C5s Bb4s A4s G4s F4s C4s Bb4s A4s G4s F4s E4s",
+   "now": "A3s +A2s C5s Bb4s A4s G4s F4s C4s Bb4s A4s G4s F4s E4s"
+  },
+  {
+   "bar": 245,
+   "page": 9,
+   "was": "F4s grace:F3s C4s F4s A4s C5s E5s F5q re",
+   "now": "F4s +F3s C4s F4s A4s C5s E5s F5q"
+  },
+  {
+   "bar": 246,
+   "page": 9,
+   "was": "C5e rh re",
+   "now": "C5e"
+  },
+  {
+   "bar": 265,
+   "page": 10,
+   "was": "C#4e A4e G5e A3e G5s F5s G5s E5s",
+   "now": "C#4e +A4e A4e +C#5e G5e A3e +A4e G5s F5s G5s E5s"
+  },
+  {
+   "bar": 277,
+   "page": 10,
+   "was": "D3s rs F4s Eb4s D4s C4s Bb3s C4s D4s C4s Bb3s A3s",
+   "now": "D3e F4s Eb4s D4s C4s Bb3s C4s D4s C4s Bb3s A3s"
+  },
+  {
+   "bar": 286,
+   "page": 10,
+   "was": "Bb4s grace:D5e grace:Bb4e re F4s grace:D4s F4s grace:Bb3e rq rs rs F4s D4s Bb3s F3s D3s Bb2q",
+   "now": "Bb4s F4s +D5s D4s +Bb4s Bb3s +F4s F3s +D4s D3s +F4s Bb2q +Bb3q"
+  }
+ ],
+ "confirmed": 28,
+ "left": [
+  "bar 126 (page 6): not settled (Bb4q. G3e Ab3s G3s Ab3s Bb3s Ab3s Bb3s grace:C4e Bb3s Ab3t(3-tuplet) Bb3t(3-tuplet) C4t(3-tuplet))",
+  "bar 143 (page 6): not settled (Bb3e C4s D4s Eb4s F4s G4s Ab4s G4s F4s Eb4s D4s Eb4s C4s Bb4s A4s)"
+ ],
+ "homr_only": [
+  {
+   "after_bar": 3,
+   "homr": [
+    "rw"
+   ]
+  }
+ ]
+}

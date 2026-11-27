@@ -1,0 +1,61 @@
+[
+ {
+  "id": 29,
+  "v": "N",
+  "fix": "E4e C4e D4e E4e G4e A4e Bb4e G4e F4e E4e G4e D4e"
+ },
+ {
+  "id": 30,
+  "v": "N",
+  "fix": "A4e F4e G4e A4e C5e D5e Eb5e C5e Bb4e A4e C5e G4e"
+ },
+ {
+  "id": 31,
+  "v": "B"
+ },
+ {
+  "id": 32,
+  "v": "B"
+ },
+ {
+  "id": 33,
+  "v": "?"
+ },
+ {
+  "id": 34,
+  "v": "?"
+ },
+ {
+  "id": 35,
+  "v": "?"
+ },
+ {
+  "id": 36,
+  "v": "A"
+ },
+ {
+  "id": 37,
+  "v": "?"
+ },
+ {
+  "id": 38,
+  "v": "?"
+ },
+ {
+  "id": 39,
+  "v": "B"
+ },
+ {
+  "id": 40,
+  "v": "B"
+ },
+ {
+  "id": 41,
+  "v": "B"
+ },
+ {
+  "id": 42,
+  "v": "N",
+  "fix": "A3s C4s F4s A4s C5s F5s C5s A4s F4s C4s A3s F3s A3s C4s F4s A4s C5s F5s C5s A4s F4s C4s A3s F3s"
+ }
+]

@@ -1,0 +1,65 @@
+[
+ {
+  "id": 71,
+  "v": "A"
+ },
+ {
+  "id": 72,
+  "v": "?"
+ },
+ {
+  "id": 73,
+  "v": "N",
+  "fix": "C4q C3q"
+ },
+ {
+  "id": 74,
+  "v": "N",
+  "fix": "Eb4e(3-tuplet) D4e(3-tuplet) Eb4e(3-tuplet) F4e(3-tuplet) Eb4e(3-tuplet) D4e(3-tuplet)"
+ },
+ {
+  "id": 75,
+  "v": "N",
+  "fix": "Eb4q~ Eb4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet) Ab4e(3-tuplet) G4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet) F4e(3-tuplet) Eb4e(3-tuplet)"
+ },
+ {
+  "id": 76,
+  "v": "N",
+  "fix": "D4e(3-tuplet) Eb4e(3-tuplet) F4e(3-tuplet) Bb3e(3-tuplet) D4e(3-tuplet) F4e(3-tuplet) Bb4e(3-tuplet) A4e(3-tuplet) Bb4e(3-tuplet) C5e(3-tuplet) Bb4e(3-tuplet) Ab4e(3-tuplet)"
+ },
+ {
+  "id": 77,
+  "v": "?"
+ },
+ {
+  "id": 78,
+  "v": "N",
+  "fix": "G4q G3q G4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet) Ab4e(3-tuplet) G4e(3-tuplet) F4e(3-tuplet)"
+ },
+ {
+  "id": 79,
+  "v": "N",
+  "fix": "C4e(3-tuplet) G3e(3-tuplet) Eb3e(3-tuplet) C3e(3-tuplet) Eb3e(3-tuplet) G3e(3-tuplet) C4e(3-tuplet) Eb4e(3-tuplet) G4e(3-tuplet) C5e(3-tuplet) D5e(3-tuplet) B4e(3-tuplet)"
+ },
+ {
+  "id": 80,
+  "v": "?"
+ },
+ {
+  "id": 81,
+  "v": "?"
+ },
+ {
+  "id": 82,
+  "v": "A"
+ },
+ {
+  "id": 83,
+  "v": "N",
+  "fix": "F4e C4e Bb3e A3e Bb3e C4e Bb3e E4e F4e G4e F4e E4e"
+ },
+ {
+  "id": 84,
+  "v": "?"
+ }
+]

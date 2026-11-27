@@ -1,0 +1,62 @@
+[
+ {
+  "id": 14,
+  "v": "N",
+  "fix": "G4s F#4s E4s G4s F#4s G4s A4s F#4s G4s F#4s E4s D4s C4s B3s A3s G3s"
+ },
+ {
+  "id": 18,
+  "v": "N",
+  "fix": "G3s F#4s C5s B4s C5s F#4s C5s F#4s G3s F#4s C5s B4s C5s F#4s C5s F#4s"
+ },
+ {
+  "id": 19,
+  "v": "N",
+  "fix": "G3s D4s B4s A4s B4s G4s F#4s E4s D4s C4s B3s A3s G3s F#3s E3s D3s"
+ },
+ {
+  "id": 33,
+  "v": "F#4s A4s D4s A4s E4s A4s F#4s A4s G4s A4s A4s A4s B4s A4s D4s A4s",
+  "fix": ""
+ },
+ {
+  "id": 40,
+  "v": "N",
+  "fix": "G5e D4s A4s G5s A4s G5s A4s G5s A4s D4s A4s G5s A4s G5s A4s"
+ },
+ {
+  "id": 43,
+  "v": "N",
+  "fix": "G5s A4s D5s A4s G5s A4s G5s A4s G5s A4s D5s A4s G5s A4s G5s A4s"
+ },
+ {
+  "id": 44,
+  "v": "F#5e grace:C5e D4s C5s F#5s C5s F#5s C5s F#5s C5s D4s C5s F#5s C5s F#5s C5s",
+  "fix": "Added the small parenthesised C5 between the opening F#5 and D4, read as a grace note. It is the least certain symbol: its small print makes its type and value hard to judge. The other notes match the program's reading."
+ },
+ {
+  "id": 45,
+  "v": "G5s D5s B4s D5s B4s G4s D5s B4s G4s B4s G4s D4s G4s D4s B3s D4s",
+  "fix": "No change; the program's reading matches the print."
+ },
+ {
+  "id": 47,
+  "v": "N",
+  "fix": "F#5s C5s D5s C5s F#5s C5s F#5s C5s F#5s C5s D5s C5s F#5s C5s F#5s C5s"
+ },
+ {
+  "id": 48,
+  "v": "N",
+  "fix": "G5s D5s B4s D5s B4s G4s D5s B4s G4s B4s G4s D4s G4s D4s B3s D4s"
+ },
+ {
+  "id": 49,
+  "v": "N",
+  "fix": "G3h. rq"
+ },
+ {
+  "id": 68,
+  "v": "D5e F#4e C4e B3s C4s D4s C4s B3s A3s",
+  "fix": ""
+ }
+]

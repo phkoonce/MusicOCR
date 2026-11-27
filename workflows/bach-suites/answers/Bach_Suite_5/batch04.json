@@ -1,0 +1,61 @@
+[
+ {
+  "id": 57,
+  "v": "A"
+ },
+ {
+  "id": 58,
+  "v": "A"
+ },
+ {
+  "id": 59,
+  "v": "A"
+ },
+ {
+  "id": 60,
+  "v": "A"
+ },
+ {
+  "id": 61,
+  "v": "A"
+ },
+ {
+  "id": 62,
+  "v": "A"
+ },
+ {
+  "id": 63,
+  "v": "A"
+ },
+ {
+  "id": 64,
+  "v": "?"
+ },
+ {
+  "id": 65,
+  "v": "N",
+  "fix": "Bb4q G4q"
+ },
+ {
+  "id": 66,
+  "v": "A"
+ },
+ {
+  "id": 67,
+  "v": "A"
+ },
+ {
+  "id": 68,
+  "v": "N",
+  "fix": "grace:G4e grace:+G3e C5e B4e A4e G4e C5e Eb4e F4e D4e"
+ },
+ {
+  "id": 69,
+  "v": "N",
+  "fix": "G4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet) Ab4e(3-tuplet) G4e(3-tuplet) F4e(3-tuplet)"
+ },
+ {
+  "id": 70,
+  "v": "A"
+ }
+]

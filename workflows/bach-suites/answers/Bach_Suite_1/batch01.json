@@ -1,0 +1,62 @@
+[
+ {
+  "id": 15,
+  "v": "N",
+  "fix": "F#3s C4s D4s C4s D4s C4s D4s C4s F#3s C4s D4s C4s D4s C4s D4s C4s"
+ },
+ {
+  "id": 16,
+  "v": "N",
+  "fix": "G3s B3s F4s E4s F4s B3s F4s B3s G3s B3s F4s E4s F4s B3s F4s B3s"
+ },
+ {
+  "id": 17,
+  "v": "N",
+  "fix": "G3s C4s E4s D4s E4s C4s E4s C4s G3s C4s E4s D4s E4s C4s E4s C4s"
+ },
+ {
+  "id": 18,
+  "v": "?"
+ },
+ {
+  "id": 19,
+  "v": "?"
+ },
+ {
+  "id": 20,
+  "v": "N",
+  "fix": "C#3s A3s E4s F#4s G4s E4s F#4s G4s C#3s A3s E4s F#4s G4s E4s F#4s G4s"
+ },
+ {
+  "id": 21,
+  "v": "A"
+ },
+ {
+  "id": 22,
+  "v": "A"
+ },
+ {
+  "id": 23,
+  "v": "A"
+ },
+ {
+  "id": 24,
+  "v": "A"
+ },
+ {
+  "id": 25,
+  "v": "A"
+ },
+ {
+  "id": 26,
+  "v": "A"
+ },
+ {
+  "id": 27,
+  "v": "A"
+ },
+ {
+  "id": 28,
+  "v": "A"
+ }
+]

@@ -1,0 +1,16 @@
+{
+ "changed": [],
+ "inserts": [
+  {
+   "after": 67,
+   "first_on_line": false,
+   "text": "grace:D4e A4q~ A4s F#4s G4s A4s D4s E4s F#4s G4s A4s F#4s D4s C4s",
+   "xml": "<measure><note><grace /><pitch><step>D</step><octave>4</octave></pitch><voice>1</voice><type>eighth</type></note><note><pitch><step>A</step><octave>4</octave></pitch><duration>10080</duration><tie type=\"start\" /><voice>1</voice><type>quarter</type><notations><tied type=\"start\" /></notations></note><note><pitch><step>A</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">begin</beam><beam number=\"2\">begin</beam></note><note><pitch><step>F</step><alter>1</alter><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><accidental>sharp</accidental><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>G</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>A</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">end</beam><beam number=\"2\">end</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">begin</beam><beam number=\"2\">begin</beam></note><note><pitch><step>E</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>F</step><alter>1</alter><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>G</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">end</beam><beam number=\"2\">end</beam></note><note><pitch><step>A</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">begin</beam><beam number=\"2\">begin</beam></note><note><pitch><step>F</step><alter>1</alter><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>C</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">end</beam><beam number=\"2\">end</beam></note></measure>",
+   "line": 22
+  }
+ ],
+ "doubts": [
+  "bar 79: kept 'G3s D4s F#4s A4s C5s A4s F#4s D4s grace:D4e grace:G3e B4e. D4s E4s G4s A4s C#5s', a second look read 'G3s D4s F#4s A4s C5s A4s F#4s D4s grace:G3e+D4e B4e. D4s E4s G4s A4s C#5s'",
+  "bar 101: kept 'D3h re re', a second look read 'D3h re'"
+ ]
+}

@@ -1,0 +1,62 @@
+[
+ {
+  "id": 15,
+  "v": "R"
+ },
+ {
+  "id": 16,
+  "v": "?"
+ },
+ {
+  "id": 17,
+  "v": "N",
+  "fix": "D3s C#5s Bb4s A4s Bb4s C#5s Bb4s A4s Bb4s C#5s Bb4s A4s Bb4s C#5s Bb4s A4s"
+ },
+ {
+  "id": 18,
+  "v": "?"
+ },
+ {
+  "id": 19,
+  "v": "A"
+ },
+ {
+  "id": 20,
+  "v": "A"
+ },
+ {
+  "id": 21,
+  "v": "N",
+  "fix": "Bb3e D5e Cb5s Bb4s A4e Bb4e D5e Cb5s Bb4s A4e"
+ },
+ {
+  "id": 22,
+  "v": "N",
+  "fix": "Bb4e Cb5e Bb4s Ab4s G4e Ab4e Cb5e Bb4s Ab4s G4e"
+ },
+ {
+  "id": 23,
+  "v": "A"
+ },
+ {
+  "id": 24,
+  "v": "N",
+  "fix": "Ab4s Gb4s Ab4s Gb4s Fb4s Eb4s D4s Eb4s grace:Bb3e D4q. Eb4e"
+ },
+ {
+  "id": 25,
+  "v": "R"
+ },
+ {
+  "id": 26,
+  "v": "R"
+ },
+ {
+  "id": 27,
+  "v": "A"
+ },
+ {
+  "id": 28,
+  "v": "B"
+ }
+]

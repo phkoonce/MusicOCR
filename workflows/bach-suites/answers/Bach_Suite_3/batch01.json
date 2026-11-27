@@ -1,0 +1,63 @@
+[
+ {
+  "id": 15,
+  "v": "N",
+  "fix": "G3s E4s C5s E4s G3s E4s E5s E4s G3s E4s C5s E4s"
+ },
+ {
+  "id": 16,
+  "v": "N",
+  "fix": "G3s F4s B4s F4s G3s F4s D5s F4s G3s F4s B4s F4s"
+ },
+ {
+  "id": 17,
+  "v": "N",
+  "fix": "G3s Eb4s C5s Eb4s G3s Eb4s Eb5s Eb4s G3s Eb4s C5s Eb4s"
+ },
+ {
+  "id": 18,
+  "v": "A"
+ },
+ {
+  "id": 19,
+  "v": "N",
+  "fix": "grace:C3e C5q~ C5s E4s C5s D5s C5s E4s C5s D5s"
+ },
+ {
+  "id": 20,
+  "v": "N",
+  "fix": "grace:C3e B4q~ B4s C5s B4s C5s B4s(3-tuplet) C5s(3-tuplet) B4s(3-tuplet) C5s(3-tuplet) B4s(3-tuplet) C5s(3-tuplet)"
+ },
+ {
+  "id": 21,
+  "v": "?"
+ },
+ {
+  "id": 22,
+  "v": "?"
+ },
+ {
+  "id": 23,
+  "v": "?"
+ },
+ {
+  "id": 24,
+  "v": "?"
+ },
+ {
+  "id": 25,
+  "v": "B"
+ },
+ {
+  "id": 26,
+  "v": "B"
+ },
+ {
+  "id": 27,
+  "v": "B"
+ },
+ {
+  "id": 28,
+  "v": "B"
+ }
+]

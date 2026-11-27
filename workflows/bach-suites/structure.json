@@ -1,0 +1,316 @@
+{
+ "Bach_Suite_1": {
+  "ossia": [
+   41,
+   42,
+   43,
+   47,
+   48,
+   49
+  ],
+  "words": {
+   "22": [
+    "tempo",
+    "a tempo"
+   ],
+   "112": [
+    "tempo",
+    "a tempo"
+   ],
+   "16": [
+    "cresc",
+    "cresc."
+   ]
+  },
+  "movements": [
+   [
+    1,
+    "PRELUDE",
+    "Allegro moderato"
+   ],
+   [
+    50,
+    "ALLEMANDE",
+    "Molto moderato"
+   ],
+   [
+    83,
+    "COURANTE",
+    "Allegro non troppo"
+   ],
+   [
+    127,
+    "SARABANDE",
+    "Lento"
+   ],
+   [
+    143,
+    "MINUETTO I",
+    "Moderato"
+   ],
+   [
+    167,
+    "MINUETTO II",
+    "poco più mosso"
+   ],
+   [
+    191,
+    "GIGUE",
+    "Vivace"
+   ]
+  ]
+ },
+ "Bach_Suite_2": {
+  "ossia": [],
+  "keys": {
+   "65": -1,
+   "67": null
+  },
+  "words": {
+   "83": [
+    "eljo",
+    ""
+   ]
+  },
+  "movements": [
+   [
+    1,
+    "PRELUDE",
+    "Allegro moderato"
+   ],
+   [
+    65,
+    "ALLEMANDE",
+    "Molto moderato"
+   ],
+   [
+    90,
+    "COURANTE",
+    "Allegro non troppo"
+   ],
+   [
+    124,
+    "SARABANDE",
+    "Lento"
+   ],
+   [
+    152,
+    "MINUETTO I",
+    "Moderato"
+   ],
+   [
+    176,
+    "MINUETTO II",
+    "più mosso"
+   ],
+   [
+    200,
+    "GIGUE",
+    "Vivace"
+   ]
+  ]
+ },
+ "Bach_Suite_3": {
+  "ossia": [],
+  "keys": {},
+  "words": {
+   "208": [
+    "elzo",
+    ""
+   ]
+  },
+  "movements": [
+   [
+    1,
+    "PRELUDE",
+    "Allegro"
+   ],
+   [
+    88,
+    "ALLEMANDE",
+    "Quasi maestoso"
+   ],
+   [
+    115,
+    "COURANTE",
+    "Allegro non troppo"
+   ],
+   [
+    197,
+    "SARABANDE",
+    "Lento"
+   ],
+   [
+    221,
+    "BOURRÉE I",
+    "Allegro moderato"
+   ],
+   [
+    251,
+    "BOURRÉE II",
+    "Tranquillo"
+   ],
+   [
+    277,
+    "GIGUE",
+    "Vivace"
+   ]
+  ]
+ },
+ "Bach_Suite_4": {
+  "ossia": [
+   89,
+   90
+  ],
+  "keys": {
+   "48": -3,
+   "55": null,
+   "295": -3,
+   "298": null
+  },
+  "words": {
+   "117": [
+    "Va",
+    ""
+   ]
+  },
+  "movements": [
+   [
+    1,
+    "PRELUDE",
+    "Maestoso"
+   ],
+   [
+    91,
+    "ALLEMANDE",
+    "Molto moderato"
+   ],
+   [
+    133,
+    "COURANTE",
+    "Allegro non troppo"
+   ],
+   [
+    199,
+    "SARABANDE",
+    "Lento"
+   ],
+   [
+    231,
+    "BOURRÉE I",
+    "Allegro moderato"
+   ],
+   [
+    281,
+    "BOURRÉE II",
+    "Tranquillo"
+   ],
+   [
+    295,
+    "GIGUE",
+    "Vivace"
+   ]
+  ]
+ },
+ "Bach_Suite_5": {
+  "ossia": [],
+  "keys": {
+   "243": -3,
+   "245": null
+  },
+  "times": {
+   "356": null
+  },
+  "words": {
+   "278": [
+    "elf",
+    ""
+   ]
+  },
+  "movements": [
+   [
+    1,
+    "PRELUDE",
+    "Adagio non troppo"
+   ],
+   [
+    224,
+    "ALLEMANDE",
+    "Maestoso"
+   ],
+   [
+    261,
+    "COURANTE",
+    "Moderato"
+   ],
+   [
+    284,
+    "SARABANDE",
+    "Lento"
+   ],
+   [
+    304,
+    "GAVOTTE I",
+    "Allegro moderato"
+   ],
+   [
+    342,
+    "GAVOTTE II",
+    ""
+   ],
+   [
+    366,
+    "GIGUE",
+    "Allegretto"
+   ]
+  ],
+  "triplets": [
+   [
+    342,
+    365
+   ]
+  ],
+  "manual": {
+   "243": "grace:G3e D5q~ D5s C5s D5s Eb5s B4e. Ab4s G4e. F4s",
+   "356": "C5q~ C5e(3-tuplet) Bb4e(3-tuplet) Ab4e(3-tuplet) G4e(3-tuplet) Ab4e(3-tuplet) Bb4e(3-tuplet) Ab4e(3-tuplet) G4e(3-tuplet) F4e(3-tuplet)"
+  }
+ },
+ "Bach_Suite_6": {
+  "ossia": [],
+  "keys": {
+   "145": -2,
+   "149": null
+  },
+  "words": {
+   "68": [
+    "Loco",
+    "loco"
+   ]
+  },
+  "movements": [
+   [
+    1,
+    "PRELUDE",
+    "Allegro moderato"
+   ],
+   [
+    103,
+    "ALLEMANDE",
+    "Quasi Adagio con tranquillezza"
+   ],
+   [
+    145,
+    "COURANTE",
+    "Allegro non troppo"
+   ],
+   [
+    217,
+    "GIGUE",
+    "Vivace"
+   ]
+  ],
+  "manual": {
+   "216": "D4e Bb3s C4s D4e F3e A3e Eb3e"
+  }
+ }
+}

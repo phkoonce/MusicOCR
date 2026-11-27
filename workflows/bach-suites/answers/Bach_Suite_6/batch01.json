@@ -1,0 +1,65 @@
+[
+ {
+  "id": 15,
+  "v": "B"
+ },
+ {
+  "id": 16,
+  "v": "B"
+ },
+ {
+  "id": 17,
+  "v": "B"
+ },
+ {
+  "id": 18,
+  "v": "?"
+ },
+ {
+  "id": 19,
+  "v": "B"
+ },
+ {
+  "id": 20,
+  "v": "A"
+ },
+ {
+  "id": 21,
+  "v": "N",
+  "fix": "Ab3e F3e G3e Ab3e F3e Eb3e D3e F3e G3e Ab3e F3e D3e"
+ },
+ {
+  "id": 22,
+  "v": "N",
+  "fix": "Bb3e +Bb2e D3e F3e Ab3e Bb3e D4e F4e Bb4e F4e D4e Bb3e F3e"
+ },
+ {
+  "id": 23,
+  "v": "N",
+  "fix": "G3e Eb3e F3e G3e Bb3e F3e G3e Eb3e F3e G3e Eb4e F3e"
+ },
+ {
+  "id": 24,
+  "v": "N",
+  "fix": "G3e Eb3e F3e G3e Bb3e F3e G3e Eb3e F3e G3e Eb4e C4e"
+ },
+ {
+  "id": 25,
+  "v": "N",
+  "fix": "A3e F3e G3e A3e C4e D4e Eb4e C4e Bb3e A3e C4e G3e"
+ },
+ {
+  "id": 26,
+  "v": "?"
+ },
+ {
+  "id": 27,
+  "v": "N",
+  "fix": "D4e Bb3e C4e D4e F4e C4e D4e Bb3e C4e D4e Bb4e C4e"
+ },
+ {
+  "id": 28,
+  "v": "N",
+  "fix": "D4e Bb3e C4e D4e F4e C4e D4e Bb3e C4e D4e Bb4e G4e"
+ }
+]

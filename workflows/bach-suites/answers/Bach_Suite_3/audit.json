@@ -1,0 +1,88 @@
+{
+ "changed": [
+  {
+   "bar": 88,
+   "was": "G4s A4s B4s rh rq rs",
+   "now": "G4s A4s B4s"
+  },
+  {
+   "bar": 102,
+   "was": "D5s E5s F#5s rh rq rs",
+   "now": "D5s E5s F#5s"
+  },
+  {
+   "bar": 189,
+   "was": "rw",
+   "now": "G3e Eb4e C4e Eb4e B3e Eb4e"
+  },
+  {
+   "bar": 196,
+   "was": "C5h re re",
+   "now": "C5h re"
+  },
+  {
+   "bar": 259,
+   "was": "Eb4h. rq",
+   "now": "Eb4h."
+  },
+  {
+   "bar": 276,
+   "was": "C4h. rq",
+   "now": "C4h."
+  },
+  {
+   "bar": 277,
+   "was": "G4e rq",
+   "now": "G4e"
+  }
+ ],
+ "inserts": [
+  {
+   "after": 87,
+   "first_on_line": false,
+   "text": "C3h.",
+   "xml": "<measure><note><pitch><step>C</step><octave>3</octave></pitch><duration>30240</duration><voice>1</voice><type>half</type><dot /></note></measure>",
+   "line": 24
+  },
+  {
+   "after": 114,
+   "first_on_line": true,
+   "text": "C5e",
+   "xml": "<measure><note><pitch><step>C</step><octave>5</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type></note></measure>",
+   "line": 37
+  },
+  {
+   "after": 114,
+   "first_on_line": true,
+   "text": "C5e G4e E4e C4e G3e E3e",
+   "xml": "<measure><note><pitch><step>C</step><octave>5</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>G</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>E</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>C</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>G</step><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>E</step><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note></measure>",
+   "line": 37
+  },
+  {
+   "after": 115,
+   "first_on_line": false,
+   "text": "D5e B4e G4e D4e B3e G3e",
+   "xml": "<measure><note><pitch><step>D</step><octave>5</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>B</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>G</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>B</step><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>G</step><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note></measure>",
+   "line": 37
+  },
+  {
+   "after": 191,
+   "first_on_line": false,
+   "text": "F4e G3e B3e D4e F4e B4e",
+   "xml": "<measure><note><pitch><step>F</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>G</step><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>B</step><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>F</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>B</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note></measure>",
+   "line": 48
+  },
+  {
+   "after": 366,
+   "first_on_line": false,
+   "text": "B4s D4s A4s D4s B4s D4s",
+   "xml": "<measure><note><pitch><step>B</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">begin</beam><beam number=\"2\">begin</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>A</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>B</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">continue</beam><beam number=\"2\">continue</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type><beam number=\"1\">end</beam><beam number=\"2\">end</beam></note></measure>",
+   "line": 77
+  }
+ ],
+ "doubts": [
+  "bar 95: may not be in the print (kept): rs. C4t D4s E4s F4s A3s B3s F4s E4s C3s F#4s C3s G4s C3s A4s G3s",
+  "bar 101: kept 'G4s B4t C5t D5s G4t A4t B4s G4s D4s F#4s G3q~ G3e', a second look read 'G4s B4t C5t D5s G4t A4t B4s G4s D4s F#4s G3q~ G3s'",
+  "bar 114: kept 'C3s C5t B4t C5s G4t F4t G4s E4t D4t E4s C4s grace:C3s grace:E4s C3q. +C5q.~ C3e +C5e', a second look read 'C3s C5t B4t C5s G4t F4t G4s E4t D4t E4s C4s grace:C3s grace:E4s C3+C5q..~ C3+C5s'"
+ ]
+}

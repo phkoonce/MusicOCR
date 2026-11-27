@@ -1,0 +1,45 @@
+{
+ "changed": [
+  {
+   "bar": 126,
+   "was": "rw",
+   "now": "Bb4q. G3e Ab3s G3s Ab3s Bb3s Ab3s Bb3s grace:C4e Bb3s Ab3t(3-tuplet) Bb3t(3-tuplet) C4t(3-tuplet)"
+  }
+ ],
+ "inserts": [
+  {
+   "after": 3,
+   "first_on_line": false,
+   "text": "G4e Bb3e Eb4e G4e A4e Bb4e F4e Bb3e D4e F4e A4e Bb4e",
+   "xml": "<measure><note><pitch><step>G</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>B</step><alter>-1</alter><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">continue</beam></note><note><pitch><step>E</step><alter>-1</alter><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>G</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>A</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">continue</beam></note><note><pitch><step>B</step><alter>-1</alter><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>F</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>B</step><alter>-1</alter><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">continue</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>F</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>A</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">continue</beam></note><note><pitch><step>B</step><alter>-1</alter><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note></measure>",
+   "line": 0
+  },
+  {
+   "after": 55,
+   "first_on_line": false,
+   "text": "C4e Eb3e Ab3e C4e D4e Eb4e Bb3e Eb3e G3e Bb3e D4e Eb4e",
+   "xml": "<measure><note><pitch><step>C</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>E</step><alter>-1</alter><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">continue</beam></note><note><pitch><step>A</step><alter>-1</alter><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><accidental>flat</accidental><beam number=\"1\">end</beam></note><note><pitch><step>C</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">continue</beam></note><note><pitch><step>E</step><alter>-1</alter><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>B</step><alter>-1</alter><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>E</step><alter>-1</alter><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">continue</beam></note><note><pitch><step>G</step><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note><note><pitch><step>B</step><alter>-1</alter><octave>3</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">begin</beam></note><note><pitch><step>D</step><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">continue</beam></note><note><pitch><step>E</step><alter>-1</alter><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type><beam number=\"1\">end</beam></note></measure>",
+   "line": 18
+  },
+  {
+   "after": 144,
+   "first_on_line": true,
+   "text": "Bb4e",
+   "xml": "<measure><note><pitch><step>B</step><alter>-1</alter><octave>4</octave></pitch><duration>5040</duration><voice>1</voice><type>eighth</type></note></measure>",
+   "line": 56
+  },
+  {
+   "after": 216,
+   "first_on_line": false,
+   "text": "Bb2h",
+   "xml": "<measure><note><pitch><step>B</step><alter>-1</alter><octave>2</octave></pitch><duration>20160</duration><voice>1</voice><type>half</type></note></measure>",
+   "line": 75
+  }
+ ],
+ "doubts": [
+  "bar 57: kept 'Bb3e +Bb2e D3e F3e Ab3e Bb3e D4e F4e Bb4e F4e D4e Bb3e F3e', a second look read 'Bb3e+Bb2e D3e F3e Ab3e Bb3e D4e F4e Bb4e F4e D4e Bb3e Ab3e'",
+  "bar 58: kept 'G3e Eb3e F3e G3e Bb3e F3e G3e Eb3e F3e G3e Eb4e F3e', a second look read 'G3e Eb3e F3e G3e Bb3e F3e G3e Eb3e F3e G3e F4e F3e'",
+  "bar 59: kept 'G3e Eb3e F3e G3e Bb3e F3e G3e Eb3e F3e G3e Eb4e C4e', a second look read 'G3e Eb3e F3e G3e Bb3e F3e G3e Eb3e F3e G3e F4e C4e'",
+  "bar 102: kept 'F4e D4e Bb3e D4e Bb3e F3e Bb2e +Bb3e F3e D4e +F4e Bb4q.', a second look read 'F4e D4e Bb3e D4e Bb3e F3e Bb2+Bb3e~ F3+Bb3e D4+F4e Bb4q.'"
+ ]
+}

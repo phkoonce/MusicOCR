@@ -1,0 +1,123 @@
+[
+ {
+  "id": 5,
+  "v": "N",
+  "fix": "Eb5q C3e. D5s C5e. Bb4s A4e. G4s"
+ },
+ {
+  "id": 6,
+  "v": "N",
+  "fix": "G3q +G4q G4e"
+ },
+ {
+  "id": 7,
+  "v": "N",
+  "fix": "Bb4s C5s A4s Bb4s C5s A4s"
+ },
+ {
+  "id": 8,
+  "v": "N",
+  "fix": "E4s C5s G4s Ab4s Bb4s G4s"
+ },
+ {
+  "id": 17,
+  "v": "B3s A3s G3s B3s D4s F4s",
+  "fix": ""
+ },
+ {
+  "id": 37,
+  "v": "grace:G3e D5q~ D5s C5s D5s Eb5s B4e. Ab4s G4e. F4s",
+  "fix": "Program read a whole rest. The line has three flats; the parenthesised low note is included as a grace note, and the eighth-note D5 pickup before the barline is left out."
+ },
+ {
+  "id": 40,
+  "v": "N",
+  "fix": "grace:Eb4e A4q~ A4s A4s Bb4s C5s F4e. G4t A4t A4e. G4t A4t"
+ },
+ {
+  "id": 44,
+  "v": "N",
+  "fix": "Db3e~ Db3t G3t Ab3t Bb3t C4s Bb3s Ab4e G4q F4s E4s F4e"
+ },
+ {
+  "id": 45,
+  "v": "N",
+  "fix": "C5e. G4s Eb4e. C4s C3q."
+ },
+ {
+  "id": 48,
+  "v": "?",
+  "fix": "",
+  "note": "Bar count mismatch: the image shows 3 bars, not 1, so I can't tell which one is bar 265. Left to right they read: (1) Ab4q. F4e grace:C5e B4q C5q D4q. G4e | (2) grace:G3e Eb4q. D4e C4e D4e Eb4e F4e G4e Ab4e C5e Bb4e | (3) grace:Eb4e Bb4q. Ab4e G4e F4e Eb4e D4e D4e Eb4e A3e. F4s. Check the bar segmentation and numbering for this line."
+ },
+ {
+  "id": 49,
+  "v": "N",
+  "fix": "grace:G4e Eb5q. D5e C5e Bb4e A4e Bb4e F#4q. G4e"
+ },
+ {
+  "id": 51,
+  "v": "N",
+  "fix": "grace:F3e D5q. Eb5e D5e C5e B4e C5s D5s G4q. Ab4e"
+ },
+ {
+  "id": 52,
+  "v": "N",
+  "fix": "E4q. F4e G4e Ab4e Bb4e C5e Db5q C5q"
+ },
+ {
+  "id": 53,
+  "v": "N",
+  "fix": "grace:Eb4e Ab4e G4e F4e Eb4e G4e A4e G4e A4e A4q. G4s A4s"
+ },
+ {
+  "id": 64,
+  "v": "N",
+  "fix": "D5q G4q Bb4e A4e G4e F#4e"
+ },
+ {
+  "id": 72,
+  "v": "N",
+  "fix": "G4e(3-tuplet) F4e(3-tuplet) Eb4e(3-tuplet) D4e(3-tuplet) Eb4e(3-tuplet) F4e(3-tuplet) Eb4e(3-tuplet) D4e(3-tuplet) C4e(3-tuplet) B3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet)"
+ },
+ {
+  "id": 77,
+  "v": "Y",
+  "fix": ""
+ },
+ {
+  "id": 80,
+  "v": "N",
+  "fix": "C5q.~ C5e Bb4e Ab4e G4e Ab4e Bb4e Ab4e G4e F4e"
+ },
+ {
+  "id": 81,
+  "v": "N",
+  "fix": "E4e F4e G4e C4e D4e E4e F4e E4e F4e G4e F4e E4e"
+ },
+ {
+  "id": 84,
+  "v": "N",
+  "fix": "B3e F4e G4e Ab4e G4e F4e C5e Bb4e Ab4e G4e F4e E4e"
+ },
+ {
+  "id": 85,
+  "v": "N",
+  "fix": "F4e G4e Ab4e G4e Ab4e F4e B4e C5e D5e C5e D5e B4e"
+ },
+ {
+  "id": 86,
+  "v": "C5e Bb4e Ab4e G4e F4e Eb4e Ab4e G4e F4e Eb4e D4e C4e",
+  "fix": "12 eighths; the bar was unread"
+ },
+ {
+  "id": 87,
+  "v": "B3e C4e D4e G3e B3e D4e G4e F4e G4e Ab4e G4e F4e",
+  "fix": "12 eighths; B natural holds through the bar"
+ },
+ {
+  "id": 88,
+  "v": "G4e F4e Eb4e D4e Eb4e F4e Eb4e D4e C4e B3e C4e D4e",
+  "fix": "12 eighths; B natural near the end"
+ }
+]

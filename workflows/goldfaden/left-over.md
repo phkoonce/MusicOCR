@@ -1,0 +1,66 @@
+# Bars still to check by hand
+
+- horn 3 score bar 5 (page 1): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 4 score bar 19 (page 1): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 4 score bar 83 (page 3): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 4 score bar 140 (page 5): part is wrong but was not changed (the files already agree here)
+- horn 4 score bar 141 (page 5): part is wrong but was not changed (the files already agree here)
+- horn 4 score bar 142 (page 5): part is wrong but was not changed (the files already agree here)
+- horn 1 score bar 147 (page 5): neither reading, print has: Bb4h.~
+- horn 1 score bar 148 (page 5): neither reading, print has: Bb4q. rq Bb4e
+- horn 4 score bar 148 (page 5): neither reading, print has: G3h.~
+- horn 4 score bar 149 (page 5): neither reading, print has: G3q. rq D4e
+- horn 1 score bar 161 (page 6): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 204 (page 7): neither reading, print has: re D4e Eb4e F4e Ab4e G4e
+- horn 2 score bar 205 (page 7): part is wrong but was not changed (the files already agree here)
+- horn 3 score bar 205 (page 7): neither reading, print has: F4h.
+- horn 2 score bar 206 (page 7): part is wrong but was not changed (the files already agree here)
+- horn 3 score bar 206 (page 7): neither reading, print has: re D4e Eb4e F4e F4e G4e
+- horn 2 score bar 207 (page 7): part is wrong but was not changed (the files already agree here)
+- horn 3 score bar 207 (page 7): neither reading, print has: Ab4q.~ Ab4e F4e G4e
+- horn 2 score bar 208 (page 7): neither reading, print has: F4q. Eb4q.
+- horn 1 score bar 318 (page 11): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 2 score bar 318 (page 11): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 318 (page 11): part is wrong but was not changed (the notes add up to 5/8 of a whole note; the bar is 3/4)
+- horn 4 score bar 318 (page 11): part is wrong but was not changed (the notes add up to 5/8 of a whole note; the bar is 3/4)
+- horn 1 score bar 319 (page 11): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 325 (page 11): neither reading, print has: Eb5e. C5s Ab4s rs C5e
+- horn 1 score bar 352 (page 12): unclear
+- horn 3 score bar 363 (page 13): unclear
+- horn 3 score bar 364 (page 13): score is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 371 (page 13): unclear
+- horn 3 score bar 373 (page 13): score is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 400 (page 14): neither reading, print has: re G4e G4e re A4e G4e
+- horn 4 score bar 401 (page 15): neither reading, print has: C4q re E3q.
+- horn 1 score bar 402 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 403 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 404 (page 15): part is wrong but was not changed (the notes add up to 3/4 of a whole note; the bar is 1/2)
+- horn 1 score bar 405 (page 15): part is wrong but was not changed (the notes add up to 3/4 of a whole note; the bar is 1/2)
+- horn 1 score bar 406 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 407 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 408 (page 15): part is wrong but was not changed (the notes add up to 3/4 of a whole note; the bar is 1/2)
+- horn 1 score bar 409 (page 15): part is wrong but was not changed (the notes add up to 3/4 of a whole note; the bar is 1/2)
+- horn 1 score bar 410 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 411 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 412 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 412 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 413 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 413 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 414 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 414 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 1 score bar 415 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 415 (page 15): part is wrong but was not changed (the notes add up to 3/4 of a whole note; the bar is 1/2)
+- horn 3 score bar 416 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 417 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 418 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 2 score bar 419 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 419 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 4 score bar 419 (page 15): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 2 score bar 420 (page 15): part is wrong but was not changed (the notes add up to 1/8 of a whole note; the bar is 1/2)
+- horn 3 score bar 420 (page 15): part is wrong but was not changed (the notes add up to 1/8 of a whole note; the bar is 1/2)
+- horn 4 score bar 420 (page 15): part is wrong but was not changed (the notes add up to 1/8 of a whole note; the bar is 1/2)
+- horn 4 score bar 463 (page 16): neither reading, print has: Bb4e A4e Ab4q~
+- horn 3 score bar 518 (page 19): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 4 score bar 518 (page 19): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 2 score bar 616 (page 22): part is wrong but was not changed (a slur or hairpin crosses the bar line)
+- horn 3 score bar 891 (page 32): score is wrong but was not changed (a slur or hairpin crosses the bar line)

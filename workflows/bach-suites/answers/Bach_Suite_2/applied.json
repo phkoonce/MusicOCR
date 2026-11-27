@@ -1,0 +1,129 @@
+{
+ "changed": [
+  {
+   "bar": 14,
+   "page": 1,
+   "was": "F#3s A3s Bb3s C4s D#3s C4s Bb3s A3s F#4s Eb4s D4s C4s",
+   "now": "F#3s A3s Bb3s C4s D3s C4s Bb3s A3s F#4s Eb4s D4s C4s"
+  },
+  {
+   "bar": 54,
+   "page": 2,
+   "was": "rw",
+   "now": "grace:C#3e G4e. F4s E4s D4s C#4s B3s A3s G3s F3s E3s"
+  },
+  {
+   "bar": 57,
+   "page": 2,
+   "was": "F3s A3s D4s F4s A4s D4s F4s A4s D5s B4s C5s A4s",
+   "now": "F3s A3s D4s F4s A4s D4s F4s A4s D5s Bb4s C5s A4s"
+  },
+  {
+   "bar": 65,
+   "page": 3,
+   "was": "rw",
+   "now": "A4e Bb4s A4s G4s F4s E4s D4s D4s C#4s D4s E4s A3e Bb3s G3s"
+  },
+  {
+   "bar": 77,
+   "page": 3,
+   "was": "E4s rh...",
+   "now": "E4s"
+  },
+  {
+   "bar": 78,
+   "page": 3,
+   "was": "grace:A3e~ E4e. F4s G4s E4s F4s A4s C#4s D4s E4s Bb3s A3e. G3s",
+   "now": "grace:A3e E4e. F4s G4s E4s F4s A4s C#4s D4s E4s Bb3s A3e. G3s"
+  },
+  {
+   "bar": 93,
+   "page": 4,
+   "was": "F4s D4s E4s C4s Bb3s A3s B3s A4s G4s F4s E4s D4s",
+   "now": "F4s D4s E4s C4s Bb3s A3s Bb3s A4s G4s F4s E4s D4s"
+  },
+  {
+   "bar": 122,
+   "page": 4,
+   "was": "G#4s D5s E5s F5s E5s D5s C5s D5s A4s D5s A4s C5s",
+   "now": "G#4s D5s E5s F5s E5s D5s C#5s D5s A4s D5s A4s C#5s"
+  },
+  {
+   "bar": 123,
+   "page": 4,
+   "was": "D5s A4s F4s A4s D4s F4s A3s D4s D3e re",
+   "now": "D5s A4s F4s A4s D4s F4s A3s D4s D3e. rs"
+  },
+  {
+   "bar": 148,
+   "page": 5,
+   "was": "grace:F4e A4s B4s C5s B4s grace:F#4e C#5q. B4s A4s",
+   "now": "grace:F4e A4s B4s C5s B4s grace:F#4e C5q. B4s A4s"
+  },
+  {
+   "bar": 213,
+   "page": 6,
+   "was": "E3e C#4s Bb4e rs",
+   "now": "E3e C#4e Bb4e"
+  },
+  {
+   "bar": 219,
+   "page": 6,
+   "was": "Bb4s C5s D5s B4s C5s G4s",
+   "now": "Bb4s C5s D5s Bb4s C5s G4s"
+  },
+  {
+   "bar": 230,
+   "page": 6,
+   "was": "C3s(3-tuplet) C4s(3-tuplet) E5s(3-tuplet) D5s C5s B4s G#4s",
+   "now": "C4s +C3s E5s D5s C5s B4s G#4s"
+  },
+  {
+   "bar": 233,
+   "page": 6,
+   "was": "C5e rq",
+   "now": "C5e"
+  },
+  {
+   "bar": 263,
+   "page": 6,
+   "was": "grace:G3s D4s Eb4s F4s D4s G4s E4s",
+   "now": "grace:G3e D4s E4s F4s D4s G4s E4s"
+  },
+  {
+   "bar": 274,
+   "page": 6,
+   "was": "Bb4s A4s G4s F4s Eb4s D4s",
+   "now": "Bb4s A4s G4s F4s E4s D4s"
+  }
+ ],
+ "confirmed": 30,
+ "left": [
+  "bar 50 (page 2): not settled (C#4s E4s G4s A4s Bb4e. A4s G4s F#4s G4s E5s)",
+  "bar 90 (page 4): flagged by the pipeline, though the reading was judged right",
+  "bar 106 (page 4): not settled (A4s E4s C#4s E4s A3s C#4s E4s G#4s A4e.)",
+  "bar 107 (page 4): flagged by the pipeline, though the reading was judged right",
+  "bar 165 (page 5): not settled (A4e G4e A4e F4e D5q)",
+  "bar 200 (page 6): flagged by the pipeline, though the reading was judged right"
+ ],
+ "homr_only": [
+  {
+   "after_bar": 175,
+   "homr": [
+    "rw"
+   ]
+  },
+  {
+   "after_bar": 199,
+   "homr": [
+    "D4h. +B4h."
+   ]
+  },
+  {
+   "after_bar": 276,
+   "homr": [
+    "D5q"
+   ]
+  }
+ ]
+}

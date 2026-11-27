@@ -1,0 +1,43 @@
+{
+ "changed": [
+  {
+   "bar": 66,
+   "was": "F3s A3s D4s F3s E3e C#4e D4e. E4s F4s G4s A4s B4s",
+   "now": "F3s A3s D4s F3s E3e C#4e D4e. E4s F4s G4s A4s Bb4s"
+  },
+  {
+   "bar": 90,
+   "was": "D5s rh re.",
+   "now": "D5s"
+  },
+  {
+   "bar": 107,
+   "was": "E5s rh re.",
+   "now": "E5s"
+  },
+  {
+   "bar": 200,
+   "was": "A4e rq",
+   "now": "A4e"
+  }
+ ],
+ "inserts": [
+  {
+   "after": 64,
+   "first_on_line": true,
+   "text": "A4s",
+   "xml": "<measure><note><pitch><step>A</step><octave>4</octave></pitch><duration>2520</duration><voice>1</voice><type>16th</type></note></measure>",
+   "line": 21
+  },
+  {
+   "after": 276,
+   "first_on_line": false,
+   "text": "D5q",
+   "xml": "<measure><note><pitch><step>D</step><octave>5</octave></pitch><duration>10080</duration><voice>1</voice><type>quarter</type></note></measure>",
+   "line": 67
+  }
+ ],
+ "doubts": [
+  "bar 106: kept 'A4s E4s C#4s E4s A3s C#4s E4s G#4s A4e re', a second look read 'A4s E4s C#4s E4s A3s C#4s E4s G#4s A4e.'"
+ ]
+}

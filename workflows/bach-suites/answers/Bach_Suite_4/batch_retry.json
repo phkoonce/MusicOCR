@@ -1,0 +1,197 @@
+[
+ {
+  "id": 1,
+  "v": "N",
+  "fix": "Eb3e Eb5e Bb4e G4e Bb4e Eb4e G4e Bb3e"
+ },
+ {
+  "id": 2,
+  "v": "N",
+  "fix": "Eb3e Db5e Bb4e G4e Bb4e Eb4e G4e Bb3e"
+ },
+ {
+  "id": 3,
+  "v": "N",
+  "fix": "R"
+ },
+ {
+  "id": 4,
+  "v": "N",
+  "fix": "Eb3e C5e Ab4e Eb4e Ab4e C4e Eb4e Ab3e"
+ },
+ {
+  "id": 14,
+  "v": "N",
+  "fix": "R"
+ },
+ {
+  "id": 16,
+  "v": "N",
+  "fix": "R"
+ },
+ {
+  "id": 18,
+  "v": "N",
+  "fix": "G4s Bb4s G4s F#4s rq rq rq"
+ },
+ {
+  "id": 34,
+  "v": "N",
+  "fix": "G3e(3-tuplet) Ab3e(3-tuplet) Bb3e(3-tuplet) Bb3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) Eb4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet)"
+ },
+ {
+  "id": 49,
+  "v": "N",
+  "fix": "grace:Eb4e Bb4q C5q Db5q"
+ },
+ {
+  "id": 50,
+  "v": "N",
+  "fix": "grace:Ab3e Db5e. Bb4s C5q~ C5s Bb4s Ab4s G4s"
+ },
+ {
+  "id": 51,
+  "v": "N",
+  "fix": "grace:Bb3e F4q G4q Ab4q"
+ },
+ {
+  "id": 52,
+  "v": "?",
+  "fix": "grace:Eb3e Ab4e. F4s G4e. Bb4s Eb4q~"
+ },
+ {
+  "id": 53,
+  "v": "N",
+  "fix": "Eb4e. C4s D4e. F4s Ab4q~"
+ },
+ {
+  "id": 54,
+  "v": "N",
+  "fix": "Ab4e. F4s G4e. Bb4s Db5q~"
+ },
+ {
+  "id": 55,
+  "v": "N",
+  "fix": "Db5e. Bb4s C5e. E5s G5q"
+ },
+ {
+  "id": 56,
+  "v": "N",
+  "fix": "Bb4q A4e. G4s F4e. Eb4s"
+ },
+ {
+  "id": 57,
+  "v": "N",
+  "fix": "grace:D4e Bb4e. D5s F5e. A4s Bb4q~"
+ },
+ {
+  "id": 58,
+  "v": "N",
+  "fix": "Bb4e. D5s G5e. A4s Bb4q~"
+ },
+ {
+  "id": 62,
+  "v": "N",
+  "fix": "grace:B3e Ab4e. F4s G4q~ G4s F4s Eb4s D4s"
+ },
+ {
+  "id": 63,
+  "v": "N",
+  "fix": "C4e(3-tuplet) G4e(3-tuplet) Eb5e(3-tuplet) Ab3e(3-tuplet) F4e(3-tuplet) D5e(3-tuplet) A3e(3-tuplet) F#4e(3-tuplet) C5e(3-tuplet)"
+ },
+ {
+  "id": 65,
+  "v": "N",
+  "fix": "E4e. Bb3s Ab3e. F4s G3e. G4s"
+ },
+ {
+  "id": 80,
+  "v": "Y",
+  "fix": "D5e Bb4e G4e Bb4e Eb4e C5e F4e A4e"
+ },
+ {
+  "id": 84,
+  "v": "D4q F4s Eb4s D4s C4s B3q D4s C4s B3s A3s",
+  "fix": ""
+ },
+ {
+  "id": 89,
+  "v": "N",
+  "fix": "G3e Eb4e C5e Ab4e Bb4q C5e G4e"
+ },
+ {
+  "id": 90,
+  "v": "N",
+  "fix": "Ab4q F4q F3q C5s Bb4s Ab4s G4s"
+ },
+ {
+  "id": 96,
+  "v": "N",
+  "fix": "Eb4e Eb4e D4e Eb4e Bb3e C4e D4e Eb4e D4e Eb4e G4e F4e G4e"
+ },
+ {
+  "id": 97,
+  "v": "N",
+  "fix": "Eb4e D4e Eb4e Bb3e C4e D4e Eb3q.~ Eb3q G4e"
+ },
+ {
+  "id": 98,
+  "v": "N",
+  "fix": "F4e Eb4e F4e Bb4e G4e Ab4e G4e F4e G4e Eb4e F4e G4e"
+ },
+ {
+  "id": 99,
+  "v": "N",
+  "fix": "Bb3e D4e F4e Bb4e D4e F4e Bb3q.~ Bb3q"
+ },
+ {
+  "id": 101,
+  "v": "N",
+  "fix": "F#4e A4e C5e Eb5e D5e C5e Bb4e A4e G4e D4e G4e F#4e"
+ },
+ {
+  "id": 103,
+  "v": "N",
+  "fix": "A4e C5e G4e F#4e C5e E4e D4e C5e E4e F#4e C5e G4e"
+ },
+ {
+  "id": 105,
+  "v": "N",
+  "fix": "Bb4e A4e G4e D4e G4e F#4e G4e D4e Bb3e G3q Eb4e"
+ },
+ {
+  "id": 107,
+  "v": "N",
+  "fix": "F4e Eb4e F4e Bb4e G4e Ab4e G4e F4e G4e Eb4e F4e G4e"
+ },
+ {
+  "id": 110,
+  "v": "N",
+  "fix": "R"
+ },
+ {
+  "id": 111,
+  "v": "N",
+  "fix": "D4e C4e D4e Bb3e D4e Ab3e G3e Bb3e Eb4e G4e Bb4e Db4e"
+ },
+ {
+  "id": 112,
+  "v": "N",
+  "fix": "C4e Bb3e C4e Ab3e C4e G3e F3e Ab3e D4e F4e Ab4e C4e"
+ },
+ {
+  "id": 113,
+  "v": "N",
+  "fix": "Ab3e G3e Ab3e F3e Ab3e Eb3e D3e F3e Bb3e D4e F4e Ab3e"
+ },
+ {
+  "id": 115,
+  "v": "N",
+  "fix": "Ab4e G4e Ab4e F4e Ab4e Eb4e D4e Ab4e C4e D4e Ab4e Bb3e"
+ },
+ {
+  "id": 116,
+  "v": "N",
+  "fix": "Eb4e G4e Bb4e Eb5e G3e Bb3e Eb3q.~ Eb3q"
+ }
+]

@@ -1,0 +1,413 @@
+{
+ "changed": [
+  {
+   "bar": 1,
+   "page": 1,
+   "was": "Eb3e Eb5e Bb4e G4e Bb4e Eb4e G4e Bb3e",
+   "now": "Eb3e Eb5e Bb4e G4e Bb4e Eb4e G4e Bb3e"
+  },
+  {
+   "bar": 3,
+   "page": 1,
+   "was": "Eb3e Db5e Bb4e G4e Bb4e Eb4e G4e Bb3e",
+   "now": "Eb3e Db5e Bb4e G4e Bb4e Eb4e G4e Bb3e"
+  },
+  {
+   "bar": 5,
+   "page": 1,
+   "was": "Eb3e C5e Ab4e Eb4e Ab4e C4e Eb4e Ab3e",
+   "now": "Eb3e C5e Ab4e Eb4e Ab4e C4e Eb4e Ab3e"
+  },
+  {
+   "bar": 6,
+   "page": 1,
+   "was": "Eb3e C5e Ab4e Eb4e Ab4e C4e Eb4e Ab3e",
+   "now": "Eb3e C5e Ab4e Eb4e Ab4e C4e Eb4e Ab3e"
+  },
+  {
+   "bar": 8,
+   "page": 1,
+   "was": "Eb3e Ab4e F4e D4e F4e Bb3e D4e Ab3e",
+   "now": "Eb3e Ab4e F4e D4e F4e Bb3e D4e Ab3e"
+  },
+  {
+   "bar": 48,
+   "page": 2,
+   "was": "re C#4s D4s E4s F#4s G#4s A4s B4s A4s G4s F#4s G4s E4s C#4s D4s",
+   "now": "B4s A4s G4s F#4s G4s E4s C#4s D4s E4s F#4s G4s A4s B4s A4s G4s A4s"
+  },
+  {
+   "bar": 52,
+   "page": 2,
+   "was": "D3e B4e G4e D4e G4e B3e D4e G3e",
+   "now": "D3e C5e A4e F#4e A4e D4e F#4e A3e"
+  },
+  {
+   "bar": 54,
+   "page": 2,
+   "was": "D3s C#5s Bb4s A4s B4s C#5s Bb4s A4s rh",
+   "now": "D3s C#5s Bb4s A4s Bb4s C#5s Bb4s A4s Bb4s C#5s Bb4s A4s Bb4s C#5s Bb4s A4s"
+  },
+  {
+   "bar": 55,
+   "page": 2,
+   "was": "G4s Bb4s G4s F#4s rh.",
+   "now": "G4s Bb4s G4s F#4s rq rq rq"
+  },
+  {
+   "bar": 68,
+   "page": 2,
+   "was": "Bb3e D5e Cb5s Bb4s A4e Bb4e Db5e Cb5s Bb4s A4e",
+   "now": "Bb3e D5e Cb5s Bb4s A4e Bb4e D5e Cb5s Bb4s A4e"
+  },
+  {
+   "bar": 69,
+   "page": 2,
+   "was": "Bb4e Cb5e Bb4s Ab4s G4e Ab4e Cb5e Bb4s Ab4s Gb4e",
+   "now": "Bb4e Cb5e Bb4s Ab4s G4e Ab4e Cb5e Bb4s Ab4s G4e"
+  },
+  {
+   "bar": 79,
+   "page": 2,
+   "was": "Ab4s Gb4s Ab4s Gb4s Fb4s Eb4s D4s Eb4s grace:Eb4s grace:Bb3e D4q. Eb4e",
+   "now": "Ab4s Gb4s Ab4s Gb4s Fb4s Eb4s D4s Eb4s grace:Bb3e D4q. Eb4e"
+  },
+  {
+   "bar": 81,
+   "page": 2,
+   "was": "Eb3e Eb5e Bb4e G4e Bb4e Eb4e G4e Bb3e",
+   "now": "Eb3e Eb5e Bb4e G4e Bb4e Eb4e G4e Bb3e"
+  },
+  {
+   "bar": 82,
+   "page": 2,
+   "was": "Eb3e Db5e Bb4e G4e re Eb4e G4e Bb3e",
+   "now": "Eb3e Eb5e Bb4e G4e Bb4e Eb4e G4e Bb3e"
+  },
+  {
+   "bar": 104,
+   "page": 3,
+   "was": "D4s C4s Bb3s D4s C4s Bb3s A3s C4s B3s D4s C4s B3s C4s Eb4s D4s C4s",
+   "now": "D4s C4s Bb3s D4s C4s Bb3s A3s C4s Bb3s D4s C4s Bb3s C4s Eb4s D4s C4s"
+  },
+  {
+   "bar": 108,
+   "page": 3,
+   "was": "F4e rh..",
+   "now": "F4e"
+  },
+  {
+   "bar": 114,
+   "page": 3,
+   "was": "Eb3e C5e G3e B4e C3q C5q~",
+   "now": "Eb3e C5e G3e B4e C3q~ +C5q~ C3e +C5e C5s D5s"
+  },
+  {
+   "bar": 115,
+   "page": 3,
+   "was": "Eb5s D5s Eb5s D5s C5s Bb4s C5s Bb4s Ab4s Bb4s Ab4s Bb4s C5s D5s C5s D5s",
+   "now": "Eb5s D5s Eb5s D5s C5s Bb4s C5s Bb4s A4s Bb4s A4s Bb4s C5s D5s C5s D5s"
+  },
+  {
+   "bar": 139,
+   "page": 4,
+   "was": "G3e(3-tuplet) Ab3e(3-tuplet) Bb3e(3-tuplet) Bb3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) Eb4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet)",
+   "now": "G3e(3-tuplet) Ab3e(3-tuplet) Bb3e(3-tuplet) Bb3e(3-tuplet) C4e(3-tuplet) D4e(3-tuplet) Eb4e(3-tuplet) F4e(3-tuplet) G4e(3-tuplet)"
+  },
+  {
+   "bar": 160,
+   "page": 4,
+   "was": "F4e rh re",
+   "now": "F4e"
+  },
+  {
+   "bar": 164,
+   "page": 4,
+   "was": "Eb4q C3s G4s A4s Bb4s C5s B4s C5s D5s",
+   "now": "Eb4q C3s G4s A4s B4s C5s B4s C5s D5s"
+  },
+  {
+   "bar": 199,
+   "page": 5,
+   "was": "grace:G2e D3q Eb3q Fb3q",
+   "now": "grace:Eb4e Bb4q C5q Db5q"
+  },
+  {
+   "bar": 200,
+   "page": 5,
+   "was": "grace:C2e Fb3e. D3s Eb3q~ Eb3s D3s C3s Bb2s",
+   "now": "grace:Ab3e Db5e. Bb4s C5q~ C5s Bb4s Ab4s G4s"
+  },
+  {
+   "bar": 201,
+   "page": 5,
+   "was": "grace:D2e Ab2q Bb2q C3q",
+   "now": "grace:Bb3e F4q G4q Ab4q"
+  },
+  {
+   "bar": 203,
+   "page": 5,
+   "was": "G2e. Eb2s F2e. Ab2s C3q~",
+   "now": "Eb4e. C4s D4e. F4s Ab4q~"
+  },
+  {
+   "bar": 204,
+   "page": 5,
+   "was": "C3e. Ab2s Bb2e. D3s Fb3q~",
+   "now": "Ab4e. F4s G4e. Bb4s Db5q~"
+  },
+  {
+   "bar": 205,
+   "page": 5,
+   "was": "Fb3e. D3s Eb3e. G3s Bb3q",
+   "now": "Db5e. Bb4s C5e. E5s G5q"
+  },
+  {
+   "bar": 206,
+   "page": 5,
+   "was": "D3q C3e. Bb2s Ab2e. G2s",
+   "now": "Bb4q A4e. G4s F4e. Eb4s"
+  },
+  {
+   "bar": 207,
+   "page": 5,
+   "was": "grace:F2e D3e. F3s Ab3e. C3s D3q~",
+   "now": "grace:D4e Bb4e. D5s F5e. A4s Bb4q~"
+  },
+  {
+   "bar": 208,
+   "page": 5,
+   "was": "D3e. F3s Bb3e. C3s D3q~",
+   "now": "Bb4e. D5s G5e. A4s Bb4q~"
+  },
+  {
+   "bar": 209,
+   "page": 5,
+   "was": "D3e C3s Bb2s Ab2e G2e F2e G2s Eb2s",
+   "now": "Bb4e A4s G4s F4e Eb4e D4e Eb4s C4s"
+  },
+  {
+   "bar": 210,
+   "page": 5,
+   "was": "D2h.",
+   "now": "Bb3h."
+  },
+  {
+   "bar": 211,
+   "page": 5,
+   "was": "grace:D2e Ab2q Bb2q C3q",
+   "now": "grace:Bb3e F4q G4q Ab4q"
+  },
+  {
+   "bar": 212,
+   "page": 5,
+   "was": "grace:D2e C3e. Ab2s Bb2q~ Bb2s Ab2s G2s F2s",
+   "now": "grace:B3e Ab4e. F4s G4q~ G4s F4s Eb4s D4s"
+  },
+  {
+   "bar": 213,
+   "page": 5,
+   "was": "Eb2e(3-tuplet) Bb2e(3-tuplet) G3e(3-tuplet) C2e(3-tuplet) Ab2e(3-tuplet) F3e(3-tuplet) C2e(3-tuplet) A#2e(3-tuplet) Eb3e(3-tuplet)",
+   "now": "C4e(3-tuplet) G4e(3-tuplet) Eb5e(3-tuplet) Ab3e(3-tuplet) F4e(3-tuplet) D5e(3-tuplet) A3e(3-tuplet) F#4e(3-tuplet) C5e(3-tuplet)"
+  },
+  {
+   "bar": 214,
+   "page": 5,
+   "was": "grace:Bb1e Eb3e. C3s D3e. F3s Bb2e. Ab2s",
+   "now": "grace:Bb3e C5e. A4s B4e. D5s G4e. F4s"
+  },
+  {
+   "bar": 215,
+   "page": 5,
+   "was": "G2e. D2s C2e. Ab2s Bb1e. Bb2s",
+   "now": "E4e. Bb3s Ab3e. F4s G3e. G4s"
+  },
+  {
+   "bar": 227,
+   "page": 5,
+   "was": "grace:E4e re Eb4s Gb4s C5e. F4s Eb5q A3e rh re",
+   "now": "A3e +Eb4e. Eb4s Gb4s C5e. F4s Eb5q"
+  },
+  {
+   "bar": 231,
+   "page": 5,
+   "was": "Eb4s F4s G4s Ab4s rh.",
+   "now": "Eb4s F4s G4s Ab4s"
+  },
+  {
+   "bar": 243,
+   "page": 5,
+   "was": "Bb4q F4q Bb3q rq",
+   "now": "Bb4q F4q Bb3q"
+  },
+  {
+   "bar": 244,
+   "page": 5,
+   "was": "Bb3s C4s D4s Eb4s rh.",
+   "now": "Bb3s C4s D4s Eb4s"
+  },
+  {
+   "bar": 252,
+   "page": 6,
+   "was": "A4q Ab4s G4s F4s Eb4s D4q C5e B4e",
+   "now": "Ab4q Ab4s G4s F4s Eb4s D4q C5e B4e"
+  },
+  {
+   "bar": 267,
+   "page": 6,
+   "was": "rw",
+   "now": "G3e Eb4e C5e Ab4e Bb4q C5e G4e"
+  },
+  {
+   "bar": 268,
+   "page": 6,
+   "was": "Ab4q F4q F3q C5s Bb4s Ab4s G4s",
+   "now": "Ab4q F4q F3q C5s Bb4s Ab4s G4s"
+  },
+  {
+   "bar": 274,
+   "page": 6,
+   "was": "D5s C5s Bb4e C5q. Bb4s Ab4s Bb4s Ab4s G4e",
+   "now": "Db5s C5s Bb4e C5q. Bb4s Ab4s Bb4s Ab4s G4e"
+  },
+  {
+   "bar": 280,
+   "page": 6,
+   "was": "Eb5e Eb5q Eb4e G3e Bb3e Eb3q",
+   "now": "Eb5e Eb4e G3e Bb3e Eb3q"
+  },
+  {
+   "bar": 281,
+   "page": 6,
+   "was": "G3e Eb4e rh.",
+   "now": "G3e Eb4e"
+  },
+  {
+   "bar": 286,
+   "page": 6,
+   "was": "Eb4e Bb4e rh.",
+   "now": "Eb4e Bb4e"
+  },
+  {
+   "bar": 296,
+   "page": 7,
+   "was": "E4e D4e E4e B3e C4e D4e E3q. E3q G4e",
+   "now": "Eb4e D4e Eb4e Bb3e C4e D4e Eb3q.~ Eb3q G4e"
+  },
+  {
+   "bar": 297,
+   "page": 7,
+   "was": "F4e E4e F4e B4e G4e A4e G4e F4e G4e E4e F4e G4e",
+   "now": "F4e Eb4e F4e Bb4e G4e Ab4e G4e F4e G4e Eb4e F4e G4e"
+  },
+  {
+   "bar": 304,
+   "page": 7,
+   "was": "Bb3e D4e F4e Bb4e D4e F4e Bb3q.~ Bb3q re",
+   "now": "Bb3e D4e F4e Bb4e D4e F4e Bb3q.~ Bb3q"
+  },
+  {
+   "bar": 305,
+   "page": 7,
+   "was": "Bb4e(3-tuplet) Bb4e(3-tuplet) A4e(3-tuplet) Bb4e F4e G4e A4e Bb4e A4e Bb4e D5e C5e D5e",
+   "now": "Bb4e A4e Bb4e F4e G4e A4e Bb4e A4e Bb4e D5e C5e D5e"
+  },
+  {
+   "bar": 315,
+   "page": 7,
+   "was": "rw",
+   "now": "F#4e A4e C5e Eb5e D5e C5e Bb4e A4e G4e D4e G4e F#4e"
+  },
+  {
+   "bar": 316,
+   "page": 7,
+   "was": "G4e(3-tuplet) F#4e(3-tuplet) G4e(3-tuplet) re Bb4e F#4e G4e C4e Bb3e C4e Bb4e F#4e G4e",
+   "now": "G4e F#4e G4e Bb4e F#4e G4e C4e Bb3e C4e Bb4e F#4e G4e"
+  },
+  {
+   "bar": 318,
+   "page": 7,
+   "was": "rw",
+   "now": "A4e C5e G4e F#4e C5e E4e D4e C5e E4e F#4e C5e G4e"
+  },
+  {
+   "bar": 319,
+   "page": 7,
+   "was": "A4e(3-tuplet) C5e(3-tuplet) G4e(3-tuplet) F#4e(3-tuplet) C5e(3-tuplet) E4e(3-tuplet) D4e(3-tuplet) C5e(3-tuplet) E4e(3-tuplet) rq. F#4e C5e D4e",
+   "now": "A4e C5e G4e F#4e C5e E4e D4e C5e E4e F#4e C5e D4e"
+  },
+  {
+   "bar": 320,
+   "page": 7,
+   "was": "rw",
+   "now": "Bb4e A4e G4e D4e G4e F#4e G4e D4e Bb3e G3q Eb4e"
+  },
+  {
+   "bar": 322,
+   "page": 7,
+   "was": "Eb4e D4e Eb4e Bb3e C4e D4e Eb3q. Eb3q G4e",
+   "now": "Eb4e D4e Eb4e Bb3e C4e D4e Eb3q.~ Eb3q G4e"
+  },
+  {
+   "bar": 323,
+   "page": 7,
+   "was": "rw",
+   "now": "F4e Eb4e F4e Bb4e G4e Ab4e G4e F4e G4e Eb4e F4e G4e"
+  },
+  {
+   "bar": 326,
+   "page": 7,
+   "was": "Bb4e Ab4e Bb4e Eb5e C5e Db5e C5e Bb4e C5e Ab4e Bb4e C5e",
+   "now": "Gb4e F4e Gb4e Eb4e D4e Eb4e C4e Bb3e C4e A3e C4e Eb4e"
+  },
+  {
+   "bar": 327,
+   "page": 7,
+   "was": "rw",
+   "now": "Gb4e F4e Gb4e Eb4e D4e Eb4e C4e Bb3e C4e A3e C4e Eb4e"
+  },
+  {
+   "bar": 329,
+   "page": 7,
+   "was": "rw",
+   "now": "D4e C4e D4e Bb3e D4e Ab3e G3e Bb3e Eb4e G4e Bb4e Db4e"
+  },
+  {
+   "bar": 330,
+   "page": 7,
+   "was": "rw",
+   "now": "C4e Bb3e C4e Ab3e C4e G3e F3e Ab3e D4e F4e Ab4e C4e"
+  },
+  {
+   "bar": 332,
+   "page": 7,
+   "was": "rw",
+   "now": "Ab3e G3e Ab3e F3e Ab3e Eb3e D3e F3e Bb3e D4e F4e Ab3e"
+  },
+  {
+   "bar": 333,
+   "page": 7,
+   "was": "G3e F3e G3e G4e D4e Eb4e Ab3e(3-tuplet) G3e(3-tuplet) Ab3e(3-tuplet) re G4e D4e Eb4e",
+   "now": "G3e F3e G3e G4e D4e Eb4e Ab3e G3e Ab3e G4e D4e Eb4e"
+  },
+  {
+   "bar": 335,
+   "page": 7,
+   "was": "Ab4e(3-tuplet) G4e(3-tuplet) Ab4e(3-tuplet) F4e(3-tuplet) Ab4e(3-tuplet) Eb4e(3-tuplet) D4e(3-tuplet) Ab4e(3-tuplet) C4e(3-tuplet) rq. D4e Ab4e Bb3e",
+   "now": "Ab4e G4e Ab4e F4e Ab4e Eb4e D4e Ab4e C4e D4e Ab4e Bb3e"
+  }
+ ],
+ "confirmed": 41,
+ "left": [
+  "bar 4 (page 1): not settled (N)",
+  "bar 51 (page 2): not settled (N)",
+  "bar 53 (page 2): not settled (N)",
+  "bar 202 (page 5): not settled (?)",
+  "bar 242 (page 5): not settled (Y)",
+  "bar 247 (page 5): not settled (D4q F4s Eb4s D4s C4s B3q D4s C4s B3s A3s)",
+  "bar 295 (page 7): proposed reading has 6.5 of 6 beats, not applied: Eb4e Eb4e D4e Eb4e Bb3e C4e D4e Eb4e D4e Eb4e G4e F4e G4e",
+  "bar 328 (page 7): not settled (N)",
+  "bar 336 (page 7): proposed reading has 5.5 of 6 beats, not applied: Eb4e G4e Bb4e Eb5e G3e Bb3e Eb3q.~ Eb3q"
+ ],
+ "homr_only": []
+}
